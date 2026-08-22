@@ -16,9 +16,12 @@ from .raw_primitive_guard import (
     find_raw_primitives,
     format_findings,
 )
+from .rectangle_card_guard import RectangleCardFinding, find_rectangle_as_styled_cards
 
 __all__ = [
     "RawPrimitiveFinding",
+    "RectangleCardFinding",
     "find_raw_primitives",
+    "find_rectangle_as_styled_cards",
     "format_findings",
 ]

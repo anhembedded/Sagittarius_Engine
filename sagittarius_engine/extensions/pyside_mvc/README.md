@@ -62,6 +62,15 @@ classDiagram
       +find_raw_primitives(root, exempt_dirs) list
       +format_findings(findings) str
     }
+    class RectangleCardFinding {
+      +Path file
+      +int line_number
+      +str line_text
+    }
+    class rectangle_card_guard["kit.rectangle_card_guard"] {
+      +find_rectangle_as_styled_cards(root, exempt_dirs) list
+      +format_findings(findings) str
+    }
     class state_tokens["tokens.state_tokens"] {
       +DEFAULT_STATE_TOKENS: dict
       +with_state_token_defaults(palette) dict
@@ -98,6 +107,7 @@ classDiagram
     vocabulary ..> MissingRequiredTokensError : raises
     qml_literal_guard ..> LiteralColorFinding : returns
     raw_primitive_guard ..> RawPrimitiveFinding : returns
+    rectangle_card_guard ..> RectangleCardFinding : returns
     defaults ..> state_tokens : composes
     qml_host_view ..> vocabulary : validates via
     qml_host_view ..> AppQmlConfig : stores
@@ -239,7 +249,8 @@ extensions/pyside_mvc/
 │   ├── theme_bridge.py            The `Theme` singleton exposed to QML
 │   └── qml_literal_guard.py       Anti-literal-colour static check
 ├── kit/                           Widget Kit Python tooling — EPIC-001C
-│   └── raw_primitive_guard.py     Anti-raw-primitive static check
+│   ├── raw_primitive_guard.py     Anti-raw-primitive static check
+│   └── rectangle_card_guard.py    Anti-Rectangle-as-styled-card static check
 ├── import_boundary.py             Anti-deep-import static check (ui-architecture.md §8.1)
 ├── Sagittarius/UI/                The widget kit's QML — module `Sagittarius.UI`, one dir per component
 │   ├── qmldir                     Facade: type name -> physical path

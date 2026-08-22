@@ -65,14 +65,17 @@ these, it almost certainly doesn't — re-read `ui-architecture.md` first.
 
 ## 4. Current state (check this is still accurate before trusting it)
 
-As of 2026-08-22: **`EPIC-001A`/`EPIC-001B` are done; `EPIC-001C` (Widget Kit Expansion) is
-substantially delivered** — `AppDataTable`, `Gallery`, the anti-literal-colour guard, the
-anti-raw-primitive guard, and `AppModal` all exist and are tested. What's left in `C`: a
-`Rectangle`-as-styled-card detection gap (needs a real QML parser, not a regex — deliberately
-not attempted), and `DateTimePicker.qml`'s own calendar popup was not retrofitted onto
-`AppModal`. `EPIC-001D` (Runtime/Registry) has not been started. Verify this is still true
-rather than
-trusting this document indefinitely:
+As of 2026-08-23: **`EPIC-001A`/`EPIC-001B`/`EPIC-001C` are all done.** `EPIC-001C` (Widget
+Kit Expansion) shipped `AppDataTable`, `Gallery`, the anti-literal-colour guard, the
+anti-raw-primitive guard, `AppModal`, and — closing the one gap it was still missing as of
+2026-08-22 — a `Rectangle`-as-styled-card detection guard
+(`kit/rectangle_card_guard.py`, block-scoped brace-depth parsing rather than a per-line
+regex, since the violation is a combination of properties that must all belong to the same
+Rectangle's own direct scope). Two small items remain deliberately deferred inside `C`'s own
+file (not blocking): `DateTimePicker.qml`'s calendar popup was not retrofitted onto
+`AppModal`, and no icon-only button variant exists yet. `EPIC-001D` (Runtime/Registry) is
+now unblocked (`B`+`C` both done) but has not been started. Verify this is still true rather
+than trusting this document indefinitely:
 
 ```bash
 ls Tasks/epics/EPIC-001_ui_engine_foundation/completed/

@@ -1,9 +1,10 @@
 # EPIC-001C — Widget Kit Expansion
 
 **Epic:** [EPIC-001 — UI Engine Foundation](../README.md)
-**Status:** 🟡 **In Progress — data table, gallery, anti-raw-primitive test, and AppModal all
-delivered (2026-08-22). Only the Rectangle-as-styled-card detection gap remains open (§4).**
-See §4 below before treating this as closed.
+**Status:** ✅ **Done (2026-08-23)** — data table, gallery, anti-raw-primitive test, AppModal
+(2026-08-22) and the Rectangle-as-styled-card detection guard (2026-08-23) all delivered. Three
+smaller items remain deliberately deferred, not blocking closure — see §4's "Deferred, not
+blocking" list.
 **Category:** UI Engine / Component Library
 **Priority:** P1
 **Depends on:** EPIC-001B ✅ (the kit renders tokens; the vocabulary must exist first)
@@ -59,13 +60,18 @@ not concept.
 - [x] Static test flags raw visual primitives authored outside the kit —
       `find_raw_primitives()` (new `extensions/pyside_mvc/kit/` package), scoped to `Button`/
       `CheckBox` (the two controls the kit already has a direct replacement for; `Rectangle`
-      is deliberately not covered — see Implementation Notes). 8 tests, all passing.
-      **Scope note carried forward, not closed by this test:** this guard checks
-      *authorship* (no raw controls), not layout/geometry — a screen could still hand-roll a
-      correctly-token-coloured `Rectangle` standing in for a card, which neither this guard
-      nor the colour guard would catch. Full "screens structurally cannot bypass the kit" is
-      not yet true; "screens cannot instantiate the two most common bypassed controls
-      directly" is.
+      is covered by a separate, second guard — see below). 8 tests, all passing.
+- [x] Static test flags a `Rectangle` reimplementing `BaseCard`'s own background+border+radius
+      recipe instead of deriving `BaseCard` — `find_rectangle_as_styled_cards()`
+      (`kit/rectangle_card_guard.py`, 2026-08-23). Block-scoped (brace-depth tracked), not a
+      per-line regex like its two siblings: the violation is a combination of three separate
+      property lines that must all belong to the *same* `Rectangle`'s own direct properties,
+      not a nested child's — a per-line match would misattribute a nested Rectangle's
+      properties to its non-matching parent. 13 tests, all passing, including one proving a
+      non-matching parent does not shadow a nested Rectangle that independently matches.
+      Together with the two guards above: "screens structurally cannot bypass the kit" now
+      covers raw `Button`/`CheckBox` authorship *and* the shape a screen most commonly used to
+      fake a card without deriving one.
 - [x] Kit components resolve all visual values through tokens; none carry literals except
       the sanctioned compatibility fallbacks — **and this was not already true**: running
       the EPIC-001B guard against `QmlShared/` on first use found **8 real pre-existing
@@ -164,12 +170,33 @@ not concept.
   with the wider gallery suite), **`493 passed, 7 skipped` total** (up from 481), `mypy`
   clean (same 26 pre-existing errors as a clean baseline, verified via `git stash`); the
   `LogPanel.qml` fix changed no Python, so no new `ruff`/`mypy` surface there.
+- **`kit/rectangle_card_guard.py`** (2026-08-23) — closes the `Rectangle`-as-styled-card gap
+  named above: `find_rectangle_as_styled_cards()` flags a `Rectangle` block whose own direct
+  properties combine `color`, `radius`, and a `border.color`/`border.width` — the exact
+  background+border+radius recipe every real `BaseCard`-derived component uses (verified
+  against `TimeRangeCard.qml`'s actual properties before writing the detector, not guessed).
+  Deliberately conservative, matching this file's own established "precision over
+  completeness" choice: requires all three properties (a plain divider or a colour-only
+  badge never matches), only the dotted `border.color:`/`border.width:` syntax is recognised
+  (the grouped `border { }` form was searched for across both this repo and the reference
+  consumer and found nowhere in use), and a `card-exempt` marker on the `Rectangle {` header
+  line is honoured for a documented, justified exception — mirroring `qml_literal_guard`'s
+  `token-exempt` convention rather than `raw_primitive_guard`'s no-exemption stance, since a
+  genuine non-card use of this exact shape can exist (the kit's own `FieldBackground.qml` is
+  one, which is why the guard's own contract keeps `exempt_dirs` rather than hardcoding a
+  self-check against zero findings). 13 new tests, including one that proves a non-matching
+  outer `Rectangle` does not shadow a nested one that independently matches, and one that
+  proves a matching child's properties are never misattributed to a non-matching parent —
+  the actual reason this needed block-scoped (brace-depth-tracked) parsing instead of a
+  per-line regex like its two sibling guards. Calibration run (read-only, not acted on —
+  application-side changes are out of this epic's scope) against the reference consumer's
+  `src/presentation/ui/` found 26 real findings across 12 files, a bounded, plausible number
+  matching the epic's own measured evidence of widespread visual-boundary drift, not an
+  exploding false-positive count. Full suite (`529 passed, 5 skipped`), `ruff`, `mypy` all
+  clean.
 
-**Not delivered — remaining scope for a follow-up pass:**
+**Deferred — not blocking closure, left for a follow-up pass if ever needed:**
 
-- The `Rectangle`-as-styled-card gap the raw-primitive guard's scope note names — no
-  automated check yet catches a screen re-implementing card/panel visuals from a raw
-  `Rectangle` while still using correct tokens.
 - `DateTimePicker.qml`'s own calendar `Popup` was not retrofitted onto `AppModal` — it has
   bespoke chrome (no header bar, custom footer with time spinners) that doesn't fit
   `AppModal`'s title/body/actions shape without changes to `AppModal` itself; left as the

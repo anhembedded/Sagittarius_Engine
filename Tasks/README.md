@@ -45,7 +45,7 @@ link is kept here; content is not duplicated.
 
 | ID | Name | Status |
 | :--- | :--- | :---: |
-| **[EPIC-001](epics/EPIC-001_ui_engine_foundation/README.md)** | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (2/4 subtasks done) |
+| **[EPIC-001](epics/EPIC-001_ui_engine_foundation/README.md)** | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (3/4 subtasks done) |
 
 ---
 
@@ -60,10 +60,11 @@ Tasks/
 ├── epics/                               # Multi-task programs — see epics/README.md
 │   └── EPIC-001_ui_engine_foundation/
 │       ├── README.md
+│       ├── completed/
+│       │   ├── EPIC-001A_architecture_rule_rewrite.md
+│       │   ├── EPIC-001B_design_token_layer.md
+│       │   └── EPIC-001C_widget_kit_expansion.md
 │       └── incomplete/
-│           ├── EPIC-001A_architecture_rule_rewrite.md
-│           ├── EPIC-001B_design_token_layer.md
-│           ├── EPIC-001C_widget_kit_expansion.md
 │           └── EPIC-001D_runtime_slot_registry.md
 ├── issue-report/                       # High-impact Architecture Issue Report
 │   ├── issue.md
