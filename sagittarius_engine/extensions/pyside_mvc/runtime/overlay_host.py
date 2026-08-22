@@ -11,7 +11,17 @@ from PySide6.QtWidgets import QWidget
 
 from .qml_host_view import create_quick_widget
 
+#: `OverlayHost.qml` is deliberately kept as a sibling of this file, not
+#: inside the `Sagittarius.UI` widget kit — it is bootstrap plumbing (loaded
+#: by direct file path, never `import`ed by other QML) paired 1:1 with this
+#: module, not a reusable component. The assertion converts a future
+#: accidental split of the pair into a loud failure here rather than a
+#: silent `QQuickWidget.setSource()` failure at first use.
 _OVERLAY_HOST_QML = Path(__file__).with_name("OverlayHost.qml")
+assert _OVERLAY_HOST_QML.is_file(), (
+    f"Expected OverlayHost.qml next to overlay_host.py at {_OVERLAY_HOST_QML} "
+    "— not found. The two are meant to move together."
+)
 _OVERLAY_CONTENT_PROPERTY = "contentSource"
 _HAS_OPEN_MODAL_PROPERTY = "hasOpenModal"
 _OVERLAY_WIDTH_PROPERTY = "overlayWidth"

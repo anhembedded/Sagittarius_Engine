@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Sagittarius.UI 1.0
 
 // Reusable modal dialog shell (EPIC-001C) — token-driven chrome (title bar
 // with close button, scrollable body, right-aligned action footer) around

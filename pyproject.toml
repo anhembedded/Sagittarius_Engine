@@ -38,8 +38,8 @@ include = ["sagittarius_engine*", "tools*"]
 
 [tool.setuptools.package-data]
 sagittarius_engine = [
-    "extensions/pyside_mvc/QmlShared/*.qml",
-    "extensions/pyside_mvc/QmlShared/qmldir",
+    "extensions/pyside_mvc/Sagittarius/UI/qmldir",
+    "extensions/pyside_mvc/Sagittarius/UI/*/*.qml",
     "extensions/pyside_mvc/runtime/*.qml",
 ]
 

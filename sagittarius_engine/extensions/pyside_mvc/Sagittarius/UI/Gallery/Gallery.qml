@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Sagittarius.UI 1.0
 
 // Runnable catalog of every Widget Kit component, driven entirely by real
 // Theme tokens — no component here authors a single literal visual value.

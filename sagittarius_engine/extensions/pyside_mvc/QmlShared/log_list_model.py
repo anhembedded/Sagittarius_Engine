@@ -14,6 +14,19 @@ import `LogListModel` from `sagittarius_engine.extensions.pyside_mvc`
 (top-level) or `...pyside_mvc.runtime.log_list_model` directly instead.
 """
 
+import warnings
+
 from ..runtime.log_list_model import LogListModel
+
+warnings.warn(
+    "sagittarius_engine.extensions.pyside_mvc.QmlShared.log_list_model is a "
+    "deprecated compat shim (EPIC-001C reorg). Import LogListModel from "
+    "sagittarius_engine.extensions.pyside_mvc (top-level) or "
+    "...pyside_mvc.runtime.log_list_model instead — this shim exists only "
+    "for real pre-existing consumers and may be removed once those import "
+    "sites are updated.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = ["LogListModel"]

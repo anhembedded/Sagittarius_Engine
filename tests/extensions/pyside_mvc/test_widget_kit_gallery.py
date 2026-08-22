@@ -23,20 +23,23 @@ from sagittarius_engine.extensions.pyside_mvc.tokens import (
     find_literal_colors,
 )
 
-_QML_SHARED_DIR = (
+_PYSIDE_MVC_DIR = (
     Path(__file__).resolve().parents[3]
     / "sagittarius_engine"
     / "extensions"
     / "pyside_mvc"
-    / "QmlShared"
 )
-#: The kit's QML surface spans two directories after the EPIC-001C reorg:
-#: the widget kit proper (`QmlShared/`) and the runtime's own
-#: `OverlayHost.qml` (`runtime/`, paired with `overlay_host.py` since it's
-#: bootstrap plumbing, not a reusable kit component). Scanning the whole
-#: extension root — not just `QmlShared/` — keeps the anti-literal-colour
-#: guard covering both without hardcoding a second path here.
-_PYSIDE_MVC_DIR = _QML_SHARED_DIR.parent
+#: The widget kit's real QML home — one directory per component — after the
+#: EPIC-001C directory-per-component reorg (2026-08-23).
+_QML_KIT_DIR = _PYSIDE_MVC_DIR / "Sagittarius" / "UI"
+#: The kit's QML surface spans two directories: the widget kit proper
+#: (`Sagittarius/UI/`) and the runtime's own `OverlayHost.qml` (`runtime/`,
+#: paired with `overlay_host.py` since it's bootstrap plumbing, not a
+#: reusable kit component). Scanning the whole extension root — not just
+#: the kit directory — keeps the anti-literal-colour guard covering both
+#: without hardcoding a second path here. Computed independently of
+#: `_QML_KIT_DIR` (not via `.parent`) since the kit now nests two levels
+#: deep (`Sagittarius/UI/`) rather than one.
 _FIXTURES_DIR = Path(__file__).parent / "fixtures"
 _PLACEHOLDER_PALETTE = {name: "#000000" for name in REQUIRED_COLOUR_TOKEN_NAMES}
 
@@ -55,7 +58,7 @@ def test_gallery_loads_with_no_qml_errors(qtbot):
     widget = create_quick_widget()
     qtbot.addWidget(widget)
 
-    widget.setSource(QUrl.fromLocalFile(str(_QML_SHARED_DIR / "Gallery.qml")))
+    widget.setSource(QUrl.fromLocalFile(str(_QML_KIT_DIR / "Gallery" / "Gallery.qml")))
 
     assert widget.errors() == []
     assert widget.rootObject() is not None

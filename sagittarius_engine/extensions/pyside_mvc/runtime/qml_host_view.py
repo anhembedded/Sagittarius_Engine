@@ -17,18 +17,28 @@ from sagittarius_engine.extensions.pyside_mvc.tokens.vocabulary import (
 from .icon_image_provider import ICON_PROVIDER_ID, IconImageProvider, IIconLoader
 from .qml_style import ensure_qml_style
 
-#: `QmlShared/` (containing every kit component's `.qml` + `qmldir`) is a
-#: sibling of this file's own directory, not this same directory — moved
-#: apart during the EPIC-001C reorg so QML-only content and Python
-#: bootstrap glue stop sharing one folder. Consumer .qml files still import
-#: it as `import QmlShared 1.0` once this directory's *parent* has been
+#: The widget kit's QML lives at `pyside_mvc/Sagittarius/UI/` (the
+#: `Sagittarius.UI` module — see EPIC-001C's directory-per-component
+#: reorg). Consumer .qml files reach it as `import Sagittarius.UI 1.0`
+#: once *this* path (the directory containing `Sagittarius/`) has been
 #: added to the QQmlEngine's import path (see create_quick_widget) — Qt
-#: resolves a dotless module name "QmlShared" against
-#: `<import path>/QmlShared/qmldir`. `runtime/` sits exactly one level
-#: under `pyside_mvc/`, the same depth `QmlShared/` itself is at, so this
-#: still correctly resolves to `pyside_mvc/` without needing to know
-#: `QmlShared/`'s exact sibling name.
-_QML_IMPORT_PATH = str(Path(__file__).resolve().parent.parent)
+#: resolves a namespaced module by walking `Sagittarius/UI/qmldir` under
+#: one of the configured import paths.
+#:
+#: Written as an explicit path relative to this package's own root, not
+#: derived from any other directory's coincidental depth/position — the
+#: assertion below turns a future "someone moved the QML tree and forgot
+#: this constant" into a loud failure right here, instead of a silent
+#: `import Sagittarius.UI 1.0` resolution failure deep inside Qt with no
+#: indication of why.
+_PYSIDE_MVC_ROOT = Path(__file__).resolve().parent.parent
+_QML_MODULE_ROOT = _PYSIDE_MVC_ROOT / "Sagittarius" / "UI"
+_QML_IMPORT_PATH = str(_PYSIDE_MVC_ROOT)
+assert (_QML_MODULE_ROOT / "qmldir").is_file(), (
+    f"Expected the Sagittarius.UI QML module at {_QML_MODULE_ROOT}/qmldir — "
+    "not found. qml_host_view.py's location relative to the QML module tree "
+    "has changed without updating _PYSIDE_MVC_ROOT/_QML_MODULE_ROOT above."
+)
 
 
 @dataclass(frozen=True)

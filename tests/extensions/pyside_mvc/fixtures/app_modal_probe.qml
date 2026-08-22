@@ -1,5 +1,5 @@
 import QtQuick
-import QmlShared 1.0
+import Sagittarius.UI 1.0
 
 // Standalone probe: opens immediately so a test can assert real popup
 // state (opened, dynamic width, action buttons present) without needing a

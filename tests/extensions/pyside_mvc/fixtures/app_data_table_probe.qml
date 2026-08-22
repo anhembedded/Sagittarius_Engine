@@ -1,5 +1,5 @@
 import QtQuick
-import QmlShared 1.0
+import Sagittarius.UI 1.0
 
 // Minimal probe: 3 columns, 2 rows, enough to prove the component wires
 // columns + model end to end without dragging in a real trading model.

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Sagittarius.UI 1.0
 
 BaseCard {
     id: root

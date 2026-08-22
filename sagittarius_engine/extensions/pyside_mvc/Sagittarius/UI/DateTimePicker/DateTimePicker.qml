@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QmlShared 1.0
+import Sagittarius.UI 1.0
 
 // A reusable DateTime picker component with a manual text field and a popup calendar.
 // Supports manual typing ("yyyy-MM-dd HH:mm") or picking via a Windows-like popup calendar.

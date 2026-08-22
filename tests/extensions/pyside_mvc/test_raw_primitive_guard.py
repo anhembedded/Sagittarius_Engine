@@ -73,7 +73,7 @@ def test_exempt_dirs_are_skipped_entirely(tmp_path: Path):
     constructed from) is meant to be exempted by the caller — this proves
     the mechanism, matching qml_literal_guard's identical contract."""
     kit_dir = _write(
-        tmp_path / "QmlShared" / "StatefulButton.qml", "Button {\n}\n"
+        tmp_path / "Sagittarius" / "UI" / "StatefulButton.qml", "Button {\n}\n"
     ).parent
     _write(tmp_path / "screens" / "Screen.qml", "Button {\n}\n")
 

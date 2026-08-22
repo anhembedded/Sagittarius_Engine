@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Sagittarius.UI 1.0
 
 // Reusable log panel (BOT-030 Phase 3). Shared by the Database sync log and
 // the Dev Board system monitor — both show the same timestamped, leveled

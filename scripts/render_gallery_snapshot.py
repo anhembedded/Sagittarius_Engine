@@ -1,4 +1,4 @@
-"""Renders QmlShared/Gallery.qml offscreen and saves a PNG snapshot.
+"""Renders Sagittarius/UI/Gallery/Gallery.qml offscreen and saves a PNG snapshot.
 
 Not a test — a manual/CI-optional tool for actually *seeing* the Widget
 Kit (EPIC-001C) instead of trusting that the QML loads clean. Uses the
@@ -75,7 +75,9 @@ def render(output_path: Path) -> None:
         / "sagittarius_engine"
         / "extensions"
         / "pyside_mvc"
-        / "QmlShared"
+        / "Sagittarius"
+        / "UI"
+        / "Gallery"
         / "Gallery.qml"
     )
     quick_widget.setSource(QUrl.fromLocalFile(str(gallery_path)))

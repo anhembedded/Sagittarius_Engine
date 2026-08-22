@@ -273,3 +273,28 @@ suite; it is not something each consumer screen re-proves for itself.
 - The engine ships with **no opinion on any specific application's domain** — no screen
   names, no business terminology, anywhere in `pyside_mvc`. If a rule, component, or token
   name references a concrete consuming application, it does not belong in this repository.
+
+### 8.1 Only the top-level package is a supported import surface
+
+A consuming application imports exclusively from
+`sagittarius_engine.extensions.pyside_mvc` — never from a submodule path
+(`...pyside_mvc.tokens.theme_bridge`, `...pyside_mvc.runtime.qml_host_view`, etc.), no
+matter how stable that path looks today. `tokens/`, `kit/`, `runtime/`, `mvc/`, `safety/`,
+and the per-component layout under `Sagittarius/UI/` are internal organization, free to
+change without notice; the top-level `__init__.py` re-export list is the only contract this
+extension keeps.
+
+This is not a style preference: `EPIC-001C`'s directory-per-component reorg found the
+reference consumer already had 2 real imports reaching past the re-export surface directly
+into `...pyside_mvc.base_view` and `...pyside_mvc.QmlShared.log_list_model` — discovered only
+by grepping the consumer's source before moving those files, not by anything in this repo
+catching it in advance. A facade nobody is required to use is optional discipline, not a
+guarantee.
+
+`import_boundary.find_deep_imports()` is the enforcement mechanism, importable by a
+consuming app's own test suite the same way the two QML guards are (§1.2/§3). It exempts a
+short, explicit, reviewed allowlist (`SANCTIONED_DEEP_IMPORTS`) for pre-existing consumers
+that predate this rule — not an escape hatch for new code, and not the same mechanism as
+§1.1's component escape hatch (that one frees behaviour inside a component; this one draws
+the outer edge of the whole extension). A sanctioned entry shrinks when the referencing
+consumer is updated, never grows because a deep import happened to be convenient.

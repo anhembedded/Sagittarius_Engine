@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Sagittarius.UI 1.0
 
 // Schema-driven data table (EPIC-001C) — column definitions are declarative
 // data, read by both the header and every row delegate from the exact same
