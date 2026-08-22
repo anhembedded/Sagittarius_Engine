@@ -243,6 +243,25 @@ no way to see everything it offers in one place is not verifiable — and is pre
 consumer ends up re-implementing something that already existed, because there was no way to
 check first.
 
+**Registering a component in `qmldir` without adding it to the gallery is incomplete work.**
+Enforced by `kit/gallery_coverage_guard.find_types_missing_from_gallery()`, which fails when
+a registered type is never declared in the gallery. It is a *presence* check by design — it
+cannot judge whether a component is demonstrated well, only that whoever added it had to look
+at it. The expensive failure is a component nobody ever sees, not one whose demo is thin.
+This caught a real gap on its first run: `DateTimePicker` had been registered since before
+the gallery existed and had never appeared in it.
+
+Exemptions live in `DEFAULT_EXEMPT_TYPES` and require a structural reason, not convenience —
+today only `BaseCard`, which has no standalone appearance and is shown through every card
+deriving from it. A component that is genuinely internal should not be in `qmldir` at all;
+that is the correct fix, not an exemption.
+
+**The gallery must be runnable interactively, not only as a snapshot.** `scripts/show-gallery.ps1`
+opens a real window by default and takes `-Snapshot` for a headless PNG. Hover, press, focus
+and modal open/close states do not exist in a still image — roughly half of what
+`StatefulButton` and the input controls actually do is invisible to the PNG path alone, so a
+snapshot is evidence the kit *parses and lays out*, not that it *behaves*.
+
 ### 6.3 Runtime conformance suite
 
 Once the runtime layer exists (`EPIC-001D`), one conformance test suite applies to **every**

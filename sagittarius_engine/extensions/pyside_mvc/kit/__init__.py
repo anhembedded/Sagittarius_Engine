@@ -16,6 +16,12 @@ code and the QML that consumes it.
 #: module import time, and `pyside_mvc/__init__.py` imports this package,
 #: so the type is always registered before any QML can load.
 from .card_model import FALLBACK_BADGE_TEXT, CardModel
+from .gallery_coverage_guard import (
+    DEFAULT_EXEMPT_TYPES,
+    MissingFromGalleryFinding,
+    find_types_missing_from_gallery,
+    registered_types,
+)
 from .raw_primitive_guard import (
     RawPrimitiveFinding,
     find_raw_primitives,
@@ -24,11 +30,15 @@ from .raw_primitive_guard import (
 from .rectangle_card_guard import RectangleCardFinding, find_rectangle_as_styled_cards
 
 __all__ = [
+    "DEFAULT_EXEMPT_TYPES",
     "FALLBACK_BADGE_TEXT",
     "CardModel",
+    "MissingFromGalleryFinding",
     "RawPrimitiveFinding",
     "RectangleCardFinding",
     "find_raw_primitives",
     "find_rectangle_as_styled_cards",
+    "find_types_missing_from_gallery",
     "format_findings",
+    "registered_types",
 ]

@@ -100,7 +100,7 @@ Rectangle {
                 Layout.rightMargin: Theme.spaceXl
                 spacing: Theme.spaceMd
 
-                SectionLabel { text: "FIELDS — FieldBackground, StyledCheck" }
+                SectionLabel { text: "FIELDS — FieldBackground, StyledCheck, DateTimePicker" }
                 RowLayout {
                     spacing: Theme.spaceLg
                     TextField {
@@ -112,6 +112,17 @@ Rectangle {
                     }
                     StyledCheck { text: "Auto-restart on crash"; checked: true }
                     StyledCheck { text: "Dry-run mode"; checked: false }
+                }
+                //: Added because the new gallery-coverage guard caught it
+                //: missing — DateTimePicker had been registered in qmldir
+                //: since before the gallery existed and was never shown,
+                //: which is precisely the decay that guard exists to stop.
+                //: Shown standalone rather than inside TimeRangeCard (which
+                //: embeds two of them) so its own chrome — the calendar
+                //: toggle button — is visible.
+                DateTimePicker {
+                    Layout.preferredWidth: 220
+                    text: "2026-08-23 09:30"
                 }
             }
 
