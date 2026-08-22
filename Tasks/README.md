@@ -23,6 +23,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-015** | Framework Logging & Null Object Pattern | Core Architecture / Observability | 2026-08-04 | [TASK-015_framework_logging_null_object.md](completed/TASK-015_framework_logging_null_object.md) |
 | **TASK-007** | Kernel Reliability and OSS Readiness | Reliability / Open Source Polish | 2026-08-04 | [TASK-007_kernel_reliability_oss_readiness.md](completed/TASK-007_kernel_reliability_oss_readiness.md) |
 | **TASK-008** | Context Decoupling Program | Core Architecture / Service Boundaries | 2026-08-04 | [TASK-008_context_decoupling_program.md](completed/TASK-008_context_decoupling_program.md) |
+| **TASK-018** | Record `BaseCard` Sub-Type Candidates (No Code Yet) | UI Engine / Widget Kit | 2026-08-23 | [TASK-018_baseCard_subtype_candidate_notes.md](completed/TASK-018_baseCard_subtype_candidate_notes.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
@@ -80,8 +81,8 @@ Tasks/
 │   ├── TASK-013_engine_context_god_object_prevention.md
 │   ├── TASK-014_cqrs_type_safety_overload.md
 │   ├── TASK-015_framework_logging_null_object.md
-│   └── TASK-016_interface_name_property.md
-│   └── TASK-007_kernel_reliability_oss_readiness.md
+│   ├── TASK-016_interface_name_property.md
 │   ├── TASK-007_kernel_reliability_oss_readiness.md
-│   └── TASK-008_context_decoupling_program.md
+│   ├── TASK-008_context_decoupling_program.md
+│   └── TASK-018_baseCard_subtype_candidate_notes.md
 ```
