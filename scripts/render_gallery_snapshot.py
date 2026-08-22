@@ -1,12 +1,13 @@
-"""Renders Sagittarius/UI/Gallery/Gallery.qml offscreen and saves a PNG snapshot.
+"""Runs the Sagittarius/UI Widget Kit gallery — as a real window, or as a PNG.
 
 Not a test — a manual/CI-optional tool for actually *seeing* the Widget
 Kit (EPIC-001C) instead of trusting that the QML loads clean. Uses the
-reference consumer's real black/gold palette so the snapshot reflects the
+reference consumer's real black/gold palette so the output reflects the
 UI Engine's intended visual identity, not an arbitrary placeholder.
 
 Usage:
-    QT_QPA_PLATFORM=offscreen python scripts/render_gallery_snapshot.py [output.png]
+    python scripts/render_gallery_snapshot.py --show        # interactive window
+    python scripts/render_gallery_snapshot.py [output.png]  # headless PNG
 """
 
 from __future__ import annotations
@@ -15,7 +16,20 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+#: Snapshot mode needs an offscreen platform (grabFramebuffer() fails on a
+#: machine with no display); `--show` must NOT have one, or Qt renders the
+#: window into memory and nothing ever appears — the exact symptom reported
+#: after the first version of this script forced offscreen unconditionally
+#: at import time. `setdefault` still yields to an explicit
+#: QT_QPA_PLATFORM from the caller in either mode.
+_WANTS_WINDOW = "--show" in sys.argv[1:]
+if not _WANTS_WINDOW:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+elif os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+    # An inherited offscreen (a prior snapshot run in the same shell, a CI
+    # profile) would silently defeat --show. Clearing it is the whole point
+    # of asking for a window.
+    del os.environ["QT_QPA_PLATFORM"]
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QIcon, QPainter, QPixmap
