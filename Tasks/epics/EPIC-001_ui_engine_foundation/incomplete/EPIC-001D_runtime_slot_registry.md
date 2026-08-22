@@ -29,6 +29,11 @@ wrong abstraction with live consumers is far more expensive to correct than dupl
 3. A uniform screen lifecycle — mount, unmount, ui_mode, shutdown — with one conformance
    test suite every screen must pass, including screens not yet written.
 4. Navigation derived from screen self-description, not wired by hand.
+5. **Open question, not yet decided (found 2026-08-23, see §"Two lifecycles" below):** does
+   the UI Engine's own runtime lifecycle become a real `IExtension`/`IModule` of Sagittarius
+   Engine itself, or does it stay deliberately outside that system? Must be settled before
+   the shell's lifecycle contract is finalized — it changes what "boot" and "shutdown" mean
+   for this layer.
 
 ---
 
@@ -52,6 +57,41 @@ Carried forward from the architecture review, to be honoured rather than redisco
   runtime would collapse the separation this extension exists to provide.
 - **Regions decide geometry.** A contribution expresses intent; the region resolves size
   and placement.
+
+### Two lifecycles that currently don't talk to each other
+
+Found 2026-08-23, verified against the reference consumer's real boot sequence, not assumed:
+the UI Engine has **no connection at all** to Sagittarius Engine's own extension system.
+
+```python
+# Sagittarius_Elite_Warrior/src/presentation/ui/app_bootstrapper.py
+app_engine = create_app(config_manager)
+app_engine.boot()                              # real IExtension lifecycle ends here
+
+app = QApplication(sys.argv)
+...
+configure_app_qml(Palette.as_ui_dict(), ...)   # UI Engine bootstrap — a bare function call,
+                                                # entirely outside app_engine
+```
+
+`pyside_mvc` implements `IExtension`/`IModule` nowhere (`grep` confirms zero matches). Contrast
+with `AssetValidatorExtension` — a small file living right next to the UI code in
+`presentation/ui/assets/` — which *does* implement the real interface and is registered via
+`app.use(AssetValidatorExtension())` alongside `LoggerExtension`, `ThreadManagerExtension`,
+`HealthExtension`. The UI Engine is the odd one out, not the pattern.
+
+**Why this likely isn't an oversight:** `configure_app_qml()` must run *after* `QApplication`
+exists; `app_engine.boot()` has no notion of "wait for a GUI framework to initialize first."
+Sagittarius Engine's plain `IExtension.boot(context)` doesn't obviously accommodate that
+ordering constraint today — fitting the UI Engine into it isn't necessarily free.
+
+**Concrete consequence of leaving this open:** `app_engine.shutdown()` has no path to the
+`Theme` singleton, `OverlayHost`, or anything else this layer will own — a screen registry
+shutting down cleanly (objective 3 above) is a *separate* lifecycle from the engine's own
+shutdown, unless this question is resolved before the shell is built. Decide this — become a
+real `IExtension`/`IModule`, or formalize staying outside with an explicit, documented
+integration point — before finalizing objective 3's conformance suite; retrofitting after
+screens depend on today's ad hoc `configure_app_qml()` call site will be the expensive path.
 
 ## 🧪 Verification & Test Coverage
 
