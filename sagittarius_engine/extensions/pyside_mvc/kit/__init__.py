@@ -11,6 +11,11 @@ same split `tokens/` already established between vocabulary/enforcement
 code and the QML that consumes it.
 """
 
+#: Imported for its `@QmlElement` side effect as much as for the symbol —
+#: registering `CardModel` into the `Sagittarius.UI` QML URI happens at
+#: module import time, and `pyside_mvc/__init__.py` imports this package,
+#: so the type is always registered before any QML can load.
+from .card_model import FALLBACK_BADGE_TEXT, CardModel
 from .raw_primitive_guard import (
     RawPrimitiveFinding,
     find_raw_primitives,
@@ -19,6 +24,8 @@ from .raw_primitive_guard import (
 from .rectangle_card_guard import RectangleCardFinding, find_rectangle_as_styled_cards
 
 __all__ = [
+    "FALLBACK_BADGE_TEXT",
+    "CardModel",
     "RawPrimitiveFinding",
     "RectangleCardFinding",
     "find_raw_primitives",

@@ -177,6 +177,66 @@ Rectangle {
                 SectionLabel { text: "MODAL — AppModal (Popup shell, dynamic sizing, centers on Overlay.overlay)" }
                 Caption { text: "Opened automatically below for this screenshot — real usage opens on demand." }
             }
+
+            // ---- Compact mode ------------------------------------------
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spaceXl
+                Layout.rightMargin: Theme.spaceXl
+                Layout.bottomMargin: Theme.spaceXl
+                spacing: Theme.spaceMd
+
+                SectionLabel { text: "COMPACT MODE — every BaseCard descendant, same three properties" }
+                Caption { text: "Icon when set; first letter of title as fallback; \"?\" when a card has neither." }
+
+                RowLayout {
+                    spacing: Theme.spaceLg
+
+                    // Same components as the full-size sections above — only
+                    // `compact: true` differs. Sized by this container, not
+                    // by the cards themselves (they only expose compactSize
+                    // as an intent).
+                    //: LogPanel is deliberately absent from this row. Its
+                    //: ListView delegate evaluates regardless of the
+                    //: container's `visible`, and reading `model.timestamp`
+                    //: throws "Value is null and could not be converted to
+                    //: an object" for a second LogPanel instance — with an
+                    //: unset model, an empty `ListModel {}`, *and* a
+                    //: populated one. Isolated by bisecting this exact item
+                    //: out of the gallery; invisible in a snapshot and
+                    //: caught only by test_gallery_emits_no_qml_runtime_warnings
+                    //: (which spins a real event loop — `app.processEvents()`
+                    //: alone does not reach it).
+                    //:
+                    //: This is a genuine LogPanel robustness gap, not a
+                    //: compact-mode one: its delegate assumes a live model
+                    //: with rows. Recorded as follow-up rather than patched
+                    //: here — fixing it means changing LogPanel's delegate
+                    //: contract, which is out of scope for adding compact
+                    //: mode and deserves its own change.
+                    TimeRangeCard {
+                        compact: true
+                        Layout.preferredWidth: compactSize
+                        Layout.preferredHeight: compactSize
+                    }
+                    // No icon set -> falls back to first letter of title.
+                    AppDataTable {
+                        compact: true
+                        icon: ""
+                        title: "Positions"
+                        Layout.preferredWidth: compactSize
+                        Layout.preferredHeight: compactSize
+                    }
+                    // Neither icon nor title -> renders "?" rather than
+                    // failing or rendering an empty badge.
+                    AppDataTable {
+                        compact: true
+                        icon: ""
+                        Layout.preferredWidth: compactSize
+                        Layout.preferredHeight: compactSize
+                    }
+                }
+            }
         }
     }
 

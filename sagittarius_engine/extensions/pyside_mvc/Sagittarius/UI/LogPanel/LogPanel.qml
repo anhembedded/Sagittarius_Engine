@@ -12,14 +12,14 @@ import Sagittarius.UI 1.0
 BaseCard {
     id: root
 
-    property string title: "LOG"
+    //: `title`/`icon`/`compact` and the card chrome (bgCard fill, border,
+    //: radius) all come from BaseCard now — this file used to redeclare
+    //: `title` and repeat the same four chrome lines independently.
+    title: "LOG"
+    icon: "scroll-text"
+
     property alias logModel: logList.model
     property bool autoScroll: true
-
-    color: Theme.bgCard
-    border.color: Theme.border
-    border.width: 1
-    radius: 8
 
     ColumnLayout {
         anchors.fill: parent

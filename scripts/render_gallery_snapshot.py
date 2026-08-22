@@ -61,32 +61,45 @@ class _PlaceholderIconLoader:
         return QIcon(pixmap)
 
 
-def render(output_path: Path) -> None:
-    app = QApplication.instance() or QApplication(sys.argv)
+GALLERY_QML = (
+    Path(__file__).resolve().parent.parent
+    / "sagittarius_engine"
+    / "extensions"
+    / "pyside_mvc"
+    / "Sagittarius"
+    / "UI"
+    / "Gallery"
+    / "Gallery.qml"
+)
 
+
+def _build_gallery_widget():
+    """Boots the shared QML plumbing and loads the Gallery, exiting on any
+    QML error rather than showing a half-rendered window — a silently
+    broken gallery is worse than no gallery, since its whole purpose is to
+    be trusted as a visual reference."""
     configure_app_qml(
         _REFERENCE_PALETTE, _PlaceholderIconLoader(), {"muted": "#848E9C"}
     )
 
     quick_widget = create_quick_widget()
     quick_widget.resize(960, 1200)
-    gallery_path = (
-        Path(__file__).resolve().parent.parent
-        / "sagittarius_engine"
-        / "extensions"
-        / "pyside_mvc"
-        / "Sagittarius"
-        / "UI"
-        / "Gallery"
-        / "Gallery.qml"
-    )
-    quick_widget.setSource(QUrl.fromLocalFile(str(gallery_path)))
+    quick_widget.setWindowTitle("Sagittarius UI Engine — Widget Kit Gallery")
+    quick_widget.setSource(QUrl.fromLocalFile(str(GALLERY_QML)))
 
     errors = quick_widget.errors()
     if errors:
         for error in errors:
             print(f"QML ERROR: {error.toString()}", file=sys.stderr)
         sys.exit(1)
+
+    return quick_widget
+
+
+def render(output_path: Path) -> None:
+    """Headless: renders the Gallery offscreen and writes a PNG."""
+    app = QApplication.instance() or QApplication(sys.argv)
+    quick_widget = _build_gallery_widget()
 
     app.processEvents()
     quick_widget.show()
@@ -103,6 +116,23 @@ def render(output_path: Path) -> None:
     print(f"Saved {output_path} ({image.width()}x{image.height()})")
 
 
+def show() -> int:
+    """Interactive: opens a real window and blocks until it is closed.
+
+    The reason this mode exists at all: hover, press and focus states are
+    invisible in a snapshot (no synthetic pointer is driven), so the PNG
+    alone cannot verify roughly half of what `StatefulButton` and the
+    input controls actually do.
+    """
+    app = QApplication.instance() or QApplication(sys.argv)
+    quick_widget = _build_gallery_widget()
+    quick_widget.show()
+    return app.exec()
+
+
 if __name__ == "__main__":
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("gallery_snapshot.png")
+    args = sys.argv[1:]
+    if args and args[0] == "--show":
+        sys.exit(show())
+    out = Path(args[0]) if args else Path("gallery_snapshot.png")
     render(out)

@@ -15,14 +15,17 @@ BaseCard {
     signal fromDateTimeEdited(string text)
     signal toDateTimeEdited(string text)
 
-    // Optional: allow hiding the title
-    property string title: "TIME RANGE"
+    //: `title`/`icon`/`compact` and the card chrome (bgCard fill, border,
+    //: radius) all come from BaseCard now — this file used to redeclare
+    //: `title` and repeat the same four chrome lines independently.
+    //: Setting `title: ""` still hides the header Text below, as before.
+    title: "TIME RANGE"
+    icon: "clock"
 
-    color: Theme.bgCard
-    border.color: Theme.border
-    border.width: 1
-    radius: 8
-
+    //: Full-size dimensions stay this card's own business — BaseCard
+    //: deliberately never touches implicitWidth/implicitHeight, so there
+    //: is nothing here to collide with (ui-architecture.md §4: the region
+    //: decides geometry, the component only expresses intent).
     implicitHeight: layout.implicitHeight + 28
     implicitWidth: 300
 

@@ -11,8 +11,8 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtCore import QObject, QUrl
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QObject, QtMsgType, QUrl, qInstallMessageHandler
+from PySide6.QtGui import QColor, QIcon, QPixmap
 
 from sagittarius_engine.extensions.pyside_mvc.runtime import (
     configure_app_qml,
@@ -45,13 +45,62 @@ _PLACEHOLDER_PALETTE = {name: "#000000" for name in REQUIRED_COLOUR_TOKEN_NAMES}
 
 
 class _TestIconLoader:
+    """Returns a real (if blank) pixmap, not a bare `QIcon()`.
+
+    An empty QIcon makes IconImageProvider hand QML a null pixmap, and Qt
+    logs "Failed to get image from provider" for every icon on screen —
+    noise that would drown the genuine binding errors
+    `test_gallery_emits_no_qml_runtime_warnings` exists to catch.
+    """
+
     def get_icon(self, name: str, color: str, size: int) -> QIcon:
-        return QIcon()
+        pixmap = QPixmap(max(size, 1), max(size, 1))
+        pixmap.fill(
+            QColor(color) if QColor.isValidColorName(color) else QColor("black")
+        )
+        return QIcon(pixmap)
 
 
 @pytest.fixture(scope="module", autouse=True)
 def configure_qml() -> None:
     configure_app_qml(_PLACEHOLDER_PALETTE, _TestIconLoader(), {})
+
+
+def test_gallery_emits_no_qml_runtime_warnings(qtbot):
+    """`QQuickWidget.errors()` reports *parse* errors only — a binding that
+    throws while evaluating still leaves `errors()` empty and the component
+    "loaded". That gap let a real defect through: every card's compact badge
+    was silently blank because its bindings hit a not-yet-constructed
+    CardModel, threw `TypeError: Cannot read property 'showIcon' of null`,
+    and never re-evaluated. Four tests passed the whole time; the only thing
+    that caught it was reading stderr from a real window.
+
+    This closes that gap by capturing Qt's message stream instead of
+    trusting `errors()`."""
+    messages: list[str] = []
+
+    def handler(mode, context, message):
+        if mode in (
+            QtMsgType.QtWarningMsg,
+            QtMsgType.QtCriticalMsg,
+            QtMsgType.QtFatalMsg,
+        ):
+            messages.append(message)
+
+    previous = qInstallMessageHandler(handler)
+    try:
+        widget = create_quick_widget()
+        qtbot.addWidget(widget)
+        widget.setSource(
+            QUrl.fromLocalFile(str(_QML_KIT_DIR / "Gallery" / "Gallery.qml"))
+        )
+        widget.show()
+        for _ in range(15):
+            qtbot.wait(1)
+    finally:
+        qInstallMessageHandler(previous)
+
+    assert messages == [], "QML runtime warnings:\n" + "\n".join(messages)
 
 
 def test_gallery_loads_with_no_qml_errors(qtbot):

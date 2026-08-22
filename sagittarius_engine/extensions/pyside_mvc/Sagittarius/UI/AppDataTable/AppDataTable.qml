@@ -37,10 +37,14 @@ BaseCard {
     property bool zebra: true
     property string emptyText: "No data"
 
-    color: Theme.bgCard
-    border.color: Theme.border
-    border.width: 1
-    radius: Theme.radiusMd
+    //: `title` inherited from BaseCard — left empty by default rather than
+    //: invented here: a table's meaning comes from its columns and its
+    //: placement, so there is no sensible generic default the way "LOG" is
+    //: for LogPanel. A consumer that wants a compact-mode badge letter sets
+    //: `title` (or `icon`) at the call site. Card chrome (bgCard fill,
+    //: border, radius) also comes from BaseCard now — this file used to
+    //: repeat those four lines independently.
+    icon: "table"
 
     function _weightSum() {
         var sum = 0
