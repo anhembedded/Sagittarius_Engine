@@ -25,14 +25,14 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-018** | Record `BaseCard` Sub-Type Candidates (No Code Yet) | UI Engine / Widget Kit | 2026-08-23 | [TASK-018_baseCard_subtype_candidate_notes.md](completed/TASK-018_baseCard_subtype_candidate_notes.md) |
 | **TASK-024** | Scaffolding feature removed (both commands were broken; feature unused) | SDK / Developer Experience | 2026-08-23 | [TASK-024_getting_started_scaffolders_broken.md](completed/TASK-024_getting_started_scaffolders_broken.md) |
 | **TASK-025** | Dead `infrastructure/persistence/` deleted + import guard test added | Infrastructure / Cleanup | 2026-08-23 | [TASK-025_dead_infrastructure_persistence_package.md](completed/TASK-025_dead_infrastructure_persistence_package.md) |
+| **TASK-029** | `TASK-024`'s `sdk/` deletion left stale "SDK" references in 5 `.agents/` files | Documentation / Doc-Code Sync | 2026-08-23 | [TASK-029_sdk_deletion_left_stale_docs.md](completed/TASK-029_sdk_deletion_left_stale_docs.md) |
 | **TASK-026** | `PydanticValidationMiddleware` no longer silently skips validation on hint-resolution failure | Middleware / Correctness | 2026-08-23 | [TASK-026_validation_middleware_silently_self_disables.md](completed/TASK-026_validation_middleware_silently_self_disables.md) |
 | **TASK-030** | `scripts/ci-local.ps1` — log capture, full-run, machine-readable summary (matches Elite) | Build / Developer Experience | 2026-08-23 | [TASK-030_ci_local_script_matching_elite_pattern.md](completed/TASK-030_ci_local_script_matching_elite_pattern.md) |
+| **TASK-017** | Production Readiness Hardening — 7 reliability/security issues + 7 regression tests | Reliability / Security | 2026-08-23 | [TASK-017_production_readiness_hardening.md](completed/TASK-017_production_readiness_hardening.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
-| Task ID | Title | Category | Priority | Spec File |
-| --- | --- | --- | --- | --- |
-| **TASK-017** | Production Readiness Hardening | Reliability / Security | P1 - Critical | [TASK-017_production_readiness_hardening.md](in_progress/TASK-017_production_readiness_hardening.md) |
+*(No standalone in-progress tasks — active work is tracked inside the Epics below.)*
 
 ### 🔵 Backlog (`Tasks/backlog/`)
 
@@ -45,7 +45,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-023** | CI's single-version matrix is the blind spot (version range now narrowed to 3.14) | CI / Compatibility | P3 | [TASK-023_ci_matrix_hides_312_313_breakage.md](backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) |
 | **TASK-027** | Engine ships no `py.typed` — consumers get zero type information | Packaging / Typing | P2 | [TASK-027_no_py_typed_marker.md](backlog/TASK-027_no_py_typed_marker.md) |
 | **TASK-028** | Gate silent-false-positive fixed by `TASK-030`; regression test + doc-accuracy recheck remain | Build / Tooling — Completion Gate | P3 | [TASK-028_pre_commit_gate_false_positive_on_missing_tool.md](backlog/TASK-028_pre_commit_gate_false_positive_on_missing_tool.md) |
-| **TASK-029** | `TASK-024`'s `sdk/` deletion left stale "SDK" references in 5 `.agents/` files | Documentation / Doc-Code Sync | P3 | [TASK-029_sdk_deletion_left_stale_docs.md](backlog/TASK-029_sdk_deletion_left_stale_docs.md) |
+| **TASK-031** | `sagittarius_engine/__init__.py` eagerly imports `extensions.persistence` | Architecture / Package Boundaries | P3 | [TASK-031_top_level_package_eagerly_imports_persistence.md](backlog/TASK-031_top_level_package_eagerly_imports_persistence.md) |
 
 ---
 
