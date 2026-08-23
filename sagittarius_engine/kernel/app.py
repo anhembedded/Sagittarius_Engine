@@ -1,10 +1,6 @@
-from typing import TypeVar, Any
-from sagittarius_engine.exceptions import ModuleRegistrationError
-from sagittarius_engine.interfaces.i_dispatchable import IDispatchable
+from typing import Any, TypeVar
 
-from sagittarius_engine.kernel.context import EngineContext
-from sagittarius_engine.kernel.middleware_pipeline import MiddlewarePipeline
-from sagittarius_engine.kernel.lifecycle import EngineLifecycle
+from sagittarius_engine.exceptions import ModuleRegistrationError
 from sagittarius_engine.interfaces import (
     IContainer,
     IEventBus,
@@ -13,6 +9,10 @@ from sagittarius_engine.interfaces import (
     IMiddleware,
     IModule,
 )
+from sagittarius_engine.interfaces.i_dispatchable import IDispatchable
+from sagittarius_engine.kernel.context import EngineContext
+from sagittarius_engine.kernel.lifecycle import EngineLifecycle
+from sagittarius_engine.kernel.middleware_pipeline import MiddlewarePipeline
 
 TInput = TypeVar("TInput")
 TOutput = TypeVar("TOutput")

@@ -41,7 +41,7 @@ _QML_KIT_DIR = _PYSIDE_MVC_DIR / "Sagittarius" / "UI"
 #: `_QML_KIT_DIR` (not via `.parent`) since the kit now nests two levels
 #: deep (`Sagittarius/UI/`) rather than one.
 _FIXTURES_DIR = Path(__file__).parent / "fixtures"
-_PLACEHOLDER_PALETTE = {name: "#000000" for name in REQUIRED_COLOUR_TOKEN_NAMES}
+_PLACEHOLDER_PALETTE = dict.fromkeys(REQUIRED_COLOUR_TOKEN_NAMES, "#000000")
 
 
 class _TestIconLoader:

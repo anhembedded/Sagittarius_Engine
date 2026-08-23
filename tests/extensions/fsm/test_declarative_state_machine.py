@@ -34,7 +34,7 @@ def test_declarative_fsm_initial_state() -> None:
 def test_declarative_fsm_invalid_initial_state() -> None:
     """Non-enum initial states are rejected with TypeError."""
     with pytest.raises(TypeError):
-        DeclarativeStateMachine("INVALID_STRING")  # type: ignore[arg-type]
+        DeclarativeStateMachine("INVALID_STRING")  # type: ignore[type-var]
 
 
 def test_add_event_transition_and_dispatch() -> None:
@@ -109,9 +109,7 @@ def test_event_callback_on_event() -> None:
 
     received_events: list[tuple[OrderState, OrderState, OrderEvent]] = []
 
-    def on_submit_hook(
-        old_st: OrderState, new_st: OrderState, ev: OrderEvent
-    ) -> None:
+    def on_submit_hook(old_st: OrderState, new_st: OrderState, ev: OrderEvent) -> None:
         received_events.append((old_st, new_st, ev))
 
     fsm.on_event(OrderEvent.SUBMIT, on_submit_hook)
@@ -134,9 +132,7 @@ def test_lifecycle_hooks_execution_order() -> None:
 
     execution_log: list[str] = []
 
-    fsm.on_exit(
-        OrderState.PENDING, lambda: execution_log.append("on_exit_pending")
-    )
+    fsm.on_exit(OrderState.PENDING, lambda: execution_log.append("on_exit_pending"))
     fsm.add_global_callback(
         lambda old_st, new_st: execution_log.append(
             f"global_{old_st.name}_to_{new_st.name}"
@@ -166,9 +162,7 @@ def test_reentrancy_event_queue_sequential_processing() -> None:
     fsm.add_event_transition(
         OrderState.PENDING, OrderEvent.SUBMIT, OrderState.SUBMITTED
     )
-    fsm.add_event_transition(
-        OrderState.SUBMITTED, OrderEvent.FILL, OrderState.FILLED
-    )
+    fsm.add_event_transition(OrderState.SUBMITTED, OrderEvent.FILL, OrderState.FILLED)
 
     execution_states: list[OrderState] = []
 
@@ -181,9 +175,7 @@ def test_reentrancy_event_queue_sequential_processing() -> None:
         execution_states.append(fsm.current_state)
 
     fsm.on_enter(OrderState.SUBMITTED, auto_fill_on_submitted)
-    fsm.on_enter(
-        OrderState.FILLED, lambda: execution_states.append(fsm.current_state)
-    )
+    fsm.on_enter(OrderState.FILLED, lambda: execution_states.append(fsm.current_state))
 
     fsm.dispatch(OrderEvent.SUBMIT)
 
@@ -279,9 +271,7 @@ def test_type_validation_on_all_methods() -> None:
 def test_self_transition_lifecycle() -> None:
     """State transitioning to itself properly triggers exit, event, and enter hooks."""
     fsm = DeclarativeStateMachine[OrderState, OrderEvent](OrderState.PENDING)
-    fsm.add_event_transition(
-        OrderState.PENDING, OrderEvent.REFRESH, OrderState.PENDING
-    )
+    fsm.add_event_transition(OrderState.PENDING, OrderEvent.REFRESH, OrderState.PENDING)
 
     steps: list[str] = []
     fsm.on_exit(OrderState.PENDING, lambda: steps.append("exit"))
@@ -295,6 +285,7 @@ def test_self_transition_lifecycle() -> None:
 
 def test_deep_reentrant_chain_fifo() -> None:
     """Multi-level nested events (A -> B -> C -> D) execute in sequential FIFO order."""
+
     class Step(Enum):
         S1 = 1
         S2 = 2

@@ -1,7 +1,7 @@
-from .hosted import IHostedService, HostedServiceManager, BackgroundService
-from .tasks import CancellationToken, BackgroundTask, TaskManager
-from .scheduler import Scheduler, ITrigger, IntervalTrigger, CronTrigger
 from .async_runtime import AsyncRuntime
+from .hosted import BackgroundService, HostedServiceManager, IHostedService
+from .scheduler import CronTrigger, IntervalTrigger, ITrigger, Scheduler
+from .tasks import BackgroundTask, CancellationToken, TaskManager
 
 __all__ = [
     "IHostedService",

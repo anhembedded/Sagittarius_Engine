@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from sagittarius_engine.kernel.app import App
     from sagittarius_engine.kernel.i_kernel_context import IKernelContext
 from sagittarius_engine.base.base_module import BaseModule
-from sagittarius_engine.interfaces import IModule, ILogger
+from sagittarius_engine.interfaces import ILogger, IModule
 
 
 class ModuleLoader:

@@ -7,7 +7,10 @@ TInput = TypeVar("TInput")
 TOutput = TypeVar("TOutput")
 
 
-class ICommand(Generic[TInput, TOutput], IDispatchable, ABC):
+# PEP 695 type-param syntax not applied here: ruff's own fixer declines this
+# one (Generic isn't the first base), and a manual rewrite is a public-API
+# syntax change better done deliberately than as a lint-cleanup rider. TASK-021.
+class ICommand(Generic[TInput, TOutput], IDispatchable, ABC):  # noqa: UP046
     """
     @brief Interface for Commands in the CQRS architecture.
 

@@ -1,6 +1,6 @@
+import concurrent.futures
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-import concurrent.futures
 from typing import Any
 
 

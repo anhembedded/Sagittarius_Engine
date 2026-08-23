@@ -1,11 +1,13 @@
 import csv
 import json
 import os
-from typing import Any, Iterator, Optional
-from sagittarius_engine.kernel.app_runner import COMMAND_KEY, EXIT_COMMAND
-from sagittarius_engine.base.base_input_port import BaseInputPort
+from collections.abc import Iterator
+from typing import Any
+
 from sagittarius_engine.adapters.batch.const import FILE_TYPE_CSV, FILE_TYPE_JSON
+from sagittarius_engine.base.base_input_port import BaseInputPort
 from sagittarius_engine.exceptions import PathTraversalError
+from sagittarius_engine.kernel.app_runner import COMMAND_KEY, EXIT_COMMAND
 
 
 class BatchInputPort(BaseInputPort):
@@ -40,7 +42,7 @@ class BatchInputPort(BaseInputPort):
         self.file_path = full_path_real
 
         self.file_type = file_type
-        self._iterator: Optional[Iterator[dict[str, Any]]] = None
+        self._iterator: Iterator[dict[str, Any]] | None = None
         self._initialized = False
 
     def _init_iterator(self) -> None:
@@ -85,9 +87,7 @@ class BatchInputPort(BaseInputPort):
         self._init_iterator()
         try:
             if self._iterator is not None:
-                row = next(self._iterator)
-                return row
-            else:
-                return {COMMAND_KEY: EXIT_COMMAND}
+                return next(self._iterator)
+            return {COMMAND_KEY: EXIT_COMMAND}
         except StopIteration:
             return {COMMAND_KEY: EXIT_COMMAND}

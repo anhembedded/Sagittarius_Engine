@@ -1,4 +1,5 @@
-from typing import Any, Optional
+from typing import Any
+
 from sagittarius_engine.interfaces.i_logger import ILogger
 from sagittarius_engine.interfaces.i_output_port import IOutputPort
 
@@ -8,7 +9,7 @@ class BaseOutputPort(IOutputPort):
     @brief Base class for output ports.
     """
 
-    def __init__(self, logger: Optional[ILogger] = None) -> None:
+    def __init__(self, logger: ILogger | None = None) -> None:
         self.logger = logger
 
     def present(self, result: Any) -> None:

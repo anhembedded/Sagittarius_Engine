@@ -1,16 +1,18 @@
 import logging
 import threading
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Callable, List, Optional
+from typing import Any
+
 from sagittarius_engine.interfaces import IEngineContext
-from sagittarius_engine.runtime.scheduler.triggers import (
-    ITrigger,
-    IntervalTrigger,
-    CronTrigger,
-)
 from sagittarius_engine.runtime.scheduler.events import (
     SchedulerStarted,
     SchedulerStopped,
+)
+from sagittarius_engine.runtime.scheduler.triggers import (
+    CronTrigger,
+    IntervalTrigger,
+    ITrigger,
 )
 
 
@@ -20,7 +22,7 @@ class ScheduledJob:
     """
 
     def __init__(
-        self, fn: Callable, trigger: ITrigger, max_runs: Optional[int] = None
+        self, fn: Callable, trigger: ITrigger, max_runs: int | None = None
     ) -> None:
         self.fn = fn
         self.trigger = trigger
@@ -38,7 +40,7 @@ class JobBuilder:
         self,
         scheduler: "Scheduler",
         trigger: ITrigger,
-        max_runs: Optional[int] = None,
+        max_runs: int | None = None,
     ) -> None:
         self.scheduler = scheduler
         self.trigger = trigger
@@ -60,7 +62,7 @@ class Scheduler:
 
     def __init__(self, context: IEngineContext) -> None:
         self.context = context
-        self.jobs: List[ScheduledJob] = []
+        self.jobs: list[ScheduledJob] = []
         self._lock = threading.Lock()
         self._cond = threading.Condition(self._lock)
         self._running = False

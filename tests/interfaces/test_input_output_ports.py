@@ -196,7 +196,7 @@ def test_batch_output_port():
         # Test error present
         port.present_error(ValueError("Failed"))
 
-        with open(tmp_path, "r") as f:
+        with open(tmp_path) as f:
             lines = f.readlines()
 
         assert len(lines) == 2

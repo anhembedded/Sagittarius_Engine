@@ -1,9 +1,10 @@
-import threading
 import logging
 import queue
+import threading
 from collections.abc import Callable
 from multiprocessing.queues import Queue
 from typing import Any
+
 from sagittarius_engine.interfaces.i_event_bus import IEventBus
 from sagittarius_engine.interfaces.i_logger import ILogger
 

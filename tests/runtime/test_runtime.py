@@ -366,7 +366,7 @@ def test_background_service_pattern():
     Verifies that BackgroundService automatically spawns background thread,
     manages CancellationToken, and provides graceful shutdown without manual task spawning.
     """
-    from sagittarius_engine.runtime import BackgroundService, CancellationToken
+    from sagittarius_engine.runtime import BackgroundService
 
     loop_count = 0
 

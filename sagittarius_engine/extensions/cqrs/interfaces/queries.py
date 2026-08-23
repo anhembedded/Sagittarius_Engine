@@ -7,7 +7,8 @@ TInput = TypeVar("TInput")
 TOutput = TypeVar("TOutput")
 
 
-class IQuery(Generic[TInput, TOutput], IDispatchable, ABC):
+# Same as ICommand in commands.py — see that file's comment. TASK-021.
+class IQuery(Generic[TInput, TOutput], IDispatchable, ABC):  # noqa: UP046
     """
     @brief Interface for Queries in the CQRS architecture.
 

@@ -1,7 +1,8 @@
-import threading
 import logging
 import queue
+import threading
 from multiprocessing.queues import Queue
+
 from sagittarius_engine.interfaces.i_logger import ILogger
 
 

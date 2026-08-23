@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from sagittarius_engine.interfaces.i_engine_context import IEngineContext
 
 

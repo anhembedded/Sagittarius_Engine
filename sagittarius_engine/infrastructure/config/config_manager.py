@@ -1,8 +1,9 @@
 import json
 import os
 from typing import Any
-from sagittarius_engine.interfaces import IConfig
+
 from sagittarius_engine.infrastructure.config.config_source import ConfigSource
+from sagittarius_engine.interfaces import IConfig
 
 
 class ConfigManager(IConfig):
@@ -111,7 +112,7 @@ class ConfigManager(IConfig):
         if cast is not None and val is not None and not isinstance(val, cast):
             try:
                 return cast(val)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return val
         return val
 
@@ -163,7 +164,7 @@ class ConfigManager(IConfig):
             try:
                 with open(self._writable_path) as f:
                     existing = json.load(f)
-            except (OSError, json.JSONDecodeError):
+            except OSError, json.JSONDecodeError:
                 existing = {}
 
         existing.update(self._dirty)

@@ -1,9 +1,10 @@
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sagittarius_engine.kernel.i_kernel_context import IKernelContext
 import warnings
-from sagittarius_engine.interfaces import ILogger, IDispatcher
+
+from sagittarius_engine.interfaces import IDispatcher, ILogger
 from sagittarius_engine.interfaces.i_dispatchable import IDispatchable
 
 

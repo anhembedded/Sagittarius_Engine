@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
+
 from sagittarius_engine.extensions.cqrs import IQuery
 from sagittarius_engine.extensions.persistence import ISession
 from sagittarius_engine.interfaces import IContainer, IEventBus
@@ -79,7 +80,15 @@ class HealthCheckQuery(IQuery):
             )
             for reg_type in known_keys:
                 type_name = getattr(reg_type, "__name__", str(reg_type))
-                if any(kw in type_name for kw in ("DatabaseManager", "DatabaseConfig", "MarketDataRepository", "Database")):
+                if any(
+                    kw in type_name
+                    for kw in (
+                        "DatabaseManager",
+                        "DatabaseConfig",
+                        "MarketDataRepository",
+                        "Database",
+                    )
+                ):
                     try:
                         resolved = self.container.resolve(reg_type)
                         if resolved is not None:

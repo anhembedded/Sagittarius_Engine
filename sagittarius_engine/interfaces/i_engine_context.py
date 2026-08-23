@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from sagittarius_engine.interfaces.i_container import IContainer
 from sagittarius_engine.interfaces.i_event_bus import IEventBus
 from sagittarius_engine.interfaces.i_logger import ILogger

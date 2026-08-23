@@ -1,10 +1,7 @@
-
-
 class FSMError(Exception):
     """
     @brief Base exception class for all FSM-related errors.
     """
-
 
 
 class InvalidStateTransitionError(FSMError):
@@ -26,4 +23,3 @@ class InvalidStateTransitionError(FSMError):
         self.from_state = from_state
         self.to_state = to_state
         self.event = event
-

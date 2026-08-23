@@ -65,6 +65,7 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         "argparse",
         "getattr",
         "dataclasses",
+        "TypeError",  # Python builtin, quoted in lint.md's UP045 corruption story.
         "Optional",
         "Union",
         "TypeVar",

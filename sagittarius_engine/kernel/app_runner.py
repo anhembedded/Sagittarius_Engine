@@ -1,10 +1,9 @@
 from collections.abc import Mapping
 from typing import Any
 
-from sagittarius_engine.kernel import App
 from sagittarius_engine.interfaces.i_input_port import IInputPort
 from sagittarius_engine.interfaces.i_output_port import IOutputPort
-
+from sagittarius_engine.kernel import App
 
 COMMAND_KEY = "command"
 EXIT_COMMAND = "exit"

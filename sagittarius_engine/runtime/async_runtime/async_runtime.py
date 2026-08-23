@@ -1,7 +1,8 @@
 import asyncio
 import logging
 import threading
-from typing import Any, Coroutine
+from collections.abc import Coroutine
+from typing import Any
 
 
 class AsyncRuntime:

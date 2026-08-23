@@ -24,7 +24,12 @@ class ExtensionDescriptor:
     description: str = ""
 
 
-class IExtension(ABC, Generic[TContext]):
+# PEP 695 syntax not applied: TContext is declared `contravariant=True`, and
+# ruff's own unsafe-fix for this rule drops that entirely (PEP 695 infers
+# variance rather than declaring it) — verified by previewing the fix and
+# reading the diff. Converting this one needs a deliberate mypy check that
+# inferred variance still matches; not a mechanical cleanup. TASK-021.
+class IExtension(ABC, Generic[TContext]):  # noqa: UP046
     """Interface for Sagittarius Engine Extensions."""
 
     @property

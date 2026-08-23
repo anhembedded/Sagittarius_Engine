@@ -1,4 +1,5 @@
 from typing import Any
+
 from sagittarius_engine.extensions.persistence.i_session import ISession
 
 

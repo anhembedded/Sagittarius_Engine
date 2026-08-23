@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional
+
 from sagittarius_engine.interfaces import IEngineContext, ITaskHandle
 from sagittarius_engine.runtime.hosted.hosted_service import IHostedService
 from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
@@ -20,7 +20,7 @@ class BackgroundService(IHostedService):
 
     def __init__(self) -> None:
         self.token = CancellationToken()
-        self.task: Optional[ITaskHandle] = None
+        self.task: ITaskHandle | None = None
 
     def start(self, context: IEngineContext) -> None:
         """

@@ -1,14 +1,15 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, List
-import platform
 import logging
+import platform
 from collections import deque
-from typing import Protocol
-from sagittarius_engine.interfaces.i_container import IContainer
+from datetime import UTC, datetime
+from typing import Any, Protocol
+
 from sagittarius_engine.extensions.health.health_check_query import (
-    HealthCheckQuery,
     HealthCheckDTO,
+    HealthCheckQuery,
 )
+from sagittarius_engine.interfaces.i_container import IContainer
+
 from .infra.websocket_broadcaster import WebsocketBroadcaster
 
 
@@ -35,7 +36,7 @@ class AuditService:
     def __init__(self, context: IAuditContext, port: int = 9999) -> None:
         self.context: IAuditContext = context
         self.port: int = port
-        self.start_time: datetime = datetime.now(timezone.utc)
+        self.start_time: datetime = datetime.now(UTC)
         self._logger: logging.Logger = logging.getLogger("AuditService")
         self.recent_events: deque = deque(maxlen=100)
 
@@ -45,7 +46,7 @@ class AuditService:
 
         self._subscribe_events()
 
-    def _get_full_state(self) -> Dict[str, Any]:
+    def _get_full_state(self) -> dict[str, Any]:
         return {
             "uptime": self.get_uptime_seconds(),
             "environment": self.get_environment_info(),
@@ -78,9 +79,9 @@ class AuditService:
                 self.broadcaster.broadcast("state_update", state)
 
             from sagittarius_engine.runtime.tasks.events import (
-                TaskStarted,
                 TaskCompleted,
                 TaskFailed,
+                TaskStarted,
             )
 
             # Subscribe to specific important events using their class (EventBus handles mapping)
@@ -113,7 +114,7 @@ class AuditService:
         """
         @brief Returns engine uptime in seconds.
         """
-        return (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        return (datetime.now(UTC) - self.start_time).total_seconds()
 
     def get_system_health(self) -> dict[str, Any]:
         """
@@ -141,7 +142,7 @@ class AuditService:
 
         return {"status": "unknown"}
 
-    def get_active_tasks(self) -> List[Dict[str, Any]]:
+    def get_active_tasks(self) -> list[dict[str, Any]]:
         """
         @brief Returns a list of active background tasks.
         """
@@ -152,7 +153,7 @@ class AuditService:
             for task_id, task in tasks_dict.items():
                 runtime = "N/A"
                 if hasattr(task, "start_time") and task.start_time:
-                    end = task.end_time or datetime.now(timezone.utc)
+                    end = task.end_time or datetime.now(UTC)
                     runtime = f"{(end - task.start_time).total_seconds():.1f}s"
 
                 tasks_data.append(
@@ -170,7 +171,7 @@ class AuditService:
             self._logger.error(f"Audit service error: {e}")
         return tasks_data
 
-    def get_loaded_extensions(self) -> List[Dict[str, Any]]:
+    def get_loaded_extensions(self) -> list[dict[str, Any]]:
         """
         @brief Returns a list of loaded extensions.
         """
@@ -200,7 +201,7 @@ class AuditService:
             self._logger.error(f"Audit service error: {e}")
         return extensions_data
 
-    def get_running_hosted_services(self) -> List[str]:
+    def get_running_hosted_services(self) -> list[str]:
         """
         @brief Returns a list of running hosted services.
         """
@@ -214,7 +215,7 @@ class AuditService:
             self._logger.error(f"Audit service error: {e}")
         return services_data
 
-    def get_environment_info(self) -> Dict[str, str]:
+    def get_environment_info(self) -> dict[str, str]:
         """
         @brief Returns basic OS, Python environment info, and System Metrics.
         """
@@ -236,11 +237,11 @@ class AuditService:
 
         return env
 
-    def get_config_and_event_bus_info(self) -> Dict[str, Any]:
+    def get_config_and_event_bus_info(self) -> dict[str, Any]:
         """
         @brief Returns high-level config keys and event bus subscriptions.
         """
-        info: Dict[str, Any] = {"event_bus_handlers": {}, "config_keys": []}
+        info: dict[str, Any] = {"event_bus_handlers": {}, "config_keys": []}
         try:
             eb = getattr(self.context, "event_bus", None)
             if eb and hasattr(eb, "_handlers"):
@@ -256,7 +257,7 @@ class AuditService:
             self._logger.error(f"Audit service error: {e}")
         return info
 
-    def get_middleware_pipeline(self) -> List[str]:
+    def get_middleware_pipeline(self) -> list[str]:
         """Returns the list of loaded middlewares."""
         try:
             pipeline = getattr(getattr(self.context, "app", None), "pipeline", None)
@@ -266,7 +267,7 @@ class AuditService:
             self._logger.error(f"Audit service error: {e}")
         return []
 
-    def get_scheduler_jobs(self) -> List[Dict[str, str]]:
+    def get_scheduler_jobs(self) -> list[dict[str, str]]:
         """Returns scheduled jobs and next run time."""
         jobs_data = []
         try:
@@ -290,7 +291,7 @@ class AuditService:
             self._logger.error(f"Audit service error: {e}")
         return jobs_data
 
-    def get_full_config(self) -> Dict[str, Any]:
+    def get_full_config(self) -> dict[str, Any]:
         """Returns the full configuration dictionary."""
         config = getattr(self.context, "config", None)
         if not config:
@@ -303,7 +304,7 @@ class AuditService:
             return getattr(config, "_store", {})
         return {"error": "Unable to extract config dictionary from implementation"}
 
-    def get_all_tasks_details(self) -> List[Dict[str, Any]]:
+    def get_all_tasks_details(self) -> list[dict[str, Any]]:
         """Returns detailed information of all background tasks including errors."""
         tasks = []
         try:
@@ -324,7 +325,7 @@ class AuditService:
 
                     runtime = "N/A"
                     if hasattr(t, "start_time") and t.start_time:
-                        end = getattr(t, "end_time", None) or datetime.now(timezone.utc)
+                        end = getattr(t, "end_time", None) or datetime.now(UTC)
                         runtime = f"{(end - t.start_time).total_seconds():.1f}s"
 
                     tasks.append(

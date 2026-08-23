@@ -1,19 +1,19 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from sagittarius_engine.kernel.i_kernel_context import IKernelContext
     from sagittarius_engine.interfaces.i_engine_context import IEngineContext
-from sagittarius_engine.interfaces.i_extension import IExtension, ExtensionDescriptor
+    from sagittarius_engine.kernel.i_kernel_context import IKernelContext
+from sagittarius_engine.exceptions import (
+    ExtensionCircularDependencyError,
+    ExtensionDependencyError,
+)
+from sagittarius_engine.interfaces.i_extension import ExtensionDescriptor, IExtension
 from sagittarius_engine.interfaces.i_module import IModule
 from sagittarius_engine.kernel.events import (
+    ExtensionDisposed,
     ExtensionInitializing,
     ExtensionStarted,
     ExtensionStopped,
-    ExtensionDisposed,
-)
-from sagittarius_engine.exceptions import (
-    ExtensionDependencyError,
-    ExtensionCircularDependencyError,
 )
 
 

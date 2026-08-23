@@ -4,7 +4,7 @@ import queue
 import socket
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -73,7 +73,7 @@ class TcpLogViewerHandler(logging.Handler):
             if not submodule and record.name and record.name != "App":
                 submodule = record.name
 
-            dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+            dt = datetime.fromtimestamp(record.created, tz=UTC)
 
             payload: dict[str, Any] = {
                 "index": index,
@@ -111,7 +111,7 @@ class TcpLogViewerHandler(logging.Handler):
                         )
                     sock.sendall(data_bytes)
                     sent = True
-                except (OSError, socket.error):
+                except OSError:
                     if sock:
                         try:
                             sock.close()

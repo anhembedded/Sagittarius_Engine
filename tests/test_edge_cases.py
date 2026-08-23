@@ -788,8 +788,9 @@ def test_container__circular_dependency__raises_error():
         def __init__(self, b: ClassB):
             self.b = b
 
-    # redefine b to create circular dependency
-    class ClassB:
+    # Redefine ClassB to create a real circular dependency between the two
+    # container-resolved classes.
+    class ClassB:  # noqa: F811 — deliberate redefinition, see comment above
         def __init__(self, a: ClassA):
             self.a = a
 

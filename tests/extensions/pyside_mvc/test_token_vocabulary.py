@@ -26,7 +26,7 @@ from sagittarius_engine.extensions.pyside_mvc.tokens import (
     with_token_defaults,
 )
 
-_COMPLETE_PALETTE = {name: "#000000" for name in REQUIRED_COLOUR_TOKEN_NAMES}
+_COMPLETE_PALETTE = dict.fromkeys(REQUIRED_COLOUR_TOKEN_NAMES, "#000000")
 
 
 class _TestIconLoader:

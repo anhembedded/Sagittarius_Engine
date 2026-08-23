@@ -8,35 +8,41 @@ Sagittarius enforces extremely strict code quality and type safety rules to ensu
 
 ## Ruff Configuration
 
-⚠️ **There are two ruff configs, and the one you'd expect is the one that loses.** A
-`ruff.toml` at the repo root **shadows** `pyproject.toml`'s `[tool.ruff]` section entirely —
-ruff never merges the two, it picks the higher-priority file and ignores the other. So the
-`extend-select = ["E", "F", "W", "C", "I", "UP", "RET"]` in `pyproject.toml` is **dead
-config**; what actually applies is `ruff.toml`'s two lines:
+Single source of truth: `pyproject.toml`'s `[tool.ruff]` / `[tool.ruff.lint]`. A root
+`ruff.toml` used to **shadow** this entirely — ruff picks one config file, it does not merge —
+so the real rule set was ruff's version-dependent built-in default for an unknown length of
+time. Deleted 2026-08-23; see
+[TASK-021](../../Tasks/backlog/TASK-021_ruff_config_shadowing.md) for the full account,
+including a case where trusting an unreviewed `--unsafe-fixes` autofix near a quoted forward
+reference silently produced runtime-invalid code (`"ClassName" | None`, a `TypeError` waiting
+on the first `typing.get_type_hints()` call) — diff every unsafe fix before applying it.
 
-```toml
-[lint]
-ignore = ["E501", "C901", "UP037"]
-```
+`[tool.ruff.lint]` uses `select`, not `extend-select`. `extend-select` **adds** to ruff's
+built-in defaults, which grow every release — confirmed: the same `extend-select` line
+reported 354 findings under ruff 0.16.4 against near-zero under CI's pinned 0.15.20. `select`
+fixes the rule set as a property of this repo, not of whichever ruff happens to be installed.
 
-With no `select`/`extend-select` there, ruff falls back to its **built-in default rule set**,
-which varies by ruff version. Verified 2026-08-23; corrected from a previous version of this
-file that named `pyproject.toml` as the config source.
-
-**Consequence to know before you run it:** `requirements-dev.txt` pins `ruff==0.15.20`, and
-that is what CI installs. A newer local ruff enables more default rules and will report
-hundreds of findings the pipeline never sees (measured: ~308 in `sagittarius_engine/` alone
-under 0.16.4). If your local run and CI disagree, check `ruff --version` before chasing the
-diff. Tracked as [TASK-021](../../Tasks/backlog/TASK-021_ruff_config_shadowing.md).
+⚠️ **Still true, config aside: local and CI can disagree on tool version.**
+`requirements-dev.txt` pins `ruff==0.15.20` / `mypy==2.1.0`; nothing enforces that locally.
+Check `ruff --version` / `mypy --version` before chasing a diff that isn't there.
 
 - Run `ruff check sagittarius_engine tests` to lint and `ruff format sagittarius_engine tests`
   to format — the exact commands CI runs (`.github/workflows/ci.yml`). Note these scope to two
-  directories; `examples/` and `tools/` are **not** linted in CI.
+  directories; `examples/` and `tools/` are **not** linted in CI (TASK-021).
 
 ## Mypy (Strong Typing)
 - **Rule**: Every function signature, argument, and return type MUST be explicitly typed.
-- **Rule**: Do NOT use `Any` unless absolutely necessary (e.g. dynamic reflection). Use `Optional`, `Union`, `TypeVar`, or `Generics`.
-- Run `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`.
+- **Rule**: Do NOT use `Any` unless absolutely necessary (e.g. dynamic reflection). Prefer
+  `X | None` and `X | Y` over `Optional`/`Union` — the `UP` rules in the ruff config above
+  (`UP045`, `UP007`) enforce this, so writing `Optional[X]` now gets flagged, not encouraged.
+  `TypeVar` is still current for `Generic[T]`; PEP 695 (`class Foo[T]:`) is available on this
+  repo's Python 3.14 floor but not yet applied everywhere — see `UP046` findings tracked in
+  TASK-021 for the classes still pending a deliberate (not autofixed) conversion.
+- Run `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. ⚠️ This
+  currently reports **~27 pre-existing errors**, unrelated to any config issue — confirmed
+  present on `main` before the 2026-08-23 audit. Tracked in TASK-021, not yet triaged
+  individually; do not treat new mypy output as your own regression without checking whether
+  the specific error was already in that count.
 
 ## Python Best Practices
 - **Data Structures**: Use `dataclasses` (with `frozen=True` preferred) or `Pydantic` models instead of raw dictionaries.

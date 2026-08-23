@@ -3,18 +3,19 @@ import logging
 import threading
 import weakref
 from collections import deque
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any
+
 from sagittarius_engine.interfaces.i_task_manager import ITaskHandle, ITaskManager
-from sagittarius_engine.runtime.tasks.background_task import BackgroundTask
+from sagittarius_engine.runtime.tasks.background_task import BackgroundTask, TaskState
 from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
 from sagittarius_engine.runtime.tasks.events import (
-    TaskStarted,
     TaskCompleted,
     TaskFailed,
     TaskProgressUpdated,
+    TaskStarted,
 )
-from sagittarius_engine.runtime.tasks.background_task import TaskState
 
 
 class DaemonThreadPoolExecutor(ThreadPoolExecutor):
@@ -76,7 +77,7 @@ class TaskManager(ITaskManager):
 
     def __init__(self, context: Any) -> None:
         self.context = context
-        self.tasks: Dict[str, BackgroundTask] = {}
+        self.tasks: dict[str, BackgroundTask] = {}
         self._finished_task_ids: deque[str] = deque()
         self.background_executor = DaemonThreadPoolExecutor(
             max_workers=20,
@@ -154,9 +155,9 @@ class TaskManager(ITaskManager):
 
     def spawn(
         self,
-        callable_or_coro: Union[Callable[..., Any], Any],
-        name: Optional[str] = None,
-        token: Optional[CancellationToken] = None,
+        callable_or_coro: Callable[..., Any] | Any,
+        name: str | None = None,
+        token: CancellationToken | None = None,
         critical: bool = False,
     ) -> BackgroundTask:
         """

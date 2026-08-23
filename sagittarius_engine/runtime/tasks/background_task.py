@@ -1,11 +1,11 @@
-from enum import Enum
 import uuid
-from typing import Any, Optional, Callable
-from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
-from datetime import datetime, timezone
-
+from collections.abc import Callable
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Any
 
 from sagittarius_engine.interfaces.i_task_manager import ITaskHandle
+from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
 
 
 class TaskState(Enum):
@@ -24,9 +24,9 @@ class BackgroundTask(ITaskHandle):
     def __init__(
         self,
         name: str,
-        token: Optional[CancellationToken] = None,
+        token: CancellationToken | None = None,
         critical: bool = False,
-        on_progress_update: Optional[Callable[[float, str], None]] = None,
+        on_progress_update: Callable[[float, str], None] | None = None,
     ) -> None:
         self._id: str = str(uuid.uuid4())
         self._name: str = name
@@ -34,15 +34,15 @@ class BackgroundTask(ITaskHandle):
         self._token: CancellationToken = (
             token if token is not None else CancellationToken()
         )
-        self._future: Optional[Any] = None
+        self._future: Any | None = None
         self._status: TaskState = TaskState.PENDING
         self._progress: float = 0.0
-        self._on_progress_update: Optional[Callable[[float, str], None]] = (
+        self._on_progress_update: Callable[[float, str], None] | None = (
             on_progress_update
         )
-        self.error: Optional[Exception] = None
-        self.start_time: Optional[datetime] = datetime.now(timezone.utc)
-        self.end_time: Optional[datetime] = None
+        self.error: Exception | None = None
+        self.start_time: datetime | None = datetime.now(UTC)
+        self.end_time: datetime | None = None
 
     @property
     def id(self) -> str:
@@ -61,11 +61,11 @@ class BackgroundTask(ITaskHandle):
         self._token = value
 
     @property
-    def future(self) -> Optional[Any]:
+    def future(self) -> Any | None:
         return self._future
 
     @future.setter
-    def future(self, value: Optional[Any]) -> None:
+    def future(self, value: Any | None) -> None:
         self._future = value
 
     @property
@@ -76,7 +76,7 @@ class BackgroundTask(ITaskHandle):
     def status(self, value: TaskState) -> None:
         self._status = value
         if value in (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED):
-            self.end_time = datetime.now(timezone.utc)
+            self.end_time = datetime.now(UTC)
 
     @property
     def progress(self) -> float:

@@ -1,6 +1,7 @@
-import os
 import json
+import os
 from typing import Any
+
 from sagittarius_engine.infrastructure.config.config_source import ConfigSource
 
 
@@ -23,5 +24,5 @@ class JsonSource(ConfigSource):
         try:
             with open(self.filepath) as f:
                 return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
+        except FileNotFoundError, json.JSONDecodeError:
             return {}

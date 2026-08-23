@@ -4,7 +4,7 @@ import logging
 from collections import deque
 from collections.abc import Callable
 from enum import Enum
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sagittarius_engine.extensions.fsm.exceptions import (
     InvalidStateTransitionError,
@@ -17,7 +17,7 @@ EventT = TypeVar("EventT", bound=Enum)
 logger = logging.getLogger("Engine.DeclarativeFSM")
 
 
-class DeclarativeStateMachine(BaseStateMachine[StateT], Generic[StateT, EventT]):
+class DeclarativeStateMachine[StateT: Enum, EventT: Enum](BaseStateMachine[StateT]):
     """
     @brief Event-driven Declarative Finite State Machine for stateful workflows and UI controllers.
     @details Extends BaseStateMachine with:
@@ -117,11 +117,7 @@ class DeclarativeStateMachine(BaseStateMachine[StateT], Generic[StateT, EventT])
         @brief Returns the set of all events that are valid triggers from the current state.
         """
         with self._lock:
-            return {
-                ev
-                for (st, ev) in self._event_matrix
-                if st == self._current_state
-            }
+            return {ev for (st, ev) in self._event_matrix if st == self._current_state}
 
     def get_next_state(self, event: EventT) -> StateT | None:
         """
@@ -159,9 +155,7 @@ class DeclarativeStateMachine(BaseStateMachine[StateT], Generic[StateT, EventT])
                 while self._event_queue:
                     current_event = self._event_queue.popleft()
                     old_state = self._current_state
-                    target_state = self._event_matrix.get(
-                        (old_state, current_event)
-                    )
+                    target_state = self._event_matrix.get((old_state, current_event))
 
                     if target_state is None:
                         logger.error(
@@ -201,9 +195,7 @@ class DeclarativeStateMachine(BaseStateMachine[StateT], Generic[StateT, EventT])
                         try:
                             g_cb(old_state, target_state)
                         except Exception:
-                            logger.exception(
-                                "Error in global transition callback"
-                            )
+                            logger.exception("Error in global transition callback")
 
                     # 4. Execute event-specific callbacks (old_state, new_state, event)
                     for ev_cb in self._on_event.get(current_event, []):

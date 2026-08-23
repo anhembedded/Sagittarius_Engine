@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any
 
 
 class ITelemetryBroadcaster(ABC):
@@ -18,7 +18,7 @@ class ITelemetryBroadcaster(ABC):
         ...
 
     @abstractmethod
-    def broadcast(self, event_name: str, payload: Dict[str, Any]) -> None:
+    def broadcast(self, event_name: str, payload: dict[str, Any]) -> None:
         """
         Broadcast a message to all connected clients.
 

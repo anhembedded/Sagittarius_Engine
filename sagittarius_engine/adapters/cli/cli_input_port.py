@@ -1,8 +1,9 @@
 import argparse
 import sys
 from typing import Any
-from sagittarius_engine.base.base_input_port import BaseInputPort
+
 from sagittarius_engine.adapters.cli.const import COMMAND_KEY
+from sagittarius_engine.base.base_input_port import BaseInputPort
 
 
 class CLIInputPort(BaseInputPort):

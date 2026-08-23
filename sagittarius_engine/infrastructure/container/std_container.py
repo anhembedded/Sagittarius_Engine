@@ -4,8 +4,8 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 
 from sagittarius_engine.exceptions import DependencyResolutionError
-from sagittarius_engine.interfaces import IContainer
 from sagittarius_engine.infrastructure.container.scope_context import ScopeContext
+from sagittarius_engine.interfaces import IContainer
 
 T = TypeVar("T")
 

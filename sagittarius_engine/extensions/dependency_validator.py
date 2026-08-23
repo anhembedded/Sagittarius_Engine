@@ -1,6 +1,7 @@
-import sys
 import importlib.util
-from typing import List, Any
+import sys
+from typing import Any
+
 from sagittarius_engine.interfaces.i_extension import IExtension
 
 
@@ -10,7 +11,7 @@ class DependencyValidatorExtension(IExtension[Any]):
     Checks for the presence of critical packages during boot.
     """
 
-    def __init__(self, required_packages: List[str]):
+    def __init__(self, required_packages: list[str]):
         self.required_packages = required_packages
 
     def register(self, context: Any) -> None:

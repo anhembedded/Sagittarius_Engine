@@ -115,6 +115,7 @@ def test_task_manager_get_active_tasks():
 
 def test_task_manager_shutdown_logs_warning_when_active_tasks(caplog):
     import logging
+
     from sagittarius_engine.runtime.tasks.background_task import (
         BackgroundTask,
         TaskState,

@@ -1,8 +1,8 @@
-from sagittarius_engine.interfaces import IExtension
 from sagittarius_engine.extensions.audit.audit_service import (
     AuditService,
     IAuditContext,
 )
+from sagittarius_engine.interfaces import IExtension
 
 
 class AuditExtension(IExtension[IAuditContext]):

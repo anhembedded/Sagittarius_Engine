@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from sagittarius_engine.interfaces import IMiddleware, IContainer
+from sagittarius_engine.interfaces import IContainer, IMiddleware
 
 try:
     # pyrefly: ignore [missing-import]

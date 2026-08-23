@@ -76,8 +76,19 @@ target-version = "py314"
 exclude = [".venv", "build", "dist", "__pycache__", ".pytest_cache", ".git"]
 
 [tool.ruff.lint]
-extend-select = ["E", "F", "W", "C", "I", "UP", "RET"]
-ignore = ["E501"]
+# Single source of truth. A root `ruff.toml` used to shadow this whole block —
+# ruff picks one config file, it does not merge — so none of this ran until
+# 2026-08-23 (TASK-021). `C901` and `UP037` came from that file's ignore list
+# and are folded in here; dropping them would be a behaviour change.
+#
+# `select`, deliberately, not `extend-select`. `extend-select` ADDS to ruff's
+# built-in defaults, and those defaults widen with every ruff release — which
+# is why a newer local ruff reported 354 findings against CI's ~0. A closed
+# `select` set makes the rule set a property of this file rather than of
+# whichever ruff version happens to be installed. Widen it on purpose, in a
+# commit, not by upgrading a tool.
+select = ["E", "F", "W", "C", "I", "UP", "RET"]
+ignore = ["E501", "C901", "UP037"]
 per-file-ignores = {"__init__.py" = ["F401"]}
 
 [tool.mypy]

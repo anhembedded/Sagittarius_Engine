@@ -2,18 +2,18 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sagittarius_engine.interfaces.i_config import IConfig
-
     from sagittarius_engine.kernel.app import App
 
-from sagittarius_engine.interfaces.i_extension import IExtension
+from typing import Protocol
+
 from sagittarius_engine.infrastructure.thread_manager import ThreadManager
 from sagittarius_engine.interfaces import IConfig
+from sagittarius_engine.interfaces.i_container import IContainer
+from sagittarius_engine.interfaces.i_extension import IExtension
+from sagittarius_engine.interfaces.i_module import IModule
 from sagittarius_engine.interfaces.i_thread_manager import (
     IThreadManager,
 )
-from sagittarius_engine.interfaces.i_module import IModule
-from typing import Protocol
-from sagittarius_engine.interfaces.i_container import IContainer
 
 
 class IThreadManagerContext(Protocol):
@@ -36,7 +36,7 @@ class ThreadManagerExtension(IExtension[IThreadManagerContext]):
 
         try:
             max_workers = int(max_workers)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             max_workers = 4
 
         thread_manager = ThreadManager(max_workers=max_workers)

@@ -1,5 +1,6 @@
+from typing import Any
+
 from sagittarius_engine.domain.base_event import BaseEvent
-from typing import Dict, Any
 
 
 class SystemStateChangedEvent(BaseEvent):
@@ -7,7 +8,7 @@ class SystemStateChangedEvent(BaseEvent):
     Event emitted when the system state monitored by Audit Extension changes.
     """
 
-    def __init__(self, state_snapshot: Dict[str, Any]):
+    def __init__(self, state_snapshot: dict[str, Any]):
         super().__init__()
         self.state_snapshot = state_snapshot
 

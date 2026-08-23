@@ -14,7 +14,7 @@ def test_health_check_query_healthy():
     def resolve_side_effect(interface):
         if interface == IContainer:
             return mock_container
-        elif interface == ISession:
+        if interface == ISession:
             return mock_session
         raise Exception("Unexpected resolve")
 
@@ -41,7 +41,7 @@ def test_health_check_query_unhealthy_container():
     def resolve_side_effect(interface):
         if interface == IContainer:
             raise Exception("Container error")
-        elif interface == ISession:
+        if interface == ISession:
             return mock_session
         raise Exception("Unexpected resolve")
 
@@ -66,7 +66,7 @@ def test_health_check_query_unhealthy_event_bus():
     def resolve_side_effect(interface):
         if interface == IContainer:
             return mock_container
-        elif interface == ISession:
+        if interface == ISession:
             return mock_session
         raise Exception("Unexpected resolve")
 
@@ -89,7 +89,7 @@ def test_health_check_query_database_not_configured():
     def resolve_side_effect(interface):
         if interface == IContainer:
             return mock_container
-        elif interface == ISession:
+        if interface == ISession:
             raise Exception("No DB configured")
         raise Exception("Unexpected resolve")
 
@@ -116,7 +116,7 @@ def test_health_check_query_sqlalchemy_not_installed():
     def resolve_side_effect(interface):
         if interface == IContainer:
             return mock_container
-        elif interface == ISession:
+        if interface == ISession:
             return mock_session
         raise Exception("Unexpected resolve")
 
@@ -143,7 +143,7 @@ def test_health_check_query_database_connection_failed():
     def resolve_side_effect(interface):
         if interface == IContainer:
             return mock_container
-        elif interface == ISession:
+        if interface == ISession:
             return mock_session
         raise Exception("Unexpected resolve")
 

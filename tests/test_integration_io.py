@@ -103,8 +103,7 @@ def test_integration_cli_flow():
             if call_count == 0:
                 call_count += 1
                 return original_receive()
-            else:
-                return {"command": "exit"}
+            return {"command": "exit"}
 
         with patch.object(port_in, "receive", side_effect=side_effect_receive):
             with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -143,7 +142,7 @@ def test_integration_batch_flow():
         runner = ApplicationRunner(app, port_in, port_out)
         runner.run_cli_loop(command_map, query_map)
 
-        with open(out_tmp_path, "r") as f:
+        with open(out_tmp_path) as f:
             lines = f.readlines()
 
         assert len(lines) == 2

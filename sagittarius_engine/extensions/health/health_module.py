@@ -58,7 +58,9 @@ class HealthExtension(IExtension[IHealthContext]):
             status = query.execute()
             status_str = str(status.get("status", "healthy")).upper()
             components = status.get("components", {})
-            comp_str = ", ".join(f"{k.capitalize()}: {str(v).upper()}" for k, v in components.items())
+            comp_str = ", ".join(
+                f"{k.capitalize()}: {str(v).upper()}" for k, v in components.items()
+            )
             log_msg = f"System Health: {status_str} ({comp_str})"
 
             if hasattr(context, "logger") and context.logger is not None:

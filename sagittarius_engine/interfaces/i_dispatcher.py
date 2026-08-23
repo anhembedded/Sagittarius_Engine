@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any
+
 from sagittarius_engine.interfaces.i_dispatchable import IDispatchable
 
 

@@ -1,4 +1,4 @@
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sagittarius_engine.kernel.i_kernel_context import IKernelContext
@@ -14,7 +14,7 @@ class Bootstrap:
     def _get_logger(self) -> ILogger | None:
         return self.context.logger
 
-    def boot(self, auto_discover: Optional[str] = None) -> None:
+    def boot(self, auto_discover: str | None = None) -> None:
         """
         @brief Boots the application.
         """

@@ -22,7 +22,7 @@ _PROBE_QML = Path(__file__).parent / "fixtures" / "overlay_host_probe.qml"
 #: This suite doesn't exercise theming — arbitrary placeholder values that
 #: satisfy configure_app_qml()'s required-token validation (EPIC-001B), not
 #: real visual constants.
-_PLACEHOLDER_PALETTE = {name: "#000000" for name in REQUIRED_COLOUR_TOKEN_NAMES}
+_PLACEHOLDER_PALETTE = dict.fromkeys(REQUIRED_COLOUR_TOKEN_NAMES, "#000000")
 _INITIAL_WIDTH = 640
 _INITIAL_HEIGHT = 480
 _RESIZED_WIDTH = 1000

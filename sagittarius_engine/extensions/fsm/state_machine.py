@@ -2,7 +2,7 @@ import logging
 import threading
 from collections.abc import Callable
 from enum import Enum
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sagittarius_engine.extensions.fsm.exceptions import InvalidStateTransitionError
 
@@ -11,7 +11,7 @@ T = TypeVar("T", bound=Enum)
 logger = logging.getLogger("Engine.FSM")
 
 
-class BaseStateMachine(Generic[T]):
+class BaseStateMachine[T: Enum]:
     """
     @brief Core generic Finite State Machine utility.
     @details Provides thread-safe state transitions, rule enforcement, and lifecycle hooks.

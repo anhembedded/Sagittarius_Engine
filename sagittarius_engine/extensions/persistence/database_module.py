@@ -1,15 +1,15 @@
-from typing import TYPE_CHECKING
 import os
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass
 
-from sagittarius_engine.interfaces.i_extension import IExtension
-from sagittarius_engine.interfaces import IConfig, ILogger
 from sagittarius_engine.extensions.persistence.i_session import ISession
 from sagittarius_engine.extensions.persistence.sqlalchemy_session_adapter import (
     SQLAlchemySessionAdapter,
 )
+from sagittarius_engine.interfaces import IConfig, ILogger
+from sagittarius_engine.interfaces.i_extension import IExtension
 
 try:
     from sqlalchemy import create_engine
@@ -21,6 +21,7 @@ except ImportError:
 
 
 from typing import Protocol
+
 from sagittarius_engine.interfaces.i_container import IContainer
 
 
@@ -57,12 +58,11 @@ class DatabaseExtension(IExtension[IDatabaseContext]):
                     raise ValueError(
                         "Database configuration 'database.url' is missing in production environment."
                     )
-                else:
-                    db_url = "sqlite:///:memory:"
-                    if logger:
-                        logger.info(
-                            "DatabaseExtension: 'database.url' not found. Using default in-memory SQLite."
-                        )
+                db_url = "sqlite:///:memory:"
+                if logger:
+                    logger.info(
+                        "DatabaseExtension: 'database.url' not found. Using default in-memory SQLite."
+                    )
         except Exception as e:
             if isinstance(e, ValueError) and "production environment" in str(e):
                 raise

@@ -10,7 +10,7 @@ from sagittarius_engine.kernel.app import App
 
 
 def get_imports_in_file(filepath: str) -> list[str]:
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         try:
             tree = ast.parse(f.read(), filename=filepath)
         except SyntaxError:

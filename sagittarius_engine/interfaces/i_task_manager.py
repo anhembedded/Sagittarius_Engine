@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
     from sagittarius_engine.runtime.tasks.background_task import TaskState
+    from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
 
 
 class ITaskHandle(ABC):
@@ -44,7 +45,7 @@ class ITaskHandle(ABC):
 
     @property
     @abstractmethod
-    def future(self) -> Optional[Any]:
+    def future(self) -> Any | None:
         """
         @brief The underlying Concurrent Future (or Asyncio Task) executing in the background pool.
         @return Future object supporting `.result()` or `.cancel()`, or None if uninitialized.
@@ -84,8 +85,8 @@ class ITaskManager(ABC):
     def spawn(
         self,
         callable_or_coro: Callable[..., Any] | Any,
-        name: Optional[str] = None,
-        token: Optional["CancellationToken"] = None,
+        name: str | None = None,
+        token: "CancellationToken | None" = None,
         critical: bool = False,
     ) -> ITaskHandle:
         """

@@ -1,6 +1,7 @@
 import functools
 from collections.abc import Callable
 from typing import TypeVar
+
 from sagittarius_engine.interfaces import IMiddleware
 
 TOutput = TypeVar("TOutput")

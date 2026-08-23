@@ -1,10 +1,11 @@
 import logging
-from typing import Any, List
-from sagittarius_engine.runtime.hosted.hosted_service import IHostedService
+from typing import Any
+
 from sagittarius_engine.runtime.hosted.events import (
     HostedServiceStarted,
     HostedServiceStopped,
 )
+from sagittarius_engine.runtime.hosted.hosted_service import IHostedService
 
 
 class HostedServiceManager:
@@ -14,8 +15,8 @@ class HostedServiceManager:
 
     def __init__(self, context: Any) -> None:
         self.context = context
-        self.services: List[IHostedService] = []
-        self.started_services: List[IHostedService] = []
+        self.services: list[IHostedService] = []
+        self.started_services: list[IHostedService] = []
         self._logger = logging.getLogger("App")
 
     def register(self, service: IHostedService) -> None:

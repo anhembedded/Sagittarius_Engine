@@ -1,9 +1,11 @@
 import asyncio
 import json
 import logging
-import threading
 import sys
-from typing import Any, Dict, Set, Callable, Optional
+import threading
+from collections.abc import Callable
+from typing import Any
+
 from ..ports import ITelemetryBroadcaster
 
 try:
@@ -20,14 +22,14 @@ class WebsocketBroadcaster(ITelemetryBroadcaster):
     def __init__(self, host: str = "127.0.0.1", port: int = 9999):
         self.host = host
         self.port = port
-        self.clients: Set[Any] = set()
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._thread: Optional[threading.Thread] = None
+        self.clients: set[Any] = set()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
         self._logger = logging.getLogger("WebsocketBroadcaster")
         self._server = None
 
         # Callback to fetch initial state for new clients
-        self.on_new_client_callback: Optional[Callable[[], Dict[str, Any]]] = None
+        self.on_new_client_callback: Callable[[], dict[str, Any]] | None = None
 
     async def _handler(self, websocket, *args, **kwargs):
         self.clients.add(websocket)
@@ -95,7 +97,7 @@ class WebsocketBroadcaster(ITelemetryBroadcaster):
         if self._thread:
             self._thread.join(timeout=2.0)
 
-    def broadcast(self, event_name: str, payload: Dict[str, Any]) -> None:
+    def broadcast(self, event_name: str, payload: dict[str, Any]) -> None:
         if not self._loop or not self.clients:
             return
 

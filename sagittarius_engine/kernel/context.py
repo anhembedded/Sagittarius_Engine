@@ -1,21 +1,21 @@
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sagittarius_engine.kernel.app import App
 from sagittarius_engine.interfaces import (
+    IConfig,
     IContainer,
     IEventBus,
     ILogger,
-    IConfig,
     ITaskManager,
 )
-from sagittarius_engine.kernel.middleware_pipeline import MiddlewarePipeline
-from sagittarius_engine.kernel.lifecycle import EngineLifecycle
-from sagittarius_engine.kernel.module_loader import ModuleLoader
 from sagittarius_engine.kernel.bootstrap import Bootstrap
 from sagittarius_engine.kernel.dispatcher import Dispatcher
-from sagittarius_engine.kernel.i_kernel_context import IKernelContext
 from sagittarius_engine.kernel.extension_manager import ExtensionManager
+from sagittarius_engine.kernel.i_kernel_context import IKernelContext
+from sagittarius_engine.kernel.lifecycle import EngineLifecycle
+from sagittarius_engine.kernel.middleware_pipeline import MiddlewarePipeline
+from sagittarius_engine.kernel.module_loader import ModuleLoader
 
 
 class EngineContext(IKernelContext):
@@ -40,11 +40,11 @@ class EngineContext(IKernelContext):
 
         # Runtime Infrastructure
         from sagittarius_engine.runtime.async_runtime.async_runtime import AsyncRuntime
-        from sagittarius_engine.runtime.tasks.task_manager import TaskManager
-        from sagittarius_engine.runtime.scheduler.scheduler import Scheduler
         from sagittarius_engine.runtime.hosted.hosted_service_manager import (
             HostedServiceManager,
         )
+        from sagittarius_engine.runtime.scheduler.scheduler import Scheduler
+        from sagittarius_engine.runtime.tasks.task_manager import TaskManager
 
         self.async_runtime = AsyncRuntime(self)
         self._tasks: ITaskManager = TaskManager(self)
