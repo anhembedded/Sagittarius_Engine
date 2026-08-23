@@ -1,5 +1,29 @@
 # BUG-001 — `IEngineContext` docstring names a class that does not exist (`AppRunner`)
 
+> **Closed 2026-08-23.**
+>
+> - **Req 1 — the mention was dropped, not renamed.** Confirmed against `kernel/app_runner.py`'s
+>   actual constructor (`ApplicationRunner.__init__(self, app: App, input_port: IInputPort,
+>   output_port: IOutputPort)`) — it takes no context at all, so listing it under "VALID usage of
+>   IEngineContext" would be wrong even spelled correctly. The docstring now names the real,
+>   closed set of context-holding orchestrators (`architecture.md`'s "IEngineContext — God Object
+>   Prevention") and explicitly states `ApplicationRunner` is not one of them.
+> - **Req 2 — done.** `grep -rn "AppRunner" sagittarius_engine/` returns nothing outside a stale
+>   `.pyc` in `__pycache__` (irrelevant, not source).
+> - **Req 3 — done.** `doc-code-sync.md:63`'s row is marked closed in place rather than deleted —
+>   it stays as the historical example the rule file's own intro references.
+> - **Req 4 — considered, decision recorded rather than left implicit: not extending the guard.**
+>   The reason narrows the decision rather than closing it generally: `AppRunner` was not even
+>   backtick-quoted in the source docstring, so a check modelled on
+>   `tests/test_agents_docs_resolve.py` (which scans backtick-quoted tokens) would not have caught
+>   this specific bug — it would need bare-word scanning across every Python docstring. That
+>   checker's narrower, more constrained scope (`.agents/context/`) already needs a growing
+>   `IGNORE_TOKENS` list to avoid false positives; the same approach across all of
+>   `sagittarius_engine/`'s docstrings (33 files reference a backtick-quoted-looking class name
+>   today) is a materially larger false-positive surface, for a bug class rated Low severity here.
+>   Not worth building now. Revisit if a second live instance of this pattern is found.
+
+
 **Reported date:** 2026-08-23
 **Severity:** Low (documentation-level; no runtime impact)
 **Status:** 🔴 Open

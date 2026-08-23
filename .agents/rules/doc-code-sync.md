@@ -60,7 +60,7 @@ claim in something checkable, and add a test that checks it" — see
 | `repository.md`: *"The `Sagittarius_ForkBoy` repository"* | Wrong repo name | Nothing reads this file except a human or an AI trusting it at face value |
 | `repository.md` lists `extensions/sqlalchemy` | Renamed to `persistence` long ago | The rename didn't touch `.agents/` because nothing required it to |
 | `modules.md` presents `IModule` as the module model | Engine code calls it *"a legacy `IModule`"* (`kernel/extension_manager.py:22`); `IExtension` is the real interface, unmentioned | `IExtension` was added without a corresponding doc update |
-| `interfaces/i_engine_context.py:30` docstring names `AppRunner` | No such class exists; real orchestrator is `ApplicationRunner`, different constructor entirely | The class was renamed/replaced without a grep for its old name in docstrings |
+| ✅ **Closed 2026-08-23** (`BUG-001`). `interfaces/i_engine_context.py:30` docstring names `AppRunner` | No such class exists; real orchestrator is `ApplicationRunner`, different constructor entirely | The class was renamed/replaced without a grep for its old name in docstrings |
 
 Every row has the same root cause: a code change happened, and nothing asked "does a doc
 claim this differently now?"
