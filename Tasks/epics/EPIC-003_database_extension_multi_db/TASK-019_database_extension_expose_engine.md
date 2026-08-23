@@ -1,5 +1,10 @@
 # TASK-019: `DatabaseExtension` gives no sanctioned way to reach the raw `Engine`
 
+**Superseded 2026-08-23 by [`EPIC-003B`](../epics/EPIC-003_database_extension_multi_db/README.md).**
+The suggested fix below (register the `Engine` as a container singleton) is exactly what
+`EPIC-003B` did, plus multi-database/sharding support this task never anticipated needing.
+Kept here as historical record — see the epic for the actual implementation.
+
 **Priority:** P2
 **Category:** Extensions / Persistence
 **Found:** 2026-08-23, while building the `EPIC-002A` sample app

@@ -58,6 +58,9 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         # Third-party/stdlib names referenced by their own name, not a
         # repo-local package this checker resolves against.
         "asyncio",
+        # sqlalchemy.Engine, referenced bare in configuration.md's
+        # database.url vs database.shards section (EPIC-003).
+        "Engine",
         "pytest",
         "qtbot",
         "QApplication",

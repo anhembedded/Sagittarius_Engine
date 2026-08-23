@@ -45,7 +45,6 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
-| **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
 | **TASK-031** | `sagittarius_engine/__init__.py` eagerly imports `extensions.persistence` | Architecture / Package Boundaries | P3 | [TASK-031_top_level_package_eagerly_imports_persistence.md](backlog/TASK-031_top_level_package_eagerly_imports_persistence.md) |
 | **TASK-033** | `tools/` ships two different apps both named `audit_dashboard` | Tooling / Package Boundaries | P3 | [TASK-033_tools_mypy_errors.md](backlog/TASK-033_tools_mypy_errors.md) |
 
@@ -76,6 +75,7 @@ link is kept here; content is not duplicated.
 | :--- | :--- | :---: |
 | **[EPIC-001](epics/EPIC-001_ui_engine_foundation/README.md)** | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (3/4 subtasks done) |
 | **[EPIC-002](epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | ✅ Completed 2026-08-23 (4/4 subtasks done) |
+| **[EPIC-003](epics/EPIC-003_database_extension_multi_db/README.md)** | `DatabaseExtension` Multi-Database Support — named/sharded databases via `IDatabaseManager`, supersedes `TASK-019` | ✅ Completed 2026-08-23 (4/4 subtasks done) |
 
 ---
 
