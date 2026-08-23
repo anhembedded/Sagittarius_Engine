@@ -1,12 +1,12 @@
 import inspect
 import logging
 import threading
-import weakref
 from collections import deque
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+from sagittarius_engine.interfaces.i_config import IConfig
 from sagittarius_engine.interfaces.i_task_manager import ITaskHandle, ITaskManager
 from sagittarius_engine.runtime.tasks.background_task import BackgroundTask, TaskState
 from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
@@ -18,68 +18,19 @@ from sagittarius_engine.runtime.tasks.events import (
 )
 
 
-class DaemonThreadPoolExecutor(ThreadPoolExecutor):
-    """
-    @brief ThreadPoolExecutor subclass that creates daemon worker threads safely without global monkey patching.
-    """
-
-    def _adjust_thread_count(self) -> None:
-        num_threads = len(self._threads)
-        if num_threads < self._max_workers:
-            thread_name = (
-                f"{self._thread_name_prefix or 'ThreadPoolExecutor'}_{num_threads}"
-            )
-            try:
-                import concurrent.futures.thread
-
-                def weakref_cb(_, q=self._work_queue):
-                    pass
-
-                if hasattr(self, "_create_worker_context"):
-                    t = threading.Thread(
-                        name=thread_name,
-                        target=concurrent.futures.thread._worker,
-                        args=(
-                            weakref.ref(self, weakref_cb),
-                            self._create_worker_context(),  # type: ignore
-                            self._work_queue,
-                        ),
-                    )
-                elif hasattr(self, "_initializer") and hasattr(self, "_initargs"):
-                    t = threading.Thread(
-                        name=thread_name,
-                        target=concurrent.futures.thread._worker,
-                        args=(
-                            weakref.ref(self, weakref_cb),
-                            self._work_queue,
-                            self._initializer,  # type: ignore
-                            self._initargs,  # type: ignore
-                        ),
-                    )
-                else:
-                    t = threading.Thread(
-                        name=thread_name,
-                        target=concurrent.futures.thread._worker,
-                        args=(weakref.ref(self, weakref_cb), self._work_queue),
-                    )
-                t.daemon = True
-                t.start()
-                self._threads.add(t)  # type: ignore
-                concurrent.futures.thread._threads_queues[t] = self._work_queue  # type: ignore
-            except Exception:
-                super()._adjust_thread_count()
-
-
 class TaskManager(ITaskManager):
     """
     @brief Unified manager for spawning, tracking, and coordinating sync and async tasks.
     """
 
+    _DEFAULT_MAX_RETAINED_TASKS = 50
+    _MAX_RETAINED_TASKS_CONFIG_KEY = "task_manager.max_retained_tasks"
+
     def __init__(self, context: Any) -> None:
         self.context = context
         self.tasks: dict[str, BackgroundTask] = {}
         self._finished_task_ids: deque[str] = deque()
-        self.background_executor = DaemonThreadPoolExecutor(
+        self.background_executor = ThreadPoolExecutor(
             max_workers=20,
             thread_name_prefix="SagittariusBgTask",
         )
@@ -91,6 +42,31 @@ class TaskManager(ITaskManager):
         self.executor = self.background_executor
         self._lock = threading.Lock()
         self._logger = logging.getLogger("App")
+        # Resolved lazily (IConfig is normally registered by an extension
+        # during boot, after this constructor already ran) and memoized —
+        # this engine has no live config-reload story, so resolving once is
+        # correct, not just an optimization.
+        self._max_retained_tasks: int | None = None
+
+    def _get_max_retained_tasks(self) -> int:
+        if self._max_retained_tasks is not None:
+            return self._max_retained_tasks
+
+        limit = self._DEFAULT_MAX_RETAINED_TASKS
+        try:
+            config = self.context.container.resolve(IConfig)
+            limit = config.get(
+                self._MAX_RETAINED_TASKS_CONFIG_KEY,
+                default=self._DEFAULT_MAX_RETAINED_TASKS,
+                cast=int,
+            )
+        except Exception:
+            # No IConfig registered (the common case for a minimal app) —
+            # keep the built-in default rather than failing task cleanup.
+            pass
+
+        self._max_retained_tasks = limit
+        return limit
 
     def _emit(self, event_name: str, event_data: Any) -> None:
         try:
@@ -99,9 +75,10 @@ class TaskManager(ITaskManager):
             self.context.logger.error(f"Failed to emit event: {e}")
 
     def _cleanup_old_tasks(self) -> None:
+        max_retained = self._get_max_retained_tasks()
         with self._lock:
             # Prevent memory leaks by capping the tracking list of finished tasks
-            while len(self._finished_task_ids) > 50:
+            while len(self._finished_task_ids) > max_retained:
                 tid = self._finished_task_ids.popleft()
                 if tid in self.tasks:
                     del self.tasks[tid]

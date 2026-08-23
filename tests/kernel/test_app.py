@@ -223,4 +223,45 @@ def test_app_stop_exceptions_logged():
     app.stop()
 
     assert logger_mock.error.call_count == 6
+
+
+def test_app_stop_completes_despite_a_rogue_hanging_extension():
+    """@brief TASK-017 issue 7 regression: a step that hangs (e.g. a rogue
+    extension's stop()) must not block App.stop() from completing, and every
+    later step must still run."""
+    import threading
+    import time
+
+    app = App.__new__(App)
+    app.context = MagicMock()
+    app.context.lifecycle.is_stopping = False
+    app.context.lifecycle.is_stopped = False
+    logger_mock = MagicMock(spec=ILogger)
+    app.context.logger = logger_mock
+
+    release_rogue = threading.Event()
+
+    def rogue_extension_stop():
+        # Simulates an extension whose stop() never returns in time.
+        release_rogue.wait(timeout=5.0)
+
+    app.context.extension_manager.stop_and_dispose.side_effect = rogue_extension_stop
+
+    started_at = time.monotonic()
+    app.stop(step_timeout=0.2)
+    elapsed = time.monotonic() - started_at
+
+    try:
+        assert elapsed < 2.0, f"App.stop() blocked for {elapsed}s on the rogue step"
+        # Every step after the rogue one must still have run.
+        app.context.tasks.shutdown.assert_called_once()
+        app.context.async_runtime.stop.assert_called_once()
+        app.context.event_bus.shutdown.assert_called_once()
+        app.context.lifecycle.set_stopped.assert_called_once()
+        assert any(
+            "did not stop within" in str(call.args[0])
+            for call in logger_mock.error.call_args_list
+        )
+    finally:
+        release_rogue.set()  # let the rogue thread exit instead of leaking it
     app.context.lifecycle.set_stopped.assert_called_once()

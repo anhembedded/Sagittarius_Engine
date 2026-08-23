@@ -1,5 +1,33 @@
 # TASK-017: Production Readiness Hardening
 
+> **Completed 2026-08-23.** All 7 issues addressed, each with its own regression test (7 new
+> tests; suite 698 → 705 passing). **Every checklist item was re-verified against the current
+> tree before being touched**, per this repo's standing warning not to trust the checkboxes —
+> and that mattered: **issue 3 was already fixed** (`TransactionMiddleware` had already been
+> moved to `extensions/persistence/`; core `middleware/` has zero persistence references), so
+> only its missing regression test was added. Item-by-item outcome below; details in the commit
+> message.
+>
+> | # | Issue | Outcome |
+> | :-- | :--- | :--- |
+> | 1 | IPC broker deadlock | Fixed — `put()` now bounded by a `subscriber_put_timeout` (default 0.1s), `queue.Full` caught and the event dropped with a WARNING. |
+> | 2 | DI container factory loss | Fixed — the lazy factory is restored on a failed `_resolve()`, so a transient failure no longer permanently destroys the registration. |
+> | 3 | Core middleware coupled to extension | **Already fixed before this task**; added the missing regression test (boots the core with `sqlalchemy` sabotaged, asserts no `ImportError`). See TASK-031 for the related coupling this test uncovered one layer up. |
+> | 4 | Deep hooking into CPython internals | Fixed — `DaemonThreadPoolExecutor` (which poked `concurrent.futures.thread._worker` / `._threads_queues`) deleted entirely; standard `ThreadPoolExecutor` + the already-present `shutdown(wait=False, cancel_futures=True)` is sufficient. |
+> | 5 | Task-manager memory retention | Fixed — hardcoded `50` replaced by `task_manager.max_retained_tasks` via `IConfig`, resolved lazily and memoized, defaulting to 50 when no `IConfig` is registered. |
+> | 6 | Audit WebSocket security | Bind default was **already** `127.0.0.1` (not `0.0.0.0` as the issue stated). Added the missing half: optional `auth_token`, validated from the `?token=` query parameter, rejecting with close code 4401 before any telemetry is sent. |
+> | 7 | Incomplete graceful shutdown | Fixed — each of the 6 shutdown steps now runs on a bounded daemon thread (`step_timeout`, default 10s); a hanging step is logged and shutdown continues instead of blocking forever. |
+>
+> **Acceptance criteria status:** items 1, 2 and 4 (no regression) met. Item 3 — "CI passes with
+> 100% success" — **not met, and deliberately not claimed**: the gate (`scripts/ci-local.ps1`)
+> reports `RESULT: FAIL / FAILED_STEPS: Mypy,Tests`, at *exactly* the pre-existing baseline this
+> task inherited — mypy's 24 known errors (`TASK-021` req. 5, zero of them in any file this task
+> touched) and 2 pre-existing test failures (a QML font-directory warning that is local
+> environment noise, and `.agents/context/repository.md`'s stale `sdk/` reference, `TASK-029`).
+> Coverage is 85.34%, above the 80% bar. Per `rules/design-discipline.md`, closing this task does
+> not weaken that criterion: it is unmet, it is unmet for reasons that predate this work, and
+> those reasons are tracked elsewhere.
+
 ## Background
 The Sagittarius Engine has reached a high level of maturity, but an architecture review identified several critical bugs, architectural risks, and bottlenecks that hinder 24/7 production readiness. This task consolidates these issues into a single hardening program.
 

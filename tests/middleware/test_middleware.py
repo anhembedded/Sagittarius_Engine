@@ -87,6 +87,33 @@ def test_transaction_middleware_rollbacks_on_exception():
     mock_session.commit.assert_not_called()
 
 
+def test_core_boot_does_not_require_persistence_extension():
+    """@brief Regression test for TASK-017 issue 3: the core engine must boot
+    with no ImportError even when the database extension's dependency
+    (sqlalchemy) is not installed — TransactionMiddleware moved out of core
+    middleware/ into extensions/persistence/, which guards its own sqlalchemy
+    import. Run in a subprocess with sqlalchemy sabotaged via sys.modules, the
+    standard way to simulate "not installed" without needing a second venv."""
+    import subprocess
+    import sys
+
+    script = (
+        "import sys\n"
+        "sys.modules['sqlalchemy'] = None\n"  # simulate sqlalchemy not installed
+        "from sagittarius_engine.kernel import App\n"
+        "from sagittarius_engine.infrastructure.container.std_container import StdLibContainer\n"
+        "from sagittarius_engine.infrastructure.event_bus.memory_event_bus import MemoryEventBus\n"
+        "app = App(StdLibContainer(), MemoryEventBus())\n"
+        "app.boot()\n"
+        "print('OK')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "OK" in result.stdout
+
+
 def test_middleware_pipeline_concurrent_execution():
     import concurrent.futures
     import random

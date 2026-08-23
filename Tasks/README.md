@@ -30,13 +30,14 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
-*(No standalone in-progress tasks — active work is tracked inside the Epics below.)*
+| Task ID | Title | Category | Priority | Spec File |
+| --- | --- | --- | --- | --- |
+| **TASK-017** | Production Readiness Hardening | Reliability / Security | P1 - Critical | [TASK-017_production_readiness_hardening.md](in_progress/TASK-017_production_readiness_hardening.md) |
 
 ### 🔵 Backlog (`Tasks/backlog/`)
 
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
-| **TASK-017** | Production Readiness Hardening | Reliability / Security | P1 - Critical | [TASK-017_production_readiness_hardening.md](backlog/TASK-017_production_readiness_hardening.md) |
 | **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
 | **TASK-020** | CI `benchmark` job runs a moved path, masked by `continue-on-error` | CI / Build | P3 | [TASK-020_ci_benchmark_job_stale_path.md](backlog/TASK-020_ci_benchmark_job_stale_path.md) |
 | **TASK-021** | `ruff.toml` shadows `pyproject.toml` — the intended rule set never runs | Build / Tooling | P2 | [TASK-021_ruff_config_shadowing.md](backlog/TASK-021_ruff_config_shadowing.md) |

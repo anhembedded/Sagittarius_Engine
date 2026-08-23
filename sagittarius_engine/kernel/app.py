@@ -1,3 +1,5 @@
+import threading
+from collections.abc import Callable
 from typing import Any, TypeVar
 
 from sagittarius_engine.exceptions import ModuleRegistrationError
@@ -117,10 +119,52 @@ class App:
         )
         return self.dispatch(query_class, input_dto)
 
-    def stop(self) -> None:
+    _DEFAULT_STOP_STEP_TIMEOUT_SECONDS = 10.0
+
+    def _run_stop_step(
+        self, step_name: str, fn: Callable[[], None], timeout: float, logger: ILogger
+    ) -> None:
+        """
+        @brief Runs one shutdown step on a daemon thread, bounded by `timeout`.
+
+        @details A step that hangs (e.g. a rogue extension's `stop()`) must not block
+        every step after it — `App.stop()` has to always complete. The step's own
+        thread is left to finish or hang in the background as a daemon; it cannot be
+        forcibly killed, so a hung step is logged and the sequence moves on rather
+        than waiting forever.
+        """
+        outcome: dict[str, BaseException] = {}
+
+        def _runner() -> None:
+            try:
+                fn()
+            except Exception as e:  # noqa: BLE001 - reported below, not swallowed
+                outcome["error"] = e
+
+        thread = threading.Thread(
+            target=_runner, name=f"AppStop-{step_name}", daemon=True
+        )
+        thread.start()
+        thread.join(timeout=timeout)
+
+        if thread.is_alive():
+            logger.error(
+                f"'{step_name}' did not stop within {timeout}s — continuing shutdown "
+                "without waiting for it further"
+            )
+            return
+
+        error = outcome.get("error")
+        if error is not None:
+            logger.error(f"Error stopping {step_name}: {error}")
+
+    def stop(self, step_timeout: float = _DEFAULT_STOP_STEP_TIMEOUT_SECONDS) -> None:
         """
         @brief Shuts down the application gracefully.
-        @details Stops the scheduler, hosted services, extensions, task manager, and async runtime in reverse order.
+        @details Stops the scheduler, hosted services, extensions, task manager, and
+        async runtime in reverse order. Each step is bounded by `step_timeout` seconds
+        so a single hanging step cannot block the rest of shutdown indefinitely.
+        @param step_timeout Maximum seconds to wait for each individual step.
         """
         if self.context.lifecycle.is_stopping or self.context.lifecycle.is_stopped:
             return
@@ -130,45 +174,23 @@ class App:
 
         self.context.lifecycle.set_stopping()
 
-        # 1. Stop Scheduler
-        try:
-            self.context.scheduler.stop()
-        except Exception as e:
-            logger.error(f"Error stopping scheduler: {e}")
-
-        # 2. Stop Hosted Services
-        try:
-            self.context.hosted_services.stop()
-        except Exception as e:
-            logger.error(f"Error stopping hosted services: {e}")
-
-        # 3. Stop Extensions
-        try:
-            self.context.extension_manager.stop_and_dispose()
-        except Exception as e:
-            logger.error(f"Error stopping extensions: {e}")
-
-        # 4. Shutdown Task Manager
-        try:
-            self.context.tasks.shutdown()
-        except Exception as e:
-            logger.error(f"Error shutting down task manager: {e}")
-
-        # 5. Stop Async Runtime
-        try:
-            self.context.async_runtime.stop()
-        except Exception as e:
-            logger.error(f"Error stopping async runtime: {e}")
-
-        # 6. Shutdown Event Bus (if supported)
-        try:
+        def _shutdown_event_bus() -> None:
             bus = self.context.event_bus
             if hasattr(bus, "shutdown") and callable(getattr(bus, "shutdown")):
                 bus.shutdown()
             elif hasattr(bus, "dispose") and callable(getattr(bus, "dispose")):
                 bus.dispose()
-        except Exception as e:
-            logger.error(f"Error shutting down event bus: {e}")
+
+        steps: list[tuple[str, Callable[[], None]]] = [
+            ("scheduler", self.context.scheduler.stop),
+            ("hosted services", self.context.hosted_services.stop),
+            ("extensions", self.context.extension_manager.stop_and_dispose),
+            ("task manager", self.context.tasks.shutdown),
+            ("async runtime", self.context.async_runtime.stop),
+            ("event bus", _shutdown_event_bus),
+        ]
+        for step_name, fn in steps:
+            self._run_stop_step(step_name, fn, step_timeout, logger)
 
         self.context.lifecycle.set_stopped()
         logger.info("App stopped.")

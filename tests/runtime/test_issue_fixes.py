@@ -1,4 +1,5 @@
-import threading
+from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import Mock
 
 import pytest
 
@@ -12,33 +13,36 @@ from sagittarius_engine.infrastructure.event_bus.thread_pool_event_bus import (
 )
 from sagittarius_engine.interfaces.i_extension import ExtensionDescriptor, IExtension
 from sagittarius_engine.kernel.app import App
-from sagittarius_engine.runtime.tasks.task_manager import DaemonThreadPoolExecutor
+from sagittarius_engine.runtime.tasks import task_manager as task_manager_module
+from sagittarius_engine.runtime.tasks.task_manager import TaskManager
 
 
-def test_issue_001_daemon_executor_no_global_monkey_patch():
-    original_thread_cls = threading.Thread
-    executor = DaemonThreadPoolExecutor(max_workers=2, thread_name_prefix="TestDaemon")
-    fut = executor.submit(lambda: 42)
-    assert fut.result(timeout=2.0) == 42
-    # Verify threading.Thread identity is strictly preserved
-    assert threading.Thread is original_thread_cls
-    executor.shutdown(wait=True)
+def test_issue_001_daemon_executor_hack_removed():
+    """@brief TASK-017 issue 4 regression: the private-CPython-internals hack
+    (concurrent.futures.thread._worker / _threads_queues poking) must be gone
+    — TaskManager now uses the standard library's own ThreadPoolExecutor."""
+    assert not hasattr(task_manager_module, "DaemonThreadPoolExecutor")
+
+    context = type("Ctx", (), {"event_bus": Mock(), "async_runtime": Mock()})()
+    manager = TaskManager(context)
+    try:
+        assert type(manager.background_executor) is ThreadPoolExecutor
+        fut = manager.background_executor.submit(lambda: 42)
+        assert fut.result(timeout=2.0) == 42
+    finally:
+        manager.shutdown()
 
 
-def test_issue_001_global_thread_identity_never_mutated_during_concurrency():
-    original_thread_cls = threading.Thread
-    executors = [
-        DaemonThreadPoolExecutor(max_workers=2, thread_name_prefix=f"BgPool_{i}")
-        for i in range(5)
-    ]
-    futures = [
-        ex.submit(lambda: threading.Thread is original_thread_cls) for ex in executors
-    ]
-    for fut in futures:
-        assert fut.result(timeout=2.0) is True
-    assert threading.Thread is original_thread_cls
-    for ex in executors:
-        ex.shutdown(wait=True)
+def test_issue_001_task_manager_shutdown_does_not_hang():
+    """@brief With the daemon-thread hack gone, TaskManager.shutdown() must
+    still return promptly instead of the process being left waiting on
+    lingering non-daemon worker threads."""
+    context = type("Ctx", (), {"event_bus": Mock(), "async_runtime": Mock()})()
+    manager = TaskManager(context)
+    manager.spawn(lambda token=None: 1, name="quick")
+    manager.shutdown(timeout=2.0)
+    assert manager.background_executor._shutdown is True
+    assert manager.critical_executor._shutdown is True
 
 
 def test_issue_002_event_bus_shutdown_on_app_stop():
