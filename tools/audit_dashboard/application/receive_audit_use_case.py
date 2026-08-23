@@ -1,4 +1,5 @@
-from typing import Dict, Any
+from typing import Any
+
 from Domain.ports import IRealtimeConnector
 from event.dashboard_events import TelemetryReceivedEvent
 
@@ -25,7 +26,7 @@ class StartRealtimeListenerCommand(ICommand):
         self.connector = connector
         self.event_bus = event_bus
 
-    def execute(self, data_transfer_obj: Dict[str, Any] = None) -> None:
+    def execute(self, data_transfer_obj: dict[str, Any] = None) -> None:
         def handle_message(payload: Any) -> None:
             # Emits event so that the UI can update
             event = TelemetryReceivedEvent(raw_data=payload)

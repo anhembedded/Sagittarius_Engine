@@ -40,14 +40,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      # examples/ and tools/ were unlinted until TASK-021 req. 4 — the sample app
+      # that .agents/context/ calls the reference implementation was never checked.
       - name: Ruff — lint
-        run: ruff check sagittarius_engine tests
+        run: ruff check sagittarius_engine tests examples tools
 
       - name: Ruff — format check
-        run: ruff format --check sagittarius_engine tests
+        run: ruff format --check sagittarius_engine tests examples tools
 
+      # mypy covers examples/ (clean) but NOT tools/, which has 9 pre-existing
+      # errors — see TASK-033. Adding it here would break the zero baseline
+      # TASK-032 just established; triaging those errors is its own task.
       - name: mypy — type check
-        run: mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip
+        run: mypy sagittarius_engine tests examples --ignore-missing-imports --follow-imports=skip
 
   # ──────────────────────────────────────────────────────────────
   # Job 2: Test Matrix (Python 3.14 dev on Linux & Windows)

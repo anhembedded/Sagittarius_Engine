@@ -149,13 +149,19 @@ def test_list_students_returns_all(repo, event_bus):
 
 def test_search_students_by_name_is_case_insensitive(repo, event_bus):
     EnrollStudentHandler(repo, event_bus).execute(
-        EnrollStudentCommand(full_name="Alice Nguyen", email="a@x.com", major="CS", gpa=3.0)
+        EnrollStudentCommand(
+            full_name="Alice Nguyen", email="a@x.com", major="CS", gpa=3.0
+        )
     )
     EnrollStudentHandler(repo, event_bus).execute(
-        EnrollStudentCommand(full_name="Bob Tran", email="b@x.com", major="Math", gpa=3.5)
+        EnrollStudentCommand(
+            full_name="Bob Tran", email="b@x.com", major="Math", gpa=3.5
+        )
     )
 
-    result = SearchStudentsHandler(repo).execute(SearchStudentsQuery(name_contains="alice"))
+    result = SearchStudentsHandler(repo).execute(
+        SearchStudentsQuery(name_contains="alice")
+    )
 
     assert len(result) == 1
     assert result[0].full_name == "Alice Nguyen"

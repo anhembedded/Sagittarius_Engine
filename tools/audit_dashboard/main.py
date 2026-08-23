@@ -1,12 +1,12 @@
-import sys
 import argparse
+import sys
+
 from PySide6.QtWidgets import QApplication
 
 # Try to use standard container and event bus from Sagittarius
 try:
-    from sagittarius_engine.infrastructure import StdLibContainer
-    from sagittarius_engine.infrastructure import MemoryEventBus
     from sagittarius_engine import App
+    from sagittarius_engine.infrastructure import MemoryEventBus, StdLibContainer
     from sagittarius_engine.interfaces import IContainer, IEventBus
 except ImportError:
     # Dummy fallbacks for standalone execution without framework
@@ -37,9 +37,8 @@ except ImportError:
 
 
 from application.receive_audit_use_case import StartRealtimeListenerCommand
-from presentation.main_window import MainWindow
-
 from infra.websocket_connector import WebsocketConnector
+from presentation.main_window import MainWindow
 
 
 def main():

@@ -1,12 +1,12 @@
+from PySide6.QtCore import QObject, Qt, Signal, Slot
 from PySide6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
     QLabel,
-    QTextEdit,
+    QMainWindow,
     QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Slot, Signal, QObject, Qt
 
 
 class DashboardSignals(QObject):

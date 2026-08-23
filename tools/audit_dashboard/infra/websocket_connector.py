@@ -1,9 +1,11 @@
-from PySide6.QtWebSockets import QWebSocket
-from PySide6.QtCore import QUrl
-from typing import Callable, Any
 import json
 import logging
+from collections.abc import Callable
+from typing import Any
+
 from Domain.ports import IRealtimeConnector
+from PySide6.QtCore import QUrl
+from PySide6.QtWebSockets import QWebSocket
 
 
 class WebsocketConnector(IRealtimeConnector):

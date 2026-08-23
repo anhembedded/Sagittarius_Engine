@@ -32,6 +32,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-017** | Production Readiness Hardening — 7 reliability/security issues + 7 regression tests | Reliability / Security | 2026-08-23 | [TASK-017_production_readiness_hardening.md](completed/TASK-017_production_readiness_hardening.md) |
 | **TASK-027** | `py.typed` marker shipped (PEP 561) + stale-wheel packaging defect fixed | Packaging / Typing | 2026-08-23 | [TASK-027_no_py_typed_marker.md](completed/TASK-027_no_py_typed_marker.md) |
 | **TASK-022** | `LICENSE` file added (MIT) and verified present in wheel + sdist | Packaging / Legal | 2026-08-23 | [TASK-022_missing_license_file.md](completed/TASK-022_missing_license_file.md) |
+| **TASK-021** | Ruff config consolidated; `examples/`+`tools/` now linted; toolchain-pin check added | Build / Tooling | 2026-08-23 | [TASK-021_ruff_config_shadowing.md](completed/TASK-021_ruff_config_shadowing.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
@@ -43,10 +44,10 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | --- | --- | --- | --- | --- |
 | **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
 | **TASK-020** | CI `benchmark` job runs a moved path, masked by `continue-on-error` | CI / Build | P3 | [TASK-020_ci_benchmark_job_stale_path.md](backlog/TASK-020_ci_benchmark_job_stale_path.md) |
-| **TASK-021** | `ruff.toml` shadows `pyproject.toml` — the intended rule set never runs | Build / Tooling | P2 | [TASK-021_ruff_config_shadowing.md](backlog/TASK-021_ruff_config_shadowing.md) |
 | **TASK-023** | CI's single-version matrix is the blind spot (version range now narrowed to 3.14) | CI / Compatibility | P3 | [TASK-023_ci_matrix_hides_312_313_breakage.md](backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) |
 | **TASK-028** | Gate silent-false-positive fixed by `TASK-030`; regression test + doc-accuracy recheck remain | Build / Tooling — Completion Gate | P3 | [TASK-028_pre_commit_gate_false_positive_on_missing_tool.md](backlog/TASK-028_pre_commit_gate_false_positive_on_missing_tool.md) |
 | **TASK-031** | `sagittarius_engine/__init__.py` eagerly imports `extensions.persistence` | Architecture / Package Boundaries | P3 | [TASK-031_top_level_package_eagerly_imports_persistence.md](backlog/TASK-031_top_level_package_eagerly_imports_persistence.md) |
+| **TASK-033** | `tools/` has 9 mypy errors + an `audit_dashboard` module/package name clash | Tooling / Typing | P3 | [TASK-033_tools_mypy_errors.md](backlog/TASK-033_tools_mypy_errors.md) |
 
 ---
 

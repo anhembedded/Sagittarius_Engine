@@ -22,13 +22,20 @@ built-in defaults, which grow every release — confirmed: the same `extend-sele
 reported 354 findings under ruff 0.16.4 against near-zero under CI's pinned 0.15.20. `select`
 fixes the rule set as a property of this repo, not of whichever ruff happens to be installed.
 
-⚠️ **Still true, config aside: local and CI can disagree on tool version.**
-`requirements-dev.txt` pins `ruff==0.15.20` / `mypy==2.1.0`; nothing enforces that locally.
-Check `ruff --version` / `mypy --version` before chasing a diff that isn't there.
+**Local vs CI tool version — now checked, not merely warned about.**
+`requirements-dev.txt` pins `ruff==0.15.20` / `mypy==2.1.0`. `scripts/ci-local.ps1` compares the
+installed versions against those pins on every run and prints a warning (never a failure — it
+must not block someone deliberately running a newer tool) when they differ. Measured 2026-08-23
+on this machine: both match. An earlier note here reported drift to `ruff 0.16.4` / `mypy 2.3.1`;
+that measurement came from a `.venv` that no longer exists in this checkout (TASK-021 req. 5).
 
-- Run `ruff check sagittarius_engine tests` to lint and `ruff format sagittarius_engine tests`
-  to format — the exact commands CI runs (`.github/workflows/ci.yml`). Note these scope to two
-  directories; `examples/` and `tools/` are **not** linted in CI (TASK-021).
+- Run `ruff check sagittarius_engine tests examples tools` to lint and
+  `ruff format sagittarius_engine tests examples tools` to format — the exact commands CI runs
+  (`.github/workflows/ci.yml`). `examples/` and `tools/` joined that scope in TASK-021 req. 4;
+  they had never been linted, which was awkward given `.agents/context/` calls
+  `examples/student_management/` the reference implementation. Bringing them in fixed 31 findings
+  (import sorting, `typing.Dict`/`List` → `dict`/`list`, `Optional` → `| None`) and reformatted
+  4 files.
 
 ## Mypy (Strong Typing)
 - **Rule**: Every function signature, argument, and return type MUST be explicitly typed.
@@ -38,8 +45,11 @@ Check `ruff --version` / `mypy --version` before chasing a diff that isn't there
   `TypeVar` is still current for `Generic[T]`; PEP 695 (`class Foo[T]:`) is available on this
   repo's Python 3.14 floor but not yet applied everywhere — see `UP046` findings tracked in
   TASK-021 for the classes still pending a deliberate (not autofixed) conversion.
-- Run `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. **Clean —
-  `Success: no issues found in 259 source files`**, as of 2026-08-23
+- Run `mypy sagittarius_engine tests examples --ignore-missing-imports --follow-imports=skip`.
+  **Clean** as of 2026-08-23. `examples/` was added to this scope in TASK-021 req. 4 and was
+  already clean. `tools/` is deliberately **excluded** — it has 9 pre-existing errors
+  (`TASK-033`), and folding them in here would have re-broken the zero baseline the moment it
+  was achieved
   ([TASK-032](../../Tasks/completed/TASK-032_mypy_baseline_cleanup.md), split out of
   `TASK-021`). History: 28 pre-existing errors before that day's `TASK-017`, 27 after it, 23
   after `BUG-003`'s `ILogger` annotation fix, 0 after `TASK-032`'s category-by-category
