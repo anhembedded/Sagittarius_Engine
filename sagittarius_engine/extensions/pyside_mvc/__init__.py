@@ -20,7 +20,7 @@ except ImportError:
     # We don't raise an error here because simply scanning the extensions folder shouldn't crash the engine.
 else:
     from .kit import RawPrimitiveFinding, find_raw_primitives
-    from .mvc import BasePresenter, BaseView, PresenterManager
+    from .mvc import BasePresenter, BaseView, IView, PresenterManager
     from .runtime import (
         ICON_PROVIDER_ID,
         AppQmlConfig,
@@ -80,6 +80,7 @@ else:
         "BaseView",
         "CrossThreadUiMutationError",
         "IIconLoader",
+        "IView",
         "IconImageProvider",
         "LiteralColorFinding",
         "LogListModel",

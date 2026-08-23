@@ -7,6 +7,7 @@ QML hosting) at the same directory level.
 
 from .base_presenter import BasePresenter
 from .base_view import BaseView
+from .i_view import IView
 from .presenter_manager import PresenterManager
 
-__all__ = ["BasePresenter", "BaseView", "PresenterManager"]
+__all__ = ["BasePresenter", "BaseView", "IView", "PresenterManager"]
