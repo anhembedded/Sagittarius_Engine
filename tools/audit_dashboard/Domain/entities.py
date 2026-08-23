@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from typing import List, Dict
 
 
 @dataclass(frozen=True)
 class SystemHealth:
     status: str  # "healthy", "unhealthy"
-    components: Dict[str, str]  # {"database": "ok", "container": "ok"}
+    components: dict[str, str]  # {"database": "ok", "container": "ok"}
 
 
 @dataclass(frozen=True)
@@ -39,6 +38,6 @@ class EngineTelemetry:
     uptime_seconds: float
     health: SystemHealth
     environment: EnvironmentMetrics
-    active_tasks: List[TaskDetail]
-    loaded_extensions: List[ExtensionInfo]
-    recent_events: List[str]
+    active_tasks: list[TaskDetail]
+    loaded_extensions: list[ExtensionInfo]
+    recent_events: list[str]

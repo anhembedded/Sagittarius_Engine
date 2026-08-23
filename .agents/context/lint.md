@@ -22,13 +22,19 @@ built-in defaults, which grow every release — confirmed: the same `extend-sele
 reported 354 findings under ruff 0.16.4 against near-zero under CI's pinned 0.15.20. `select`
 fixes the rule set as a property of this repo, not of whichever ruff happens to be installed.
 
-⚠️ **Still true, config aside: local and CI can disagree on tool version.**
-`requirements-dev.txt` pins `ruff==0.15.20` / `mypy==2.1.0`; nothing enforces that locally.
-Check `ruff --version` / `mypy --version` before chasing a diff that isn't there.
+⚠️ **Local and CI tool versions can still drift over time — check before trusting a diff.**
+`requirements-dev.txt` pins `ruff==0.16.4` / `mypy==2.3.1` (bumped 2026-08-23, TASK-021): CI's
+old `mypy==2.1.0` pin rejected `cls.__new__(cls)` inside a `type[QObject]`-narrowed classmethod
+in `thread_affinity.py` (`call-overload`) that `2.3.1` resolves correctly — verified via an
+isolated probe venv that this is mypy's own overload resolution improving, not a code bug
+(`QObject.__new__ is object.__new__` evaluates to false, so the call is genuinely correct and
+`object.__new__(cls)` would silently be a different, wrong call). Re-check `ruff --version` /
+`mypy --version` against this file whenever a local/CI gate disagrees.
 
-- Run `ruff check sagittarius_engine tests` to lint and `ruff format sagittarius_engine tests`
-  to format — the exact commands CI runs (`.github/workflows/ci.yml`). Note these scope to two
-  directories; `examples/` and `tools/` are **not** linted in CI (TASK-021).
+- Run `ruff check sagittarius_engine tests examples tools` to lint and
+  `ruff format sagittarius_engine tests examples tools` to format — the exact commands CI runs
+  (`.github/workflows/ci.yml`). `examples/` and `tools/` were added to CI's scope 2026-08-23
+  (TASK-021); before that they went unlinted.
 
 ## Mypy (Strong Typing)
 - **Rule**: Every function signature, argument, and return type MUST be explicitly typed.

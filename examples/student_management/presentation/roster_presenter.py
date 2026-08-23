@@ -83,7 +83,9 @@ class RosterPresenter(BasePresenter):
 
     def _on_remove_requested(self, student_id: str) -> None:
         try:
-            self.dispatcher.dispatch(RemoveStudentHandler, RemoveStudentCommand(student_id))
+            self.dispatcher.dispatch(
+                RemoveStudentHandler, RemoveStudentCommand(student_id)
+            )
         except StudentNotFoundError as e:
             self.logger.error(f"Remove failed: {e}")
 

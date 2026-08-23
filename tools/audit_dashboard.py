@@ -1,27 +1,24 @@
-import urllib.request
-import json
 import argparse
+import json
 import sys
 import time
+import urllib.request
 
 try:
-    from rich.live import Live
+    from rich import box
+    from rich.console import Console
     from rich.layout import Layout
+    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
-    from rich.console import Console
     from rich.tree import Tree
-    from rich import box
 
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
 
 
-from typing import Optional
-
-
-def fetch_telemetry(port: int, path: str = "/") -> Optional[dict]:
+def fetch_telemetry(port: int, path: str = "/") -> dict | None:
     try:
         req = urllib.request.Request(f"http://localhost:{port}{path}")
         with urllib.request.urlopen(req, timeout=1.0) as response:
@@ -318,12 +315,11 @@ def main():
     def get_ui():
         if args.view == "config":
             return generate_config_ui(args.port)
-        elif args.view == "events":
+        if args.view == "events":
             return generate_events_ui(args.port)
-        elif args.view == "tasks":
+        if args.view == "tasks":
             return generate_tasks_ui(args.port)
-        else:
-            return generate_ui(args.port)
+        return generate_ui(args.port)
 
     try:
         with Live(get_ui(), refresh_per_second=1, screen=True) as live:
