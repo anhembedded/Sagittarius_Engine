@@ -6,10 +6,13 @@
 .DESCRIPTION
     Two modes:
 
-      (default)   Launches the QML GUI (gui.py) — a real window backed by
+      (default)   Launches the GUI (gui.py) — a real window backed by
                   pyside_mvc, booted as a genuine IExtension. See
                   docs/ui_extension_lifecycle.md for why QApplication must
-                  exist before App.boot() runs.
+                  exist before App.boot() runs. QML by default; pass
+                  -QtWidget for the QWidget rendering backend instead
+                  (TASK-037) — same Presenter/ViewModel either way, picked
+                  via gui.py's own --qtwidget flag.
 
       -Cli        Runs the argparse CLI (main.py) instead. Requires a
                   subcommand — enroll/update/remove/get/list/search/report —
@@ -24,6 +27,11 @@
 .PARAMETER Cli
     Run the CLI (main.py) instead of the GUI.
 
+.PARAMETER QtWidget
+    GUI mode only: render with the QWidget backend (WidgetRosterView)
+    instead of the default QML one. Ignored (with a warning) under -Cli,
+    which has no rendering backend to pick.
+
 .PARAMETER Python
     Explicit interpreter to use, bypassing .venv discovery.
 
@@ -32,7 +40,11 @@
 
 .EXAMPLE
     .\examples\student_management\run.ps1
-    Opens the roster GUI.
+    Opens the roster GUI (QML backend).
+
+.EXAMPLE
+    .\examples\student_management\run.ps1 -QtWidget
+    Opens the roster GUI with the QWidget backend instead.
 
 .EXAMPLE
     .\examples\student_management\run.ps1 -Cli list
@@ -45,6 +57,7 @@
 [CmdletBinding()]
 param(
     [switch]$Cli,
+    [switch]$QtWidget,
     [string]$Python,
     # Explicit Position, under CmdletBinding, so this is the ONLY positional
     # parameter — without it, $Python (declared with no Position of its own)
@@ -94,6 +107,9 @@ else {
 $env:PYTHONPATH = $repoRoot
 
 if ($Cli) {
+    if ($QtWidget) {
+        Write-Warning "-QtWidget has no effect under -Cli (no rendering backend to pick); ignoring."
+    }
     if (-not $CliArgs -or $CliArgs.Count -eq 0) {
         throw "-Cli requires a subcommand (enroll/update/remove/get/list/search/report). " +
               "Example: .\run.ps1 -Cli list"
@@ -104,8 +120,14 @@ else {
     if ($CliArgs -and $CliArgs.Count -gt 0) {
         Write-Warning "Ignoring extra arguments in GUI mode: $CliArgs. Pass -Cli to use them."
     }
-    Write-Host "Opening the Student Management roster GUI. Close the window to exit."
-    & $pythonExe $entryScript
+    $backend = if ($QtWidget) { "QWidget" } else { "QML" }
+    Write-Host "Opening the Student Management roster GUI ($backend backend). Close the window to exit."
+    if ($QtWidget) {
+        & $pythonExe $entryScript --qtwidget
+    }
+    else {
+        & $pythonExe $entryScript
+    }
 }
 
 if ($LASTEXITCODE -ne 0) {

@@ -74,8 +74,10 @@ class RosterPresenter(BasePresenter):
     def __init__(self, view, container: IContainer) -> None:
         super().__init__(view, container)
         self.view_model = RosterViewModel()
-        self.view.set_view_model(self.view_model)
-        self.view.load_qml("RosterScreen.qml")
+        # IView.bind() -- view may be a RosterView (QML) or a
+        # WidgetRosterView (QWidget, TASK-037); this presenter has no
+        # opinion on which.
+        self.view.bind(self.view_model)
 
         self._connect_ui_signals()
         self._connect_engine_events()
