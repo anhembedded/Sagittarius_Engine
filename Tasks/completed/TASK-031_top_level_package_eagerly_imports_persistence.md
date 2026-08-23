@@ -1,5 +1,38 @@
 # TASK-031: `sagittarius_engine/__init__.py` eagerly imports `extensions.persistence`
 
+> **Closed 2026-08-23 — the original diagnosis in this file was incomplete, and the fix
+> attempt caught it.**
+>
+> Requirement 1's decision, made and then revised: initially decided to drop `BaseRepository`
+> but keep `ICommand`/`IQuery`, reasoning that `extensions.cqrs` "carries none of
+> `extensions.persistence`'s optional-dependency baggage." That reasoning turned out to be
+> irrelevant to the actual mechanism — implementing just that partial removal and writing the
+> regression requirement 3 asks for, the test **failed**. `sagittarius_engine.extensions` is a
+> barrel (`extensions/__init__.py`) that eagerly imports every extension's public symbols,
+> persistence's `ISession` included (via `.health.health_check_query`) — and Python always
+> executes a parent package's `__init__.py` before any of its submodules, so importing
+> `extensions.cqrs` alone was enough to trigger the whole barrel regardless of which name was
+> asked for. There is no partial import possible through this package structure; keeping
+> `ICommand`/`IQuery` at the top level cannot avoid pulling in persistence.
+>
+> Revised requirement 1's decision accordingly: **all three** (`BaseRepository`, `ICommand`,
+> `IQuery`) removed from `sagittarius_engine/__init__.py`'s re-export list. Verified zero usage
+> of any of the three via the top-level path anywhere in this repo (source, tests, examples) —
+> every real usage already imports from `extensions.cqrs` / `extensions.persistence` directly,
+> both unchanged.
+>
+> - **Req 2 — done.** No hits for any of the three names via the top-level path anywhere in
+>   `.agents/`, `examples/`, `tests/`, `tools/`.
+> - **Req 3 — done, strengthened.** The test asserts the stronger, more honest claim: that bare
+>   `import sagittarius_engine` does not pull in `sagittarius_engine.extensions` **at all**, not
+>   just persistence specifically — since the actual mechanism is barrel-wide, not
+>   persistence-specific. `tests/test_architecture.py::test_bare_import_does_not_pull_in_any_extension`.
+>
+> **Filed, not fixed:** the barrel design itself —
+> [`TASK-034`](TASK-034_extensions_barrel_eager_imports_everything.md). Making
+> `extensions/__init__.py` lazy so individual extensions are actually independently importable
+> is a larger, separate architecture decision than this task's original scope.
+
 ## Description
 
 `sagittarius_engine/__init__.py` (the package root — imported the moment anyone does
