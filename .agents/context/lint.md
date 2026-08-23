@@ -39,12 +39,12 @@ Check `ruff --version` / `mypy --version` before chasing a diff that isn't there
   repo's Python 3.14 floor but not yet applied everywhere — see `UP046` findings tracked in
   TASK-021 for the classes still pending a deliberate (not autofixed) conversion.
 - Run `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. ⚠️ This
-  currently reports **27 pre-existing errors**, unrelated to any config issue — confirmed
-  present on `main` before the 2026-08-23 audit, re-verified after `TASK-017`/`TASK-029` (still
-  27, same files/lines). Categorized and tracked in
-  [TASK-032](../../Tasks/backlog/TASK-032_mypy_baseline_cleanup.md) (split out of `TASK-021`);
-  `BUG-003` covers 4 of the 27 with a fix already written. Do not treat new mypy output as your
-  own regression without checking whether the specific error is already in that count.
+  currently reports **23 pre-existing errors**, unrelated to any config issue. History: 28
+  before `TASK-017`, 27 after it, 23 after `BUG-003`'s fix (2026-08-23) narrowed two wrongly-
+  optional `ILogger` annotations. Categorized and tracked in
+  [TASK-032](../../Tasks/backlog/TASK-032_mypy_baseline_cleanup.md) (split out of `TASK-021`).
+  Do not treat new mypy output as your own regression without checking whether the specific
+  error is already in that count.
 
 ## Python Best Practices
 - **Data Structures**: Use `dataclasses` (with `frozen=True` preferred) or `Pydantic` models instead of raw dictionaries.

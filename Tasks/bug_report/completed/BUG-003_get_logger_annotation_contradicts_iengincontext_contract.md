@@ -89,3 +89,28 @@ Kernel / Typing
   and found to be missing annotations (e.g. `base_presenter.self.fsm` assigned three different
   types across branches), which is real debt but a different kind of problem from this one.
 - `TASK-015` (completed) — introduced the `NullLogger` guarantee these annotations contradict.
+
+---
+
+## ✅ Fixed — 2026-08-23
+
+Narrowed both `_get_logger()` declarations to `-> ILogger` (dispatcher.py, bootstrap.py).
+Verified `app.py`'s own `_get_logger()` already had the correct annotation — only these two
+were wrong.
+
+**Scope widened by explicit user decision** (asked first, given the concern raised about
+`NullLogger`'s release-mode role — that mechanism lives entirely in `kernel/context.py`'s
+`logger` property, untouched by this fix): also removed 6 `if logger:` guards in
+`bootstrap.py` that were dead code once the type is correctly non-optional — each wrapped a
+single unconditional `logger.info/error/warning(...)` call with no other logic inside. These
+were always vacuously true at runtime (a real `ILogger` or its `NullLogger` fallback, never
+`None`), so removing the guard changes nothing observable — confirmed by the full suite
+staying green.
+
+Verified:
+- `pytest -q`: 757 passed, 0 failed (was 746 before EPIC-002D's guard tests were added; no
+  regression).
+- `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`: **27 → 23**,
+  exactly the 4 sites this bug named, no residual and no new error introduced.
+- `scripts/ci-local.ps1`: still `FAIL` (23 unrelated errors remain, tracked in `TASK-032`) —
+  expected, this bug never claimed to clear the whole gate.

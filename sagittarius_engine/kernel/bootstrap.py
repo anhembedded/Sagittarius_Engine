@@ -11,7 +11,7 @@ class Bootstrap:
     def __init__(self, context: "IKernelContext") -> None:
         self.context = context
 
-    def _get_logger(self) -> ILogger | None:
+    def _get_logger(self) -> ILogger:
         return self.context.logger
 
     def boot(self, auto_discover: str | None = None) -> None:
@@ -19,8 +19,7 @@ class Bootstrap:
         @brief Boots the application.
         """
         logger = self._get_logger()
-        if logger:
-            logger.info("App is booting...")
+        logger.info("App is booting...")
 
         self.context.lifecycle.set_booting()
 
@@ -47,39 +46,34 @@ class Bootstrap:
             ImportError,
             OSError,
         ) as e:
-            if logger:
-                logger.error(
-                    f"[Bootstrap] Error during boot sequence: {e}. Shutting down runtime..."
-                )
+            logger.error(
+                f"[Bootstrap] Error during boot sequence: {e}. Shutting down runtime..."
+            )
             # Clean up what was started
             try:
                 self.context.scheduler.stop()
             except (RuntimeError, ValueError) as se:
-                if logger:
-                    logger.warning(
-                        f"[Bootstrap] Error stopping scheduler during boot cleanup: {se}"
-                    )
+                logger.warning(
+                    f"[Bootstrap] Error stopping scheduler during boot cleanup: {se}"
+                )
             try:
                 self.context.hosted_services.stop()
             except (RuntimeError, ValueError) as he:
-                if logger:
-                    logger.warning(
-                        f"[Bootstrap] Error stopping hosted services during boot cleanup: {he}"
-                    )
+                logger.warning(
+                    f"[Bootstrap] Error stopping hosted services during boot cleanup: {he}"
+                )
             try:
                 self.context.async_runtime.stop()
             except (RuntimeError, ValueError) as ae:
-                if logger:
-                    logger.warning(
-                        f"[Bootstrap] Error stopping async runtime during boot cleanup: {ae}"
-                    )
+                logger.warning(
+                    f"[Bootstrap] Error stopping async runtime during boot cleanup: {ae}"
+                )
             raise e
 
         self.context.lifecycle.set_booted()
 
-        if logger:
-            logger.info(
-                f"App booted successfully with {len(self.context.modules)} modules."
-            )
+        logger.info(
+            f"App booted successfully with {len(self.context.modules)} modules."
+        )
 
         self.context.event_bus.emit("app.booted", self.context.app)
