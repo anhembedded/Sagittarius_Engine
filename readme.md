@@ -155,8 +155,4 @@ Please ensure all tests pass and the documentation builds without errors before 
 
 ## License
 
-MIT License — declared in `pyproject.toml` (`license = {text = "MIT"}`).
-
-⚠️ **There is no `LICENSE` file in this repository.** This line previously linked to one.
-The declared license and the absent file are tracked as
-[TASK-022](Tasks/backlog/TASK-022_missing_license_file.md).
+MIT License — see [LICENSE](LICENSE).

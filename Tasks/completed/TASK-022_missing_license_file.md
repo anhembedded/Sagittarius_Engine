@@ -1,5 +1,27 @@
 # TASK-022: Package declares MIT but ships no LICENSE file
 
+> **Closed 2026-08-23.** All four requirements done.
+>
+> - **Req 1** — `LICENSE` added at the repo root with the standard MIT text.
+> - **Req 2 — the owner's decision, taken by the owner.** The copyright line is
+>   `Copyright (c) 2026 AnhEmbedded Team`. The holder was confirmed by the user rather than
+>   guessed, as this task insisted; it matches `pyproject.toml`'s own `authors` entry
+>   (`{name = "AnhEmbedded Team", email = "Anh.Embedded@gmail.com"}`), so the package metadata
+>   and the licence file now agree. The year is 2026 because every commit in this repository's
+>   history is from 2026 (`git log --reverse --format=%ad`).
+> - **Req 3 — verified, not assumed.** Built both artifacts and inspected them:
+>   the wheel carries `sagittarius_engine-2.2.0.dist-info/licenses/LICENSE` and the sdist carries
+>   `sagittarius_engine-2.2.0/LICENSE`. Modern setuptools did pick up the root file
+>   automatically, but this repo has shipped wheels missing files it believed were included
+>   (`TASK-024`, and the stale-asset defect found in `TASK-027`), so it was checked.
+> - **Req 4** — `readme.md`'s License section is now a plain one-line link to `LICENSE`; the
+>   warning block pointing at this task is gone.
+>
+> Locked in by `tests/test_license_file.py`: the file exists and contains the required MIT
+> clauses, the copyright line carries no leftover placeholder, `pyproject.toml` still declares
+> MIT (so a relicence cannot silently desync the two), and the built wheel actually ships the
+> licence.
+
 ## Description
 
 `pyproject.toml` declares the project MIT-licensed in two places:
