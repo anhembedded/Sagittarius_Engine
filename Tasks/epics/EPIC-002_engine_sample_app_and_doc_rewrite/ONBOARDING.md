@@ -138,21 +138,26 @@ this file.
 
 ## 4. Current state (check this is still accurate before trusting it)
 
-As of 2026-08-23: **EPIC-002A is done** (moved to `completed/`). What's actually in place:
+As of 2026-08-23: **EPIC-002A and EPIC-002B are both done** (moved to `completed/`). What's
+actually in place:
 
-- `examples/student_management/` is a real, running app: domain, application (7 use cases),
-  infrastructure (real SQLite persistence via the engine's `persistence` extension), a
-  `StudentManagementExtension` (`IExtension`, not `IModule`), and `main.py` (an `argparse`
-  subcommand CLI — `enroll`/`update`/`remove`/`get`/`list`/`search`/`report`). 30 tests, all
-  collected by the root suite. Verified by hand, not just by test: run
-  `.venv/bin/python -m examples.student_management.main list` after an `enroll` in a separate
-  process — persistence survives across process boundaries, not just within one run.
-- `MODULE_COVERAGE.md` is filled in for every row except `pyside_mvc` (EPIC-002B's own row —
-  see the ledger's own header note on why that's by design, not an oversight).
-- Four design docs exist in `examples/student_management/docs/`, each with a Mermaid diagram,
+- `examples/student_management/` is a real, running app, backend and UI both: domain,
+  application (7 use cases), infrastructure (real SQLite persistence via the engine's
+  `persistence` extension), a `StudentManagementExtension` (`IExtension`, not `IModule`),
+  `main.py` (an `argparse` CLI), and `gui.py` (a real QML UI — `RosterScreen.qml` composing
+  `AppDataTable`/`BaseCard`/`AppModal`, `RosterView`/`RosterPresenter`/`RosterViewModel`, and
+  `PySideMvcExtension` booting `pyside_mvc` as a real `IExtension`). 34 tests, all collected by
+  the root suite. Verified by hand, not just by test: ran the real CLI across separate process
+  invocations (persistence survives) and ran the real GUI with `QT_QPA_PLATFORM=offscreen`.
+- `MODULE_COVERAGE.md` is filled in for **every** row, `pyside_mvc` included — resolved to
+  Used, not Skipped, unlike the two prior sample apps in this repo.
+- Six design docs exist in `examples/student_management/docs/`, each with a Mermaid diagram,
   written as their topic was settled: `bootstrap.md`, `module_registration.md`,
-  `config_loading.md`, `persistence_and_transactions.md` (a topic not named up front —
-  added because it turned out non-trivial, per the epic's own instruction to do that).
+  `config_loading.md`, `persistence_and_transactions.md`, `ui_extension_lifecycle.md` — the
+  last one also documents a real methodology correction (a filed engine task that turned out
+  to be a false positive, retracted after `tail`-truncated command output was found to have
+  hidden a passing test result — read it before trusting any "N warnings" claim made by
+  piping test output through `tail` in this repo).
 - **One real engine gap found and filed, not worked around invisibly:**
   [`TASK-019`](../../backlog/TASK-019_database_extension_expose_engine.md) —
   `DatabaseExtension` exposes no way to reach the raw SQLAlchemy `Engine` it builds
@@ -162,10 +167,9 @@ As of 2026-08-23: **EPIC-002A is done** (moved to `completed/`). What's actually
   [`BOT-117`](../../../../Sagittarius_Elite_Warrior/Tasks/backlog/BOT-117_stale_pyside_mvc_paths_in_palette_docstring.md)
   in `Sagittarius_Elite_Warrior`.
 
-**The next concrete action is EPIC-002B** — wire `pyside_mvc` into this app's UI, booting it
-as a real `IExtension` (the app-side wrapper described in EPIC-002B's own file, since no
-`IExtension` for `pyside_mvc` exists in the engine itself yet — see that file's "Resolve
-before starting" section before writing any code).
+**The next concrete action is EPIC-002C** — consolidate everything above into
+`AUDIT_REPORT.md`. Read the epic README's Definition of Done and `EPIC-002C`'s own file before
+starting; this subtask is pure writing, no code.
 
 Stale references to the deleted *old* example still exist and need fixing as part of
 EPIC-002D (not A/B — these are `.agents/`-side references, D's job):

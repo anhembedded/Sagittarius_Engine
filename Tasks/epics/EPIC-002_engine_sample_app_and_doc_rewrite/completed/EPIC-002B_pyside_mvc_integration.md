@@ -1,7 +1,7 @@
 # EPIC-002B — Full `pyside_mvc` Integration
 
 **Epic:** [EPIC-002 — Engine Sample App & Doc Rewrite](../README.md)
-**Status:** 🔵 Backlog
+**Status:** ✅ Completed (2026-08-23)
 **Category:** Documentation / Developer Experience / UI Engine
 **Priority:** P1
 **Depends on:** EPIC-002A (needs the backend to point a UI at)
@@ -104,3 +104,34 @@ These are gates, not aspirations — do not mark this subtask done with any of t
   when the ordering was settled (per Objective 5) — not reconstructed after the fact.
 - Any real engine gap hit has a filed `TASK-XXX`, linked from both this file's own notes and
   `MODULE_COVERAGE.md`'s `pyside_mvc` row if the gap is what blocked "Used."
+
+---
+
+## ✅ Completion notes (2026-08-23)
+
+**Resolved: no engine gap.** The EPIC-001D ordering concern (a `QApplication` must exist
+before `pyside_mvc` boots) resolves cleanly as long as the composition root (`gui.py`)
+constructs `QApplication` before calling `App.boot()` — verified directly, no workaround
+needed. `PySideMvcExtension` (app-side `IExtension` wrapper, since none exists in the engine
+yet) is documented as a real prototype for `EPIC-001D` to build from — see
+`docs/ui_extension_lifecycle.md`.
+
+**Shipped:** `RosterScreen.qml` (real `AppDataTable`, `BaseCard` with a working compact-mode
+toggle, `AppModal` enroll form), `RosterView`/`RosterPresenter`/`RosterViewModel`
+(`QmlHostView`/`BasePresenter`/`BaseQmlViewModel`), `PySideMvcExtension`, `gui.py` entry point.
+All 4 applicable static guards (literal-colour, raw-primitive, rectangle-as-card,
+import-boundary) return zero findings. `presentation/` has exactly one `QtWidgets` import
+(`QApplication` in `gui.py` — the unavoidable minimum). `MODULE_COVERAGE.md`'s `pyside_mvc`
+row: **Used**.
+
+**A significant investigation, and a real self-correction — worth reading in full in
+`docs/ui_extension_lifecycle.md`'s last section.** Chasing "zero QML runtime warnings"
+initially produced a false-positive engine bug report (`QmlHostView` reparenting before
+`setSource()`), filed as a task and then **retracted** once a methodology error was found:
+`tail`-truncated command output had been hiding pytest's own `N passed` verdict under a flood
+of raw stderr the entire time. The tests had been passing throughout. The real, smaller,
+still-true finding that survived scrutiny: `qInstallMessageHandler` — the technique this
+codebase already trusts for catching silent QML failures — has a blind spot for QML JS engine
+`TypeError`s that print directly to stderr, bypassing Qt's message-handler system entirely.
+Not filed as an engine task (no actionable, confirmed root cause; zero functional impact —
+final state is always correct); named and bounded in the design doc instead.

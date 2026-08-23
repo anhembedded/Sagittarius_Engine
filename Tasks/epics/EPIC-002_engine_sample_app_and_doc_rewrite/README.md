@@ -1,6 +1,6 @@
 # EPIC-002 — Engine Sample App & Doc Rewrite
 
-**Status:** 🟡 In Progress (1/4 subtasks done)
+**Status:** 🟡 In Progress (2/4 subtasks done)
 **Category:** Documentation / Developer Experience
 **Priority:** P1 — `.agents/context/` is actively misleading every AI session that loads it
 **Depends on:** [EPIC-001](../EPIC-001_ui_engine_foundation/README.md) (needs a stable
@@ -101,7 +101,7 @@ immediately, with a mermaid diagram).
 | ID | Title | Status |
 | :--- | :--- | :---: |
 | **EPIC-002A** | Scaffold the sample app — domain, Clean Architecture layers, `IExtension`-based module registration, honest (not forced) engine-module coverage | ✅ Completed (2026-08-23) |
-| **EPIC-002B** | Wire the full `pyside_mvc` widget kit into the sample's UI, booting it as a real `IExtension` per the EPIC-001D decision | 🔵 Backlog |
+| **EPIC-002B** | Wire the full `pyside_mvc` widget kit into the sample's UI, booting it as a real `IExtension` per the EPIC-001D decision | ✅ Completed (2026-08-23) |
 | **EPIC-002C** | Write `AUDIT_REPORT.md` from the build experience — every ambiguity, implicit assumption, and rough edge, with evidence, not impressions | 🔵 Backlog |
 | **EPIC-002D** | Rewrite `.agents/context/*.md` from the audit; add a staleness-detection test; fix the 4 dangling references to the deleted old sample | 🔵 Backlog |
 

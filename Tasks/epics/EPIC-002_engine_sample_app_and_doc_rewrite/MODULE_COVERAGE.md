@@ -1,10 +1,8 @@
 # Module Coverage Ledger
 
-**Owner subtask:** [EPIC-002A](completed/EPIC-002A_sample_app_scaffold.md) for every row
-except `pyside_mvc`, which is [EPIC-002B](incomplete/EPIC-002B_pyside_mvc_integration.md)'s
-own deliverable. **Gate, not a nice-to-have:** EPIC-002A cannot move to `completed/` while any
-row *other than* `pyside_mvc` reads "TBD"; EPIC-002B cannot close until `pyside_mvc` itself
-resolves to **Used**.
+**Owner subtasks:** [EPIC-002A](completed/EPIC-002A_sample_app_scaffold.md) for every row
+except `pyside_mvc`, which was [EPIC-002B](completed/EPIC-002B_pyside_mvc_integration.md)'s
+own deliverable — both now resolved, every row filled in, no "TBD" remaining.
 
 Why this file exists: prose claims of "honest module coverage" aren't verifiable — see
 `ONBOARDING.md` §3's "not a promise, it's checked against a ledger." Every top-level
@@ -47,5 +45,5 @@ the way `.agents/context/` did.
 | `health` | Skipped | Health checks fit a long-running server/daemon process; this is a one-shot CLI invocation that exits after each command. |
 | `logger` | Used | `LoggerExtension` — `main.py:build_app()`. |
 | `persistence` | Used | `DatabaseExtension` — `main.py:build_app()`, real SQLite via `ISession`/`SqlAlchemyStudentRepository`. **One real engine gap found and filed**, not silently worked around: [`TASK-019`](../../backlog/TASK-019_database_extension_expose_engine.md) (`DatabaseExtension` exposes no way to reach the raw `Engine` for schema creation) — see `docs/persistence_and_transactions.md` for the workaround applied here. |
-| `pyside_mvc` | TBD — EPIC-002B's own row | Must resolve to **Used**, not Skipped. Two prior sample apps in this repo (`student_management`, `tools/audit_dashboard`) both skipped it in favor of plain `QtWidgets`; that precedent is exactly what this ledger exists to prevent repeating. |
+| `pyside_mvc` | Used | `presentation/roster_view.py` (`QmlHostView`), `roster_presenter.py` (`BasePresenter`), `roster_view_model.py` (`BaseQmlViewModel`), `qml/RosterScreen.qml` (`AppDataTable`, `BaseCard` with a real compact-mode toggle, `AppModal`), `infrastructure/ui/pyside_mvc_extension.py` (real `IExtension`, calls `configure_app_qml()`). All 4 static guards (literal-colour, raw-primitive, rectangle-as-card, import-boundary) return zero findings against this code. Two prior sample apps in this repo (`student_management`, `tools/audit_dashboard`) both skipped `pyside_mvc` in favor of plain `QtWidgets` — this is the first one that doesn't. |
 | `thread_manager` | Skipped | No concurrent or background work to manage — a synchronous CRUD CLI has nothing to hand to a thread pool. |

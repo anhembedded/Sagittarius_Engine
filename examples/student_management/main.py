@@ -64,10 +64,15 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 DEFAULT_DB_PATH = PACKAGE_DIR / "data" / "student_management.db"
 
 
-def build_app(db_url: str | None = None) -> App:
+def build_app(db_url: str | None = None, extra_extensions: list | None = None) -> App:
     """
     @brief Wires and boots the app. See docs/bootstrap.md and
     docs/module_registration.md for why things happen in this exact order.
+
+    @param extra_extensions Registered after the core three, before
+    app.boot(). gui.py passes [PySideMvcExtension()] here — see
+    docs/ui_extension_lifecycle.md for why a QApplication must already
+    exist by the time the caller passes that in.
     """
     config = ConfigManager().load_json(str(PACKAGE_DIR / "config.json"))
     config.load_env(prefix="STUDENT_MGMT_")
@@ -92,6 +97,8 @@ def build_app(db_url: str | None = None) -> App:
     app.use(LoggerExtension())
     app.use(DatabaseExtension())
     app.use(StudentManagementExtension())
+    for extension in extra_extensions or []:
+        app.use(extension)
     # Outermost-first: Logging should see the whole operation (including
     # commit/rollback), Transaction should wrap only the handler itself.
     app.use_middleware(LoggingMiddleware(container))
