@@ -41,7 +41,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
 | **TASK-020** | CI `benchmark` job runs a moved path, masked by `continue-on-error` | CI / Build | P3 | [TASK-020_ci_benchmark_job_stale_path.md](backlog/TASK-020_ci_benchmark_job_stale_path.md) |
 | **TASK-021** | `ruff.toml` shadows `pyproject.toml` — the intended rule set never runs | Build / Tooling | P2 | [TASK-021_ruff_config_shadowing.md](backlog/TASK-021_ruff_config_shadowing.md) |
-| **TASK-032** | Triage and clear the 27-error mypy baseline (split out of `TASK-021`) | Kernel / Typing / Tech Debt | P3 | [TASK-032_mypy_baseline_cleanup.md](backlog/TASK-032_mypy_baseline_cleanup.md) |
+| **TASK-032** | Triage and clear the remaining 23-error mypy baseline (split out of `TASK-021`) | Kernel / Typing / Tech Debt | P3 | [TASK-032_mypy_baseline_cleanup.md](backlog/TASK-032_mypy_baseline_cleanup.md) |
 | **TASK-022** | Package declares MIT but ships no `LICENSE` file | Packaging / Legal | P2 | [TASK-022_missing_license_file.md](backlog/TASK-022_missing_license_file.md) |
 | **TASK-023** | CI's single-version matrix is the blind spot (version range now narrowed to 3.14) | CI / Compatibility | P3 | [TASK-023_ci_matrix_hides_312_313_breakage.md](backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) |
 | **TASK-027** | Engine ships no `py.typed` — consumers get zero type information | Packaging / Typing | P2 | [TASK-027_no_py_typed_marker.md](backlog/TASK-027_no_py_typed_marker.md) |

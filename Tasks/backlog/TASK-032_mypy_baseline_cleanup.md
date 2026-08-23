@@ -1,4 +1,4 @@
-# TASK-032: Triage and clear the 27-error mypy baseline
+# TASK-032: Triage and clear the remaining 23-error mypy baseline
 
 ## Description
 
@@ -9,20 +9,20 @@ uncovered and deliberately left out of scope. Keeping them apart matches
 of work, not a config fix bundled with 27 unrelated type errors.
 
 `scripts/ci-local.ps1` — the repo's real completion gate — has been failing at its mypy step
-throughout tonight's whole work series. Confirmed pre-existing and unrelated to any of it: a
-`git stash` back to a clean `main` before tonight's changes reported **28** errors; after
-tonight's fixes (mostly `TASK-017`'s reliability hardening), **27**. Re-verified today,
-2026-08-23, after `TASK-017`'s full close (7 issues, 7 tests) and `TASK-029`'s doc cleanup: still
-**27**, same files, same lines. Neither of those changed this set.
+throughout tonight's whole work series. History: a `git stash` back to a clean `main` before
+tonight's changes reported **28** errors; after `TASK-017`'s reliability hardening, **27**;
+after `BUG-003`'s fix (2026-08-23, category 1 below — closed, not just filed), **23**. This task
+now covers only what's left.
 
-## The 27, categorized (not a blanket `--ignore-missing-imports` widening — each needs its own look)
+## The remaining 23, categorized (not a blanket `--ignore-missing-imports` widening — each needs its own look)
 
-### 1. Wrong `ILogger | None` annotation — already filed as `BUG-003` (4 errors)
+### 1. ~~Wrong `ILogger | None` annotation~~ — done, see `BUG-003` (was 4 errors)
 
-`kernel/dispatcher.py:34,39,48,54` — `_get_logger()` declares `ILogger | None` while
-`IEngineContext.logger` guarantees non-`None` (`NullLogger` fallback). **Fix this one first and
-separately** — it's a one-line-per-site annotation narrowing, already scoped, already has a
-written fix. See `Tasks/bug_report/incomplete/BUG-003_get_logger_annotation_contradicts_iengincontext_contract.md`.
+Closed 2026-08-23: `kernel/dispatcher.py`'s and `kernel/bootstrap.py`'s `_get_logger()`
+narrowed to `-> ILogger`, matching `IEngineContext.logger`'s guarantee. Also removed 6 dead
+`if logger:` guards in `bootstrap.py` left over from when the type was (wrongly) optional. See
+`Tasks/bug_report/completed/BUG-003_get_logger_annotation_contradicts_iengincontext_contract.md`
+for the full account — kept for context, no action needed here.
 Doing it will drop this baseline from 27 to 23 before the rest of this task even starts.
 
 ### 2. `StdLibContainer` generic return type (3 errors)

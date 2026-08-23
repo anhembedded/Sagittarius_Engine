@@ -14,7 +14,7 @@ class Dispatcher(IDispatcher):
     def __init__(self, context: "IKernelContext") -> None:
         self.context = context
 
-    def _get_logger(self) -> ILogger | None:
+    def _get_logger(self) -> ILogger:
         return self.context.logger
 
     def dispatch(
