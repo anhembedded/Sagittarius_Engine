@@ -48,37 +48,29 @@ def test_architectural_dependency_rules():
         os.path.join(os.path.dirname(__file__), "..", "sagittarius_engine")
     )
 
-    # Rule 1: Kernel must NOT import extensions or sdk
+    # Rule 1: Kernel must NOT import extensions
     kernel_dir = os.path.join(base_dir, "kernel")
     violations = check_forbidden_imports(
         kernel_dir,
-        ["sagittarius_engine.extensions", "sagittarius_engine.sdk"],
+        ["sagittarius_engine.extensions"],
     )
     assert not violations, "Kernel dependency violations found:\n" + "\n".join(
         violations
     )
 
-    # Rule 2: Interfaces must NOT import extensions or sdk
+    # Rule 2: Interfaces must NOT import extensions
     interfaces_dir = os.path.join(base_dir, "interfaces")
     violations = check_forbidden_imports(
         interfaces_dir,
-        ["sagittarius_engine.extensions", "sagittarius_engine.sdk"],
+        ["sagittarius_engine.extensions"],
     )
     assert not violations, "Interfaces dependency violations found:\n" + "\n".join(
         violations
     )
 
-    # Rule 3: Extensions must NOT import sdk
-    extensions_dir = os.path.join(base_dir, "extensions")
-    violations = check_forbidden_imports(extensions_dir, ["sagittarius_engine.sdk"])
-    assert not violations, "Extensions dependency violations found:\n" + "\n".join(
-        violations
-    )
-
-    # Rule 4: SDK must NOT import extensions
-    sdk_dir = os.path.join(base_dir, "sdk")
-    violations = check_forbidden_imports(sdk_dir, ["sagittarius_engine.extensions"])
-    assert not violations, "SDK dependency violations found:\n" + "\n".join(violations)
+    # (Rule 4 removed 2026-08-23: it guarded `sagittarius_engine/sdk/`, the
+    # project-scaffolding package, which was deleted along with
+    # `tools/scaffold.py`. See Tasks/backlog/TASK-024.)
 
 
 def test_public_api_exports():

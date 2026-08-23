@@ -32,7 +32,7 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
 
 ## Requirements
 
-- Python **3.12** or higher (3.12, 3.13, 3.14)
+- Python **3.14** or higher
 - Zero mandatory external dependencies (built on the Python Standard Library)
 
 ---
@@ -48,7 +48,6 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
 - **Unified dispatcher** — route commands and queries through a single `app.dispatch()` call.
 - **Multiple Event Bus strategies** — synchronous, thread-pool, and asyncio variants.
 - **Remote Audit Dashboard (TUI)** — inspect live engine telemetry (tasks, extensions, health) from a separate terminal via the built-in HTTP telemetry server.
-- **SDK templates** — scaffold new Clean Architecture projects with `minimal`, `clean`, `ddd`, or `mvc` templates.
 
 ---
 
@@ -64,12 +63,6 @@ pip install git+https://github.com/anhembedded/Sagittarius-Engine.git
 
 ```bash
 pip install -e .
-```
-
-### Option 3: Scaffold New Clean Architecture Project
-
-```bash
-python -m tools.scaffold my_new_app
 ```
 
 ---
@@ -101,63 +94,31 @@ app.stop()
 
 ---
 
-## Project Templates (SDK)
-
-Use the SDK to scaffold a new project:
-
-```bash
-python -m sagittarius_engine.sdk new my_app --template clean
-```
-
-Available templates:
-
-| Template | Description |
-| --- | --- |
-| `minimal` | Bare-bones App with a single Extension. |
-| `clean` | Layered architecture with Domain, Application, Infrastructure, and Adapters. |
-| `ddd` | Domain-Driven Design template with Aggregate Roots and Domain Events. |
-| `mvc` | Model-View-Controller layout for desktop or CLI apps. |
-
-Generated projects are immediately runnable.
-
----
-
 ## Examples
 
 The `examples/` directory contains reference applications that demonstrate real-world Engine usage.
 
 | Project | Directory | Description |
 | --- | --- | --- |
-| Student Management | `examples/student_management/` | Full Clean Architecture MVP Desktop (PySide6) & CLI App with SQLite persistence, ConfigManager, and BaseEvent domain events. |
-| Desktop Application | `examples/desktop/` | Event-driven PySide6 desktop app with thread-safe UI updates. |
-| Worker Service | `examples/worker/` | Background queue consumer with cooperative cancellation. |
-| Trading Bot | `examples/trading_bot/` | Long-running strategy loop using `HostedService`, `Scheduler`, and `TaskManager`. |
-| WebSocket Client | `examples/websocket/` | Async WebSocket client with reconnect backoff via Async Runtime. |
-| Plugin System | `examples/plugin_system/` | Dynamic Extension loading, dependency graph, and activation. |
-| REST API | `examples/rest_api/` | Simple HTTP server using the DI Container and Dispatcher. |
+| Student Management | `examples/student_management/` | Clean Architecture CLI + `pyside_mvc` QML desktop UI, real SQLite persistence, `IExtension`-based module registration, event-driven UI refresh. Rebuilt 2026-08-23 (`EPIC-002`) — see `.agents/context/examples.md` for the full breakdown. |
+
+`student_management` is the only example. Six other rows this table used to list —
+`desktop/`, `worker/`, `trading_bot/`, `websocket/`, `plugin_system/`, `rest_api/` — were
+removed on 2026-08-23: none of those directories exist, and none is planned.
 
 ---
 
 ## Documentation
 
-The full documentation is available at the project docs site (built with MkDocs Material).
+**The `docs/` tree this section used to describe does not exist** — it was deleted in commit
+`a338d42` ("Remove outdated tutorials and examples") and never rebuilt (confirmed 2026-08-23,
+`git ls-tree -r HEAD` shows 0 files under `docs/`). `mkdocs.yml` still declares `docs_dir: docs`,
+so `mkdocs serve` will fail until either the tree is rebuilt or `mkdocs.yml`/
+`requirements-docs.txt` are removed. Until then, treat `.agents/context/` (start at
+[`.agents/ONBOARDING.md`](.agents/ONBOARDING.md)) as the authoritative documentation for this
+repository.
 
-| Section | Topics |
-| --- | --- |
-| [Getting Started](docs/getting-started/installation.md) | Installation, First App, First Extension, Templates |
-| [Concepts](docs/concepts/README.md) | Engine, Runtime, Dispatcher, Event Bus, Middleware, Extensions, Lifecycle |
-| [Runtime Guides](docs/runtime/application_lifecycle.md) | Application Lifecycle, Hosted Services, Scheduler, Task Manager, Async Runtime, Cancellation Token |
-| [Advanced Guides](docs/advanced/architecture.md) | Extension Dependencies, Architecture, Performance, Best Practices, Troubleshooting |
-| [Tutorials](docs/tutorials/README.md) | Desktop App, Worker Service, Trading Bot, WebSocket Client, Plugin System |
-| [API Reference](docs/api/index.md) | App, EngineContext, Dispatcher, Event Bus, Scheduler, Task Manager, Hosted Service, Extension, Cancellation Token |
-| [Migration Guides](docs/migration/upgrading.md) | Upgrading to v1.0, Deprecated APIs, Migrating from Clean Architecture |
-
-To build and serve the documentation locally:
-
-```bash
-pip install -r requirements-docs.txt
-mkdocs serve
-```
+For the one real sample app's own design notes, see `examples/student_management/docs/`.
 
 ---
 
@@ -167,11 +128,14 @@ mkdocs serve
 # Run the full test suite
 pytest
 
-# Run documentation code validation only
-pytest tests/test_docs.py
-
 # Run with coverage
 pytest --cov=sagittarius_engine
+```
+
+UI tests need an offscreen Qt platform in headless environments:
+
+```bash
+QT_QPA_PLATFORM=offscreen pytest
 ```
 
 ---
@@ -191,4 +155,8 @@ Please ensure all tests pass and the documentation builds without errors before 
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License — declared in `pyproject.toml` (`license = {text = "MIT"}`).
+
+⚠️ **There is no `LICENSE` file in this repository.** This line previously linked to one.
+The declared license and the absent file are tracked as
+[TASK-022](Tasks/backlog/TASK-022_missing_license_file.md).
