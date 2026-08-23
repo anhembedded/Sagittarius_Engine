@@ -161,10 +161,6 @@ This list is exhaustive — a new top-level package is an architecture change.
   `infrastructure/` concretes — that is its job as a composition unit
   (`LoggerExtension` binds `StdLogger` to `ILogger`). It must not be imported
   *by* `kernel/` or `infrastructure/`.
-- `sdk/` — Project scaffolding (`project_generator.py`, `cli.py`) plus the
-  `templates/` the engine emits: `minimal`, `clean`, `ddd`, `mvc`. The
-  `clean`/`ddd` templates are where the 4-layer shape below is materialised,
-  including the `application/` directory the engine itself does not have.
 - `utils/` — Leaf helpers with no engine dependencies (`NullLogger`,
   `PathUtils`).
 

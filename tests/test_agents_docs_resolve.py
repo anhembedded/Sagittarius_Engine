@@ -119,6 +119,11 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         # tests/runtime/ in 843137a). The dangling-ness is the documented
         # fact — see TASK-020.
         "tests/benchmark_runtime.py",
+        # Deleted-feature paths (TASK-024), quoted in project.md's own
+        # "there used to be a row here" note explaining the deletion —
+        # correctly dangling, same pattern as IConnector/TerminalMenu above.
+        "sagittarius_engine.sdk",
+        "tools/scaffold.py",
         # A parameter name of App.boot(), quoted in api.md's correction of
         # its documented type — a method argument, not a class or package.
         "auto_discover",
