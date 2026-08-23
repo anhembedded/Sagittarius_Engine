@@ -82,13 +82,44 @@ def test_public_api_exports():
         "EngineContext",
         "IExtension",
         "ExtensionDescriptor",
-        "ICommand",
-        "IQuery",
-        "BaseRepository",
     }
     assert public_exports == expected_exports, (
         f"Expected root exports {expected_exports}, got {public_exports}"
     )
+
+
+def test_bare_import_does_not_pull_in_any_extension():
+    """@brief Regression test for TASK-031: importing bare `sagittarius_engine`
+    must not transitively import the `extensions` package at all.
+
+    It did — persistence specifically — until `BaseRepository`, `ICommand`,
+    and `IQuery` were all dropped from the top-level re-export list. Removing
+    only `BaseRepository` was insufficient (this test caught that): Python
+    always executes a parent package's `__init__.py` before any of its
+    submodules, and `extensions/__init__.py` is a barrel that eagerly imports
+    every extension's public symbols (persistence's `ISession` included, via
+    `health.health_check_query`) — so importing `extensions.cqrs` alone for
+    `ICommand`/`IQuery` was enough to trigger the whole barrel regardless of
+    which name was asked for. Asserting on the barrel itself, not just
+    persistence, is the stronger and more honest claim.
+
+    Run in a subprocess so this reflects only a fresh import, not whatever
+    earlier tests in the same process happened to import."""
+    import subprocess
+    import sys
+
+    script = (
+        "import sys\n"
+        "import sagittarius_engine\n"
+        "assert 'sagittarius_engine.extensions' not in sys.modules, "
+        "'bare import pulled in the extensions barrel'\n"
+        "print('OK')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "OK" in result.stdout
 
 
 def test_deprecation_warnings():
