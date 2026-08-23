@@ -134,10 +134,13 @@ classDiagram
       +string sortKey
       +bool sortAscending
       +alias currentIndex
+      +real zoomFactor
       +rowClicked(index, rowData)
       +rowDoubleClicked(index, rowData)
       -_weightSum() int
       -_sortedModel() var
+      -_effectiveColumnWidths() var
+      -_resizeColumn(index, newWidth)
     }
     class AppModal {
       <<Popup root>>

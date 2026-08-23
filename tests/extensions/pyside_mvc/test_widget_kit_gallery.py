@@ -179,6 +179,115 @@ def test_app_data_table_current_index_defaults_unselected_and_is_settable(qtbot)
     assert root.property("currentIndex") == 1
 
 
+def test_app_data_table_current_index_survives_empty_to_populated_model(qtbot):
+    """Regression (found 2026-08-23): ListView resets currentIndex to 0 on
+    its own whenever `model` transitions from empty to non-empty, not just
+    once at load. app_data_table_probe.qml's model is set once at
+    construction and never exercises that transition, which is exactly why
+    this needs its own fixture -- a real screen's ViewModel starts empty and
+    populates moments after boot, the same shape as
+    app_data_table_dynamic_model_probe.qml here."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(
+            str(_FIXTURES_DIR / "app_data_table_dynamic_model_probe.qml")
+        )
+    )
+    assert widget.errors() == []
+    root = widget.rootObject()
+    assert root is not None
+
+    table = root.findChild(QObject, "table")
+    assert table is not None
+    assert table.property("currentIndex") == -1
+
+    root.setProperty("tableModel", [{"a": 1, "b": 2}, {"a": 3, "b": 4}])
+    assert table.property("currentIndex") == -1
+
+
+def test_app_data_table_zoom_factor_scales_row_height(qtbot):
+    """Ctrl+wheel zoom (TASK-036) scales row height along with font size;
+    verified here via the rendered delegate's actual height rather than the
+    wheel gesture itself (no precedent for simulated wheel/mouse input in
+    this suite)."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "app_data_table_probe.qml"))
+    )
+    assert widget.errors() == []
+    widget.resize(600, 200)
+    widget.show()
+    for _ in range(5):
+        qtbot.wait(1)
+    root = widget.rootObject()
+    assert root is not None
+
+    rows_view = root.findChild(QObject, "appDataTableRows")
+    assert rows_view is not None
+
+    def first_delegate():
+        content_item = rows_view.property("contentItem")
+        items = content_item.childItems()
+        return items[0] if items else None
+
+    base_row = first_delegate()
+    assert base_row is not None
+    base_height = base_row.property("height")
+
+    root.setProperty("zoomFactor", 2.0)
+    for _ in range(5):
+        qtbot.wait(1)
+    zoomed_row = first_delegate()
+    assert zoomed_row is not None
+    assert zoomed_row.property("height") == pytest.approx(base_height * 2.0)
+
+
+def test_app_data_table_resized_column_keeps_others_and_last_absorbs_rest(qtbot):
+    """Drag-to-resize (TASK-036): resizing one column keeps every other
+    column at its own explicit width; the LAST column absorbs whatever
+    space remains rather than needing a horizontal scrollbar. Drives the
+    same `_userResized`/`_columnWidths` state a real drag would produce
+    (via DragHandler) rather than the drag gesture itself -- verified by
+    the DragHandler's own wiring in code review, no precedent for
+    simulated pointer-drag input in this suite."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "app_data_table_probe.qml"))
+    )
+    assert widget.errors() == []
+    widget.resize(600, 200)
+    widget.show()
+    for _ in range(5):
+        qtbot.wait(1)
+    root = widget.rootObject()
+    assert root is not None
+
+    rows_view = root.findChild(QObject, "appDataTableRows")
+    header_row = rows_view.parentItem().childItems()[0].childItems()[-1]
+    header_cells = [c for c in header_row.childItems() if c.property("width")][:3]
+    assert len(header_cells) == 3
+    assert [c.property("width") for c in header_cells] == pytest.approx(
+        [192.0, 192.0, 192.0]
+    )
+
+    root.setProperty("_userResized", True)
+    root.setProperty("_columnWidths", [200.0, 150.0, 0.0])
+    for _ in range(5):
+        qtbot.wait(1)
+
+    widths = [c.property("width") for c in header_cells]
+    assert widths[0] == pytest.approx(200.0)
+    assert widths[1] == pytest.approx(150.0)
+    # Last column absorbs the rest of headerRow's usable width (576 = 600 - 2*12 margins).
+    assert widths[2] == pytest.approx(576.0 - 200.0 - 150.0)
+
+
 def test_time_range_card_clear_resets_toggle_and_both_dates(qtbot):
     """Clear (TASK-036, found missing 2026-08-23) resets the whole range in
     one click instead of requiring the toggle and both fields cleared by

@@ -59,7 +59,18 @@ leave it as a blind "review everything":
 ## Progress so far
 
 - **`AppDataTable`**: shipped — click-to-sort columns, row selection/hover (see the "gains
-  click-to-sort columns and row selection" commit).
+  click-to-sort columns and row selection" commit); drag-to-resize columns and Ctrl+wheel zoom
+  (row height + font scale) added afterward, on user request ("table resize vs zoom").
+  Resize: the LAST column absorbs whatever width the others don't use (no horizontal scrollbar
+  needed); resizing latches `_userResized` so a later window resize keeps every explicit width and
+  only the last column keeps flexing, instead of reverting to proportional. Found and fixed a
+  related regression while verifying this with a real screenshot: `currentIndex` (row selection,
+  shipped just before) silently reset to 0 whenever `model` transitioned from empty to
+  non-empty — not just once at load — so a real screen (whose ViewModel starts empty and
+  populates moments after boot) always looked like it had row 0 "selected" before any click. The
+  original probe-fixture test for `currentIndex` never caught this because its model is set once
+  at construction and never exercises that transition; a second fixture
+  (`app_data_table_dynamic_model_probe.qml`) now covers it.
 - **`TimeRangeCard`**, **`DateTimePicker`**: shipped — Clear (both), Today (calendar popup) (see
   the "gains Clear/Today actions" commit).
 - **External-library spike (2026-08-23, `experiment/qml-external-date-picker` branch, not

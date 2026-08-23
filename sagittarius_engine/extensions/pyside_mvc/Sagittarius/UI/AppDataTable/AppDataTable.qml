@@ -51,8 +51,56 @@ BaseCard {
     //: internals; the two click signals carry the row's own data so a
     //: consumer never has to re-index into `model` itself.
     property alias currentIndex: rows.currentIndex
+    //: Set once the user actually clicks a row -- see the ListView's own
+    //: onModelChanged for why this exists.
+    property bool _userSelected: false
     signal rowClicked(int index, var rowData)
     signal rowDoubleClicked(int index, var rowData)
+
+    //: Column drag-to-resize (TASK-036, found missing 2026-08-23). Widths
+    //: stay weight-proportional (the original, still-default behaviour)
+    //: until the user actually drags a column border, at which point
+    //: `_userResized` latches true and every column but the last keeps its
+    //: explicit width -- the last column is the flexible one that absorbs
+    //: whatever space remains, including on a later window resize. This
+    //: mirrors common simple table-resize behaviour without needing a
+    //: horizontal scrollbar.
+    property var _columnWidths: []
+    property bool _userResized: false
+
+    function _resizeColumn(index, newWidth) {
+        root._userResized = true
+        var widths = root._effectiveColumnWidths()
+        widths[index] = Math.max(40, newWidth)
+        root._columnWidths = widths
+    }
+
+    function _effectiveColumnWidths() {
+        var available = headerRow.width
+        if (!root._userResized || root._columnWidths.length !== root.columns.length) {
+            var sum = root._weightSum()
+            var proportional = []
+            for (var i = 0; i < root.columns.length; i++) {
+                proportional.push((root.columns[i].weight || 1) / sum * available)
+            }
+            return proportional
+        }
+        var widths = root._columnWidths.slice()
+        var usedByOthers = 0
+        for (var j = 0; j < widths.length - 1; j++) {
+            usedByOthers += widths[j]
+        }
+        widths[widths.length - 1] = Math.max(40, available - usedByOthers)
+        return widths
+    }
+
+    //: Table-level zoom (TASK-036): Ctrl+wheel over the table scales row
+    //: height and font size together, the same "zoom the dense content"
+    //: convention spreadsheets/IDEs already use -- not an app-wide zoom,
+    //: just this table's own content.
+    property real zoomFactor: 1.0
+    readonly property real _minZoom: 0.6
+    readonly property real _maxZoom: 2.0
 
     //: Sorts a copy of `model` by `sortKey`/`sortAscending` -- sorting the
     //: raw (pre-formatter) values, so e.g. a GPA column sorts numerically
@@ -96,7 +144,7 @@ BaseCard {
         // ---- Header ----------------------------------------------------
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: root.headerHeight
+            Layout.preferredHeight: root.headerHeight * root.zoomFactor
             color: Theme.bgCardHeader
             radius: Theme.radiusMd
 
@@ -128,17 +176,19 @@ BaseCard {
                     delegate: Text {
                         id: headerCell
                         required property var modelData
+                        required property int index
                         readonly property bool sortable: modelData.sortable !== false
                         readonly property bool active: root.sortKey === modelData.key
+                        readonly property bool isLast: index === root.columns.length - 1
 
-                        width: (modelData.weight || 1) / root._weightSum() * headerRow.width
+                        width: root._effectiveColumnWidths()[index] || 0
                         height: headerRow.height
                         verticalAlignment: Text.AlignVCenter
                         horizontalAlignment: modelData.align !== undefined ? modelData.align : Text.AlignLeft
                         text: (modelData.title || modelData.key) +
                               (active ? (root.sortAscending ? " ▲" : " ▼") : "")
                         color: active ? Theme.textPrimary : Theme.muted
-                        font.pixelSize: Theme.fontSizeSm
+                        font.pixelSize: Theme.fontSizeSm * root.zoomFactor
                         font.bold: true
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
@@ -156,6 +206,45 @@ BaseCard {
                                 }
                             }
                         }
+
+                        //: Drag-to-resize handle (TASK-036): a thin strip
+                        //: on the column's right border, hidden on the
+                        //: last column since it's the one that absorbs
+                        //: remaining space instead of being dragged.
+                        Item {
+                            visible: !headerCell.isLast
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 8
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 1
+                                height: parent.height
+                                color: resizeDrag.active ? Theme.accent : "transparent"
+                            }
+
+                            HoverHandler {
+                                cursorShape: Qt.SizeHorCursor
+                            }
+
+                            DragHandler {
+                                id: resizeDrag
+                                target: null
+                                property real _startWidth: 0
+                                onActiveChanged: {
+                                    if (active) {
+                                        _startWidth = root._effectiveColumnWidths()[headerCell.index]
+                                    }
+                                }
+                                onActiveTranslationChanged: {
+                                    if (active) {
+                                        root._resizeColumn(headerCell.index, _startWidth + activeTranslation.x)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -168,10 +257,20 @@ BaseCard {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            //: ListView otherwise defaults currentIndex to 0 once it has a
-            //: non-empty model, which would render row 0 as "selected"
-            //: before the user has ever clicked anything.
+            //: ListView resets currentIndex to 0 on its own whenever
+            //: `model` transitions from empty to non-empty -- not just
+            //: once at load. Found 2026-08-23: the plain `currentIndex: -1`
+            //: this replaced only survived until real data actually
+            //: arrived (RosterScreen's model starts empty, then populates
+            //: moments after boot), so row 0 still ended up looking
+            //: "selected" before any click, defeating the whole point.
+            //: `onModelChanged` re-asserts -1 on every model swap (sort,
+            //: filter, fresh data) UNTIL the user actually clicks a row
+            //: (root._userSelected, set in the row's onClicked below) --
+            //: after that this stays hands off, so a later re-sort doesn't
+            //: silently clear a real selection.
             currentIndex: -1
+            onModelChanged: if (!root._userSelected) currentIndex = -1
             model: root._sortedModel()
             ScrollBar.vertical: ScrollBar {}
 
@@ -191,7 +290,7 @@ BaseCard {
                 property var rowData: modelData
 
                 width: ListView.view.width
-                height: root.rowHeight
+                height: root.rowHeight * root.zoomFactor
                 //: Priority: selected > hovered > zebra > transparent.
                 color: {
                     if (rowDelegate.index === rows.currentIndex) return Theme.stateActiveTint
@@ -205,6 +304,7 @@ BaseCard {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
+                        root._userSelected = true
                         rows.currentIndex = rowDelegate.index
                         root.rowClicked(rowDelegate.index, rowDelegate.rowData)
                     }
@@ -221,15 +321,16 @@ BaseCard {
                         model: root.columns
                         delegate: Text {
                             required property var modelData
+                            required property int index
                             readonly property var cellValue: rowDelegate.rowData[modelData.key]
 
-                            width: (modelData.weight || 1) / root._weightSum() * cellsRow.width
+                            width: root._effectiveColumnWidths()[index] || 0
                             height: cellsRow.height
                             verticalAlignment: Text.AlignVCenter
                             horizontalAlignment: modelData.align !== undefined ? modelData.align : Text.AlignLeft
                             text: modelData.formatter ? modelData.formatter(cellValue) : String(cellValue)
                             color: Theme.textPrimary
-                            font.pixelSize: Theme.fontSizeMd
+                            font.pixelSize: Theme.fontSizeMd * root.zoomFactor
                             // Security & UI Injection Defense (qml-rule.md
                             // §3.3): cell content can be arbitrary data.
                             textFormat: Text.PlainText
@@ -246,6 +347,25 @@ BaseCard {
                 color: Theme.muted
                 font.pixelSize: Theme.fontSizeMd
                 textFormat: Text.PlainText
+            }
+        }
+    }
+
+    //: Ctrl+wheel zoom (TASK-036). acceptedButtons: Qt.NoButton means this
+    //: never intercepts clicks (header sort, row select still reach their
+    //: own MouseAreas underneath); only wheel events are seen here, and
+    //: only Ctrl+wheel ones are consumed -- a plain wheel still reaches the
+    //: ListView below for normal scrolling.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: (wheel) => {
+            if (wheel.modifiers & Qt.ControlModifier) {
+                var step = wheel.angleDelta.y > 0 ? 0.1 : -0.1
+                root.zoomFactor = Math.max(root._minZoom, Math.min(root._maxZoom, root.zoomFactor + step))
+                wheel.accepted = true
+            } else {
+                wheel.accepted = false
             }
         }
     }
