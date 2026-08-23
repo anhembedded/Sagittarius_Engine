@@ -1,5 +1,38 @@
 # TASK-027: Engine ships no `py.typed` — consumers get zero type information
 
+> **Closed 2026-08-23, released in `2.2.0`.** Requirements 1–3 done. Requirement 4 is
+> **deliberately not done** and is not this repo's to do. Requirement 5's sequencing advice was
+> considered and consciously overridden — reasoning below.
+>
+> - **Req 1** — `sagittarius_engine/py.typed` added (empty, as PEP 561 specifies).
+> - **Req 2** — listed in `[tool.setuptools.package-data]` with a comment explaining why it must
+>   be there.
+> - **Req 3** — verified rather than assumed, exactly as the requirement insisted: built the wheel
+>   and inspected it. `sagittarius_engine/py.typed` is present. Locked in by
+>   `tests/test_py_typed_marker.py`, which checks the source file, the `package-data`
+>   declaration, and the built wheel's actual contents.
+> - **Req 4 — out of scope, permanently.** Removing the `ignore_missing_imports` override lives in
+>   `Sagittarius_Elite_Warrior/pyproject.toml`. `ONBOARDING.md` §8 forbids this repo writing to
+>   that one, and it is not present on this machine (checked). The marker released here is what
+>   unblocks it; the change itself belongs to a task on that repo's board.
+> - **Req 5 — overridden, deliberately.** It advised sequencing after the mypy cleanup so
+>   consumers "don't inherit a wave of engine-side noise." That mypy work (`TASK-032`) is still
+>   open, so strictly this shipped early. The judgement: the marker is additive and correct, and
+>   the concern is likely mis-stated — a type checker does not report errors *inside* an installed
+>   dependency; what consumers will see is latent errors in **their own** code that were
+>   unreportable while every engine symbol was `Any`. That is the point of the task, not noise.
+>   Recorded here rather than silently ignored.
+>
+> **A defect found while verifying req 3 — the reason that requirement's insistence on verifying
+> was right.** The first wheel built contained **9 stale assets** under
+> `extensions/pyside_mvc/QmlShared/` (`BaseCard.qml`, `LogPanel.qml`, `qmldir`, and six more) that
+> do not exist in the source tree — leftovers from the `2.0.0` rename that deleted them.
+> `setuptools` copies `build/lib/` into the wheel wholesale and never prunes it, and `build/` is
+> gitignored so `git status` shows nothing. `rm -rf build dist` first drops it to 0 (measured both
+> ways). Every wheel ever built from a dirty tree here is affected, `2.0.0` and `2.1.0` included.
+> Fixed procedurally by the new `.agents/rules/release.md` §2 and mechanically by the stale-asset
+> assertion in `tests/test_py_typed_marker.py`.
+
 ## Description
 
 `sagittarius_engine/` is fully annotated, and the project enforces strict typing on itself

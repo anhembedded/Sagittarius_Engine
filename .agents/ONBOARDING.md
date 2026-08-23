@@ -153,6 +153,7 @@ and weren't listed anywhere. Check the file, not a summary of the file.
 | Testing | `testing.md` |
 | Documentation | `documentation.md` |
 | Commit | `commit-rule.md` |
+| Cutting a release (version bump, tag, changelog) | `release.md` |
 | Deployment | `deployment.md` |
 | Complex multi-phase task | `task-tracking.md` |
 | UI / QML (`pyside_mvc`) | `ui-architecture.md` |

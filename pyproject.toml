@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sagittarius-engine"
-version = "2.1.0"
+version = "2.2.0"
 description = "A lightweight, modular Python Application Engine"
 readme = "readme.md"
 requires-python = ">=3.14"
@@ -35,6 +35,12 @@ include = ["sagittarius_engine*", "tools*"]
 
 [tool.setuptools.package-data]
 sagittarius_engine = [
+    # PEP 561 marker. Without it a type checker ignores this package's inline
+    # annotations entirely and every consumer sees the engine as untyped —
+    # which also cascades, silently shrinking how much of *their* code gets
+    # checked. This block is the only mechanism shipping non-.py files, so the
+    # marker must be listed here to reach the wheel (TASK-027).
+    "py.typed",
     "extensions/pyside_mvc/Sagittarius/UI/qmldir",
     "extensions/pyside_mvc/Sagittarius/UI/*/*.qml",
     "extensions/pyside_mvc/runtime/*.qml",
