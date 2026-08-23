@@ -26,6 +26,25 @@
 > per `rules/design-discipline.md` — "prefer leaving something undone and named over done and
 > wrong."
 
+> **Fully closed 2026-08-23.**
+>
+> - **Req 2 — done.** `tests/test_ci_local_gate_missing_tool.py` runs `scripts/ci-local.ps1`
+>   in a subprocess with a minimal `PATH` that cannot resolve `ruff`/`mypy`/`pytest` —
+>   reproducing the exact original scenario — and asserts a nonzero exit and `RESULT: FAIL`, not
+>   a false `RESULT: PASS`. Chose a pytest-based check over Pester: this repo has zero existing
+>   Pester usage and an entirely pytest-based test suite (`testing.md`: follow the conventions
+>   already used), so a subprocess test fits the existing tooling better than introducing a
+>   second test framework for one check.
+> - **Req 3 — done.** `.agents/ONBOARDING.md` §1a corrected: the `export PATH=".venv/bin"` line
+>   is now presented as an optional accelerant for the documented `.venv` workflow
+>   (`rules/install-rule.md`), not a requirement — `scripts/ci-local.ps1` already detects a
+>   missing `.venv`, warns, and falls back to system-resolved tools on its own. Also fixed two
+>   numbers in the same paragraph that had already gone stale in the few hours since they were
+>   written (stale tool-version pins, a hardcoded pass/fail claim) — replaced with a pointer at
+>   reading the gate's own output rather than trusting a snapshot.
+
+
+
 ## Description
 
 `pre_commit.ps1` gates every step on `$LASTEXITCODE`:
