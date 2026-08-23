@@ -44,19 +44,29 @@ and mypy problems took two runs instead of one.
 Run it:
 
 ```bash
-export PATH="$PWD/.venv/bin:$PATH"
 pwsh ./scripts/ci-local.ps1
 ```
 
-**Always read the printed `===CI_LOCAL_RESULT===` block, and open `LOG_FILE` before reporting
-status — never judge from scrollback alone**, per the block's own printed instruction.
+If you set up the repo with a `.venv` per `rules/install-rule.md`, put it on `PATH` first so its
+pinned tools are the ones found:
 
-**Known current state (2026-08-23):** all 5 steps pass — `RESULT: PASS`, `FAILED_STEPS: none`.
-mypy's pre-existing debt (28 → 27 → 23 → 0, see `TASK-032`) is fully cleared as of this date. If
-the gate is red for you, it is either a real regression from whatever you just touched, or your
-local toolchain drifting from CI's pinned versions (`TASK-021` — local `ruff`/`mypy` are not
-currently pinned to CI's `0.15.20`/`2.1.0`) — not leftover baseline debt. There is none left to
-blame.
+```bash
+export PATH="$PWD/.venv/bin:$PATH"   # Windows: $PWD/.venv/Scripts
+```
+
+**No `.venv` is not a broken setup** (verified 2026-08-23 — this checkout genuinely has none;
+`ruff`/`mypy` were installed globally instead). `scripts/ci-local.ps1` itself checks for one,
+warns if absent, and falls back to whatever `ruff`/`mypy`/`pytest` resolve to on `PATH` — the
+export line above is an optional accelerant for the documented `.venv` workflow, not a
+requirement the script depends on.
+
+**Always read the printed `===CI_LOCAL_RESULT===` block, and open `LOG_FILE` before reporting
+status — never judge from scrollback alone**, per the block's own printed instruction. Do not
+trust a hardcoded pass/fail summary here either — this exact note has already gone stale once
+(claimed pins this file no longer matches, once the pins were bumped in `TASK-021`). Run the
+gate and read its own output; check `requirements-dev.txt` for the current pins if a local/CI
+mismatch is suspected (`scripts/ci-local.ps1` now checks this for you automatically, per
+`TASK-021` req. 5).
 
 ## 2. Repository layout
 
