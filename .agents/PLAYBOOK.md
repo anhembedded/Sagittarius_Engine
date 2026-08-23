@@ -78,6 +78,7 @@ Always apply:
 
 - rules/architecture.md
 - rules/coding-style.md
+- rules/surprising-findings.md
 
 Additionally apply:
 
@@ -85,7 +86,6 @@ Additionally apply:
 |------|-------|
 | Testing | testing.md |
 | Documentation | documentation.md |
-| Knowledge Base | knowledge-base.md |
 | Commit | commit-rule.md |
 | Deployment | deployment.md |
 | Complex Multi-Phase Task | task-tracking.md |

@@ -30,11 +30,11 @@ rules:
   - module-implement-rule.md
   - testing.md
   - documentation.md
-  - knowledge-base.md
   - commit-rule.md
   - deployment.md
   - task-tracking.md
   - ui-architecture.md
+  - surprising-findings.md
 
 skills:
   - process_a_task.md
