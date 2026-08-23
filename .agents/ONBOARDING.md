@@ -17,6 +17,41 @@ the other (found and fixed 2026-08-23: six rule files here told an AI session to
 `Sagittarius_Elite_Warrior\scripts\ci-local.ps1` — the *other* repo's script, which does not
 exist in this one).
 
+Python floor is **3.14** (`requires-python = ">=3.14"` in `pyproject.toml`, raised from `>=3.12`
+on 2026-08-23 to match what CI actually tests — see
+`Tasks/backlog/TASK-023_ci_matrix_hides_312_313_breakage.md` for why a declared-but-untested
+floor is exactly the kind of claim this repo no longer makes). Do not
+write code that needs to run on an older Python; there is no fallback path.
+
+## 1a. The completion gate — run this before calling anything done
+
+`pre_commit.ps1` at the repo root is the actual, authoritative local CI gate (5 steps: ruff
+lint, ruff format check, mypy, pytest+coverage, architecture tests). It exists on disk and was
+not run for four consecutive commits in this repo's history on 2026-08-23, until the user
+directly caught the omission. This is the same failure mode `Sagittarius_Elite_Warrior`
+already had a rule about (its own `scripts/ci-local.ps1 -Full`) — piecemeal
+`pytest`/`ruff`/`mypy` on touched files, even all green, is not evidence the repo passes its
+own gate.
+
+Run it — needs `pwsh` (present via snap on this machine) and the venv on `PATH`:
+
+```bash
+export PATH="$PWD/.venv/bin:$PATH"
+QT_QPA_PLATFORM=offscreen pwsh ./pre_commit.ps1 > /tmp/gate.log 2>&1; echo "exit: $?"
+grep -E "FAILED|failed!|passed successfully" /tmp/gate.log
+```
+
+Piecemeal `pytest`/`ruff`/`mypy` on just the files you touched is not a substitute — it scopes
+lint to a diff, not the tree; the gate found 338 lint errors across the whole repo on
+2026-08-23 that no touched-files check would have seen. Run the real gate before committing,
+not just before reporting done.
+
+**Known current state (2026-08-23, commit `df51202`):** steps 1–2 (lint, format) pass. Step 3
+(mypy) fails with ~27 pre-existing errors, confirmed present on `main` before that day's work
+and unrelated to it — tracked in `TASK-021` requirement 5, not yet triaged. If mypy is red with
+a *different* count or *different* files than that, treat it as a real regression, not this
+known debt — check `TASK-021` for the current baseline before assuming it's pre-existing.
+
 ## 2. Repository layout
 
 ```
@@ -179,3 +214,31 @@ Say so and ask, rather than guessing and proceeding. This has been the stated st
 preference throughout this repo's history, reinforced by the exact failure this onboarding
 rewrite responds to: a doc that was confidently wrong for three weeks because nothing forced
 anyone to check it.
+
+## 10. Where things stand (2026-08-23, commit `df51202`)
+
+For a fresh session picking this up: EPIC-002 is fully complete (4/4). The engine audit that
+followed it found real bugs, not just doc drift — a full account is in each commit message
+(`git log --oneline -8`), summarized here so it doesn't need re-deriving:
+
+- Fixed: a missing import (`ITaskHandle`) that made `app.boot()` raise on Python ≤3.13 while
+  staying invisible on 3.14's deferred annotations; a dead unimportable package
+  (`infrastructure/persistence/`); the scaffolding feature (`tools/scaffold.py`,
+  `sagittarius_engine/sdk/`) removed entirely — unused, and broken in both its documented
+  forms; the `ruff.toml`/`pyproject.toml` config shadow (§1a's gate now actually lints).
+- Added two permanent guards: `tests/test_agents_docs_resolve.py` (`.agents/context/` claims
+  must resolve against the real tree) and `tests/test_all_modules_importable.py` (every module
+  must import, and public interface annotations must resolve — this is what would have caught
+  `ITaskHandle` on day one).
+- **Next real work, in priority order** (`Tasks/README.md` has the full table):
+  1. `TASK-026` (P1) — a validation middleware silently skips validation when it can't resolve
+     type hints. No log, no error.
+  2. `TASK-017` (P1, pre-existing) — 7-item production-readiness checklist. **Verify each item
+     against the current tree before touching it**: a spot-check on 2026-08-23 found item #3
+     already fixed and unchecked, item #6 half-fixed. Don't trust the checkboxes.
+  3. `TASK-021` remainder — the ~27 pre-existing mypy errors (§1a), CI toolchain pinning,
+     linting `examples/`/`tools/`.
+  4. `TASK-022` (LICENSE file) — blocked on the owner: needs a copyright name/year, deliberately
+     not guessed.
+- Two tasks filed on the *other* repo (`Sagittarius_Elite_Warrior/Tasks/backlog/BOT-118`,
+  `BOT-119`) from cross-checking its engine usage — see §8, do not action them from here.
