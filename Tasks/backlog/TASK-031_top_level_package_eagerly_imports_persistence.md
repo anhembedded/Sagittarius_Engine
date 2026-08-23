@@ -67,6 +67,6 @@ Architecture / Package Boundaries
 
 ## Related
 
-- [TASK-017](../in_progress/TASK-017_production_readiness_hardening.md) — issue 3, whose
+- [TASK-017](../completed/TASK-017_production_readiness_hardening.md) — issue 3, whose
   regression test (`tests/middleware/test_middleware.py::test_core_boot_does_not_require_persistence_extension`)
   found this while verifying the fix was complete.
