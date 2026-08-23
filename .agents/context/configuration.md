@@ -67,6 +67,40 @@ raw `Engine` for schema creation/DDL/reflection, and it supports adding/removing
 by resolving it from a real, already-booted `App` and mutating it at runtime — see
 `tests/extensions/persistence/test_database_extension_runtime.py`.
 
+## One SQLite file per shard — `SqliteShardManager`
+
+`database.shards` above expects you to know every database up front. When you don't — a shard
+per tenant, per partition, per traded instrument, learned at runtime — construct
+`SqliteShardManager` directly (`extensions/persistence/sqlite_shard_manager.py`, EPIC-004):
+
+```python
+from sagittarius_engine.extensions.persistence.sqlite_shard_manager import (
+    IN_MEMORY, SqliteShardConfig, SqliteShardManager,
+)
+
+manager = SqliteShardManager(SqliteShardConfig(directory="data/", metadata=Base.metadata))
+with manager.get_raw_session("BTCUSDT") as session:   # file created on first use
+    ...
+```
+
+Import it from its own module, not from the `persistence` package: that package's `__init__`
+is reached while booting the kernel, so re-exporting anything importing SQLAlchemy at module
+scope would make SQLAlchemy mandatory just to start the engine (`SqlAlchemyDatabaseManager` is
+kept out of the re-exports for the same reason).
+
+It is an `IDatabaseManager`, so the usual session/engine/name/disposal methods work, plus
+shard listing, removal, purging and vacuuming for the file lifecycle. Pass
+`directory=IN_MEMORY` for tests — each shard gets its own shared-cache URI, so connections to
+one shard see the same database while different shards stay isolated (plain `:memory:` would
+give every connection its own empty one).
+
+What it sets up for you, because each is easy to miss: WAL + `synchronous=NORMAL` applied on
+**every** connection (SQLite scopes PRAGMAs per connection; applying them once at engine
+creation silently does nothing for pooled connections), `check_same_thread=False` plus a lock
+timeout so pooled connections survive threads, shard-name validation and path-traversal
+containment, and `-wal`/`-shm` sidecar cleanup on removal. Override any of it via
+`SqliteShardConfig`; `pragmas=()` disables the PRAGMAs entirely.
+
 ## Extensions with their own config
 
 Some extensions accept parameters directly at construction instead of going through

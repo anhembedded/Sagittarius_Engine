@@ -63,6 +63,23 @@ class ISession(ABC):
         """
         ...
 
+    def connection(self) -> Any:
+        """
+        @brief Returns the underlying Core connection for this session, if it has one.
+
+        @details The deliberate escape hatch for bulk work: driving a chunked
+        `INSERT ... ON CONFLICT` through the Core connection skips per-row ORM
+        overhead, which the ORM-level methods above cannot express.
+
+        Optional, not abstract — `ISession` already ships in released versions, so
+        requiring it would break every existing implementation (it did: adding it as
+        `@abstractmethod` broke this repo's own test doubles). Same reasoning as
+        `close()` below. Backends with no meaningful Core connection may leave it.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose a Core connection."
+        )
+
     def close(self) -> None:
         """
         @brief Closes the session.

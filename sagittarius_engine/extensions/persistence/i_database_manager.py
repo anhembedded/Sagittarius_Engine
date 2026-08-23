@@ -27,9 +27,14 @@ class IDatabaseManager(ABC):
     """
 
     @abstractmethod
-    def add_database(self, name: str, url: str) -> None:
+    def add_database(self, name: str, url: str, **engine_options: Any) -> None:
         """@brief Creates an engine + session for `name`. Raises `ValueError` if `name`
-        is already registered."""
+        is already registered.
+
+        @param engine_options Passed straight through to SQLAlchemy's `create_engine`
+        (`connect_args`, `pool_size`, `echo`, …). Without this, a caller could not set
+        SQLite's `check_same_thread`/`timeout`, which any multi-threaded app needs.
+        """
         ...
 
     @abstractmethod
@@ -53,4 +58,14 @@ class IDatabaseManager(ABC):
     @abstractmethod
     def names(self) -> list[str]:
         """@brief Returns the currently registered database names."""
+        ...
+
+    @abstractmethod
+    def dispose_all(self) -> None:
+        """@brief Disposes every engine this manager owns and forgets them all.
+
+        @details Call at application shutdown or test teardown — without it, SQLite
+        file handles stay open and surface as `ResourceWarning: unclosed database`.
+        Unlike `remove_database`, this never touches anything on disk.
+        """
         ...
