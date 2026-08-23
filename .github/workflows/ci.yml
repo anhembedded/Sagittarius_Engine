@@ -41,13 +41,13 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Ruff — lint
-        run: ruff check sagittarius_engine tests
+        run: ruff check sagittarius_engine tests examples tools
 
       - name: Ruff — format check
-        run: ruff format --check sagittarius_engine tests
+        run: ruff format --check sagittarius_engine tests examples tools
 
       - name: mypy — type check
-        run: mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip
+        run: mypy sagittarius_engine tests examples tools --ignore-missing-imports --follow-imports=skip
 
   # ──────────────────────────────────────────────────────────────
   # Job 2: Test Matrix (Python 3.14 dev on Linux & Windows)

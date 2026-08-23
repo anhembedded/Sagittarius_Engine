@@ -50,9 +50,7 @@ class Student:
             raise ValueError(f"gpa must be between {MIN_GPA} and {MAX_GPA}, got {gpa}")
 
     @classmethod
-    def enroll(
-        cls, full_name: str, email: Email, major: str, gpa: float
-    ) -> "Student":
+    def enroll(cls, full_name: str, email: Email, major: str, gpa: float) -> "Student":
         return cls(
             id=StudentId.new(),
             full_name=full_name,

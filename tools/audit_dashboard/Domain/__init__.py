@@ -3,11 +3,11 @@ Domain layer for the Audit Dashboard.
 """
 
 from .entities import (
-    SystemHealth,
-    EnvironmentMetrics,
-    TaskDetail,
-    ExtensionInfo,
     EngineTelemetry,
+    EnvironmentMetrics,
+    ExtensionInfo,
+    SystemHealth,
+    TaskDetail,
 )
 from .ports import IRealtimeConnector
 

@@ -1,4 +1,5 @@
-from typing import Dict, Any
+from typing import Any
+
 from Domain.ports import IRealtimeConnector
 from event.dashboard_events import TelemetryReceivedEvent
 
@@ -7,11 +8,11 @@ try:
     from src.interfaces import ICommand, IEventBus
 except ImportError:
 
-    class ICommand:
+    class ICommand:  # type: ignore[no-redef]
         def execute(self, data: Any) -> Any:
             pass
 
-    class IEventBus:
+    class IEventBus:  # type: ignore[no-redef]
         def emit(self, event_name: str, event: Any) -> None:
             pass
 
@@ -25,7 +26,7 @@ class StartRealtimeListenerCommand(ICommand):
         self.connector = connector
         self.event_bus = event_bus
 
-    def execute(self, data_transfer_obj: Dict[str, Any] = None) -> None:
+    def execute(self, data_transfer_obj: dict[str, Any] | None = None) -> None:
         def handle_message(payload: Any) -> None:
             # Emits event so that the UI can update
             event = TelemetryReceivedEvent(raw_data=payload)

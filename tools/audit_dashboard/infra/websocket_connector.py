@@ -1,9 +1,11 @@
-from PySide6.QtWebSockets import QWebSocket
-from PySide6.QtCore import QUrl
-from typing import Callable, Any
 import json
 import logging
+from collections.abc import Callable
+from typing import Any
+
 from Domain.ports import IRealtimeConnector
+from PySide6.QtCore import QUrl
+from PySide6.QtWebSockets import QWebSocket
 
 
 class WebsocketConnector(IRealtimeConnector):
@@ -14,7 +16,7 @@ class WebsocketConnector(IRealtimeConnector):
         self.socket.disconnected.connect(self._on_disconnected)
         self.socket.textMessageReceived.connect(self._on_text_message_received)
         self.socket.errorOccurred.connect(self._on_error)
-        self._callback: Callable[[Any], None] = None
+        self._callback: Callable[[Any], None] | None = None
         self._logger = logging.getLogger("WebsocketConnector")
 
     def connect(self) -> None:
