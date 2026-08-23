@@ -20,10 +20,11 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-015** | Framework Logging Null Object | Core Architecture / Observability | 2026-08-04 | [TASK-015_framework_logging_null_object.md](completed/TASK-015_framework_logging_null_object.md) |
 | **TASK-016** | Formalize `name` property | Core Architecture / Clean Code | 2026-08-04 | [TASK-016_interface_name_property.md](completed/TASK-016_interface_name_property.md) |
 | **TASK-014** | CQRS Dispatcher Type Safety (TOutput Resolution) | Core Architecture / Type Safety | 2026-08-02 | [TASK-014_cqrs_type_safety_overload.md](completed/TASK-014_cqrs_type_safety_overload.md) |
-| **TASK-015** | Framework Logging & Null Object Pattern | Core Architecture / Observability | 2026-08-04 | [TASK-015_framework_logging_null_object.md](completed/TASK-015_framework_logging_null_object.md) |
 | **TASK-007** | Kernel Reliability and OSS Readiness | Reliability / Open Source Polish | 2026-08-04 | [TASK-007_kernel_reliability_oss_readiness.md](completed/TASK-007_kernel_reliability_oss_readiness.md) |
 | **TASK-008** | Context Decoupling Program | Core Architecture / Service Boundaries | 2026-08-04 | [TASK-008_context_decoupling_program.md](completed/TASK-008_context_decoupling_program.md) |
 | **TASK-018** | Record `BaseCard` Sub-Type Candidates (No Code Yet) | UI Engine / Widget Kit | 2026-08-23 | [TASK-018_baseCard_subtype_candidate_notes.md](completed/TASK-018_baseCard_subtype_candidate_notes.md) |
+| **TASK-024** | Scaffolding feature removed (both commands were broken; feature unused) | SDK / Developer Experience | 2026-08-23 | [TASK-024_getting_started_scaffolders_broken.md](completed/TASK-024_getting_started_scaffolders_broken.md) |
+| **TASK-025** | Dead `infrastructure/persistence/` deleted + import guard test added | Infrastructure / Cleanup | 2026-08-23 | [TASK-025_dead_infrastructure_persistence_package.md](completed/TASK-025_dead_infrastructure_persistence_package.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
@@ -33,9 +34,14 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
-| **TASK-016** | Formalize `name` Method on Interfaces | Core Architecture / Interfaces | P3 - Low | [TASK-016_interface_name_property.md](backlog/TASK-016_interface_name_property.md) |
 | **TASK-017** | Production Readiness Hardening | Reliability / Security | P1 - Critical | [TASK-017_production_readiness_hardening.md](backlog/TASK-017_production_readiness_hardening.md) |
 | **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
+| **TASK-020** | CI `benchmark` job runs a moved path, masked by `continue-on-error` | CI / Build | P3 | [TASK-020_ci_benchmark_job_stale_path.md](backlog/TASK-020_ci_benchmark_job_stale_path.md) |
+| **TASK-021** | `ruff.toml` shadows `pyproject.toml` — the intended rule set never runs | Build / Tooling | P2 | [TASK-021_ruff_config_shadowing.md](backlog/TASK-021_ruff_config_shadowing.md) |
+| **TASK-022** | Package declares MIT but ships no `LICENSE` file | Packaging / Legal | P2 | [TASK-022_missing_license_file.md](backlog/TASK-022_missing_license_file.md) |
+| **TASK-023** | CI's single-version matrix is the blind spot (version range now narrowed to 3.14) | CI / Compatibility | P3 | [TASK-023_ci_matrix_hides_312_313_breakage.md](backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) |
+| **TASK-026** | `PydanticValidationMiddleware` silently skips validation when hint resolution fails | Middleware / Correctness | **P1** | [TASK-026_validation_middleware_silently_self_disables.md](backlog/TASK-026_validation_middleware_silently_self_disables.md) |
+| **TASK-027** | Engine ships no `py.typed` — consumers get zero type information | Packaging / Typing | P2 | [TASK-027_no_py_typed_marker.md](backlog/TASK-027_no_py_typed_marker.md) |
 
 ---
 
@@ -48,7 +54,7 @@ link is kept here; content is not duplicated.
 | ID | Name | Status |
 | :--- | :--- | :---: |
 | **[EPIC-001](epics/EPIC-001_ui_engine_foundation/README.md)** | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (3/4 subtasks done) |
-| **[EPIC-002](epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | 🟡 In Progress (0/4 subtasks done) |
+| **[EPIC-002](epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | ✅ Completed 2026-08-23 (4/4 subtasks done) |
 
 ---
 
@@ -58,10 +64,9 @@ link is kept here; content is not duplicated.
 Tasks/
 ├── README.md                           # Master Kanban Board & Overview
 ├── backlog/                            # Planned Task Specifications & Proposals
-│   ├── TASK-016_interface_name_property.md
-│   └── TASK-017_production_readiness_hardening.md
+│   └── ... one file per TASK-XXX (see the Backlog table above)
 ├── epics/                               # Multi-task programs — see epics/README.md
-│   └── EPIC-001_ui_engine_foundation/
+│   ├── EPIC-001_ui_engine_foundation/
 │       ├── README.md
 │       ├── completed/
 │       │   ├── EPIC-001A_architecture_rule_rewrite.md
@@ -70,21 +75,8 @@ Tasks/
 │       └── incomplete/
 │           └── EPIC-001D_runtime_slot_registry.md
 ├── issue-report/                       # High-impact Architecture Issue Report
-│   ├── issue.md
-│   └── exception_case.md
+│   └── issue.md
 ├── in_progress/                        # Actively Worked On Specifications (standalone tasks only)
-├── completed/                          # Finished Tasks & Historical Docs
-│   ├── TASK-001_background_service.md
-│   ├── TASK-002_audit_extension.md
-│   ├── TASK-009_exception_case_test_coverage.md
-│   ├── TASK-010_async_lifecycle_support.md
-│   ├── TASK-011_strict_extension_adapter_typing.md
-│   ├── TASK-012_di_container_scoped_lifecycle.md
-│   ├── TASK-013_engine_context_god_object_prevention.md
-│   ├── TASK-014_cqrs_type_safety_overload.md
-│   ├── TASK-015_framework_logging_null_object.md
-│   ├── TASK-016_interface_name_property.md
-│   ├── TASK-007_kernel_reliability_oss_readiness.md
-│   ├── TASK-008_context_decoupling_program.md
-│   └── TASK-018_baseCard_subtype_candidate_notes.md
+└── completed/                          # Finished Tasks & Historical Docs
+    └── ... one file per TASK-XXX (see the Completed table above)
 ```

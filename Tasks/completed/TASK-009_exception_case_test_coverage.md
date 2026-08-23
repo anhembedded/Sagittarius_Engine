@@ -3,7 +3,9 @@
 - **Status**: ✅ Completed
 - **Category**: Testing & Quality Assurance
 - **Completed Date**: 2026-07-30
-- **Source**: [exception_case.md](../issue-report/exception_case.md)
+- **Source**: `Tasks/issue-report/exception_case.md` — deleted in commit `b1ffca8`; recover with
+  `git show b1ffca8^:Tasks/issue-report/exception_case.md` if needed. (Link de-linked
+  2026-08-23; it is not the same file as the surviving `issue-report/issue.md`.)
 
 ---
 

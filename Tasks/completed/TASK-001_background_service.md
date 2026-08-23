@@ -48,5 +48,5 @@ class BackgroundService(IHostedService):
 ---
 
 ## 🧪 Verification & Test Coverage
-- **Unit Test**: `test_background_service_pattern()` in [test_runtime.py](../../tests/test_runtime.py) (Passed)
+- **Unit Test**: `test_background_service_pattern()` in [test_runtime.py](../../tests/runtime/test_runtime.py) (Passed)
 - **Static Analysis**: `mypy` and `ruff check` (0 errors)
