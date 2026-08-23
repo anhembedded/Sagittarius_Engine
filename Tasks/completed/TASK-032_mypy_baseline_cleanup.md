@@ -126,3 +126,68 @@ Kernel / Typing / Tech Debt
 
 - `TASK-021` — where this was originally requirement 5; now split out.
 - `BUG-003` — the 4-error subset with an already-written fix; do this one first.
+
+---
+
+## ✅ Outcome — completed 2026-08-23
+
+**All 23 remaining errors cleared. `mypy sagittarius_engine tests --ignore-missing-imports
+--follow-imports=skip`: `Success: no issues found in 259 source files`. `scripts/ci-local.ps1`:
+`RESULT: PASS`, `FAILED_STEPS: none` — the first fully green run of this repo's real completion
+gate in this entire work series.**
+
+Per-category outcome:
+
+- **Category 2** (`std_container.py`, 3 errors) — `cast(T, concrete(...))` at all three
+  construction sites, each with a comment explaining the invariant: `_bindings: dict[type,
+  type]` erases the generic on purpose, so the guarantee that `concrete` produces a `T` is a
+  runtime contract this container enforces via correct `bind()`/`singleton()` usage, not
+  something mypy can see through the dict's value type.
+- **Category 3** (`base_presenter.py`, 3 errors) — confirmed `DeclarativeStateMachine` is a
+  real subclass of `BaseStateMachine` (PEP 695 generic), then declared
+  `self.fsm: BaseStateMachine | None = None` once before the branches, matching the type
+  every path actually assigns.
+- **Category 4** (`thread_affinity.py`, 3 errors + 1 note) — `:81`/`:96`: `# type:
+  ignore[attr-defined]` on the two dynamic-attribute-stash sites, following the exact existing
+  precedent at `infrastructure/logging/logger_config.py:19`
+  (`logging.TRACE = TRACE  # type: ignore[attr-defined]`), not a new convention. `:118`:
+  narrowed `_registered_slot_names`/`unprotected_mutators`'s `cls: type` to `cls: type[QObject]`
+  — both functions are genuinely QObject-only (confirmed: `QObject.__init__(instance)` runs
+  right after `cls.__new__(cls)`), and the bare `type` annotation was what made mypy resolve
+  `.__new__` to the metaclass's own overloads instead of the instance-construction one.
+- **Category 5** (`state_tokens.py`, 1 error) — checked for a real bug first, per the task's own
+  instruction, before touching the annotation: `stateDisabledOpacity` (`0.45`) is genuinely a
+  `float`, bound directly to a QML `opacity:` property in `StatefulButton.qml` — the *value* is
+  correct. The wrong thing was `with_state_token_defaults`'s return type, narrowly declared
+  `dict[str, str]` when it merges in a dict that's always had a float value. Widened to `dict[str,
+  str | float]`, matching `DEFAULT_STATE_TOKENS`'s own already-correct type and every other
+  caller in `defaults.py`, which already treated the whole vocabulary as `str | float`.
+- **Category 6** (`base_view.py`, 1 error) — real narrowing fix, as the task predicted:
+  `isinstance(event, QChildEvent)` alongside the existing `event.type() ==
+  QEvent.Type.ChildAdded` check, so `.child()` is only called once mypy (and a reader) can see
+  the concrete type guarantees it.
+- **Category 7** (test files, 12 errors):
+  - `test_overlay_host.py` (5) — `content_item`'s `QObject | None` annotation is *correct*
+    (real optionality); the test's `qtbot.waitUntil(lambda: host.content_item is not None)`
+    proves it at runtime but doesn't narrow the type across the `@property`'s repeated
+    re-evaluation. Bound to a local `content_item` variable with an explicit `assert ... is not
+    None` at each of the 4 call sites, which narrows correctly and reads as the real
+    precondition it is.
+  - `test_thread_affinity.py` (2) — `self.value = None` / `self.called_from_thread = None` in
+    `__init__` had mypy inferring the attribute type as bare `None` from the first assignment;
+    annotated explicitly (`int | None`, `threading.Thread | None`).
+  - `test_declarative_state_machine.py` (4) — confirmed real code smell, not just a typing
+    gap: `lambda: (order.append(2), fsm.dispatch(Ev.E2))` is the tuple-comma-trick, and its
+    actual return value is a 2-tuple, not `None` — `on_enter` requires `Callable[[], None]`.
+    Replaced both sites with real nested `def`s. `lambda: order.append(4)` (the third callback,
+    unflagged) was correctly left alone — `list.append()` genuinely returns `None`, so that one
+    already satisfied the contract.
+  - `test_exclusive_action.py` (1) — bare `Future()` gave mypy nothing to infer its generic
+    parameter from; annotated `Future[None]`, matching the immediate `.set_result(None)`.
+
+Verified after every category, not just at the end: `pytest -q` stayed at **757 passed, 0
+failed** throughout (confirms zero behavior change from any fix — every change here is either a
+type annotation or a genuine, runtime-neutral code-smell cleanup), and the mypy count dropped by
+exactly that category's stated error count each time, with no unexpected residual.
+
+`.agents/context/lint.md` and `Tasks/README.md` updated to say 0, not 23.

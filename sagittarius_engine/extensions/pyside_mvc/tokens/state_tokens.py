@@ -34,7 +34,9 @@ DEFAULT_STATE_TOKENS: dict[str, str | float] = {
 }
 
 
-def with_state_token_defaults(palette: dict[str, str] | None) -> dict[str, str]:
+def with_state_token_defaults(
+    palette: dict[str, str] | None,
+) -> dict[str, str | float]:
     """
     @brief Merges an app-supplied palette dict with the engine's state-token
     defaults, app values winning on any key collision.
@@ -42,5 +44,11 @@ def with_state_token_defaults(palette: dict[str, str] | None) -> dict[str, str]:
     isolation from `get_theme_bridge()`'s session-scoped, first-call-wins
     contract — see that function's own docstring for why callers after the
     first are otherwise silently ignored.
+
+    Return type is `str | float`, not `str`: `DEFAULT_STATE_TOKENS` includes
+    `stateDisabledOpacity` (a real `float`, bound to QML `opacity:` — see
+    `StatefulButton.qml`), so a result typed all-`str` was never accurate.
+    `palette` itself stays colour-only (`dict[str, str]`) — no consuming app
+    is expected to override the opacity token; nothing here requires one to.
     """
     return {**DEFAULT_STATE_TOKENS, **(palette or {})}

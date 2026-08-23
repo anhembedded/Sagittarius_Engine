@@ -183,7 +183,7 @@ def test_submit_passes_task_unwrapped_as_thread_managers_first_positional_arg() 
     every one of those without touching a single line of app code — this
     pins the exact call shape a mock-based caller can rely on."""
     mock_thread_manager = MagicMock()
-    mock_future = Future()
+    mock_future: Future[None] = Future()
     mock_future.set_result(None)
     mock_thread_manager.submit.return_value = mock_future
     action = ExclusiveAction(thread_manager=mock_thread_manager)

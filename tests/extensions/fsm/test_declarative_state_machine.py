@@ -304,8 +304,20 @@ def test_deep_reentrant_chain_fifo() -> None:
 
     order: list[int] = []
 
-    fsm.on_enter(Step.S2, lambda: (order.append(2), fsm.dispatch(Ev.E2)))
-    fsm.on_enter(Step.S3, lambda: (order.append(3), fsm.dispatch(Ev.E3)))
+    # Real functions, not a `lambda: (a(), b())` tuple-comma trick -- that
+    # shape doesn't actually return None (it returns a 2-tuple of the two
+    # calls' results), which is both what on_enter's Callable[[], None]
+    # contract requires and what mypy correctly flagged.
+    def _enter_s2() -> None:
+        order.append(2)
+        fsm.dispatch(Ev.E2)
+
+    def _enter_s3() -> None:
+        order.append(3)
+        fsm.dispatch(Ev.E3)
+
+    fsm.on_enter(Step.S2, _enter_s2)
+    fsm.on_enter(Step.S3, _enter_s3)
     fsm.on_enter(Step.S4, lambda: order.append(4))
 
     fsm.dispatch(Ev.E1)

@@ -78,7 +78,13 @@ def ui_mutator(func: Callable) -> Callable:
         QTimer.singleShot(0, self, functools.partial(func, self, *args, **kwargs))
         return None
 
-    wrapper._is_ui_mutator = True
+    # Stashing metadata directly on the wrapped callable, read back via
+    # `getattr(member, "_is_ui_mutator", False)` in unprotected_mutators()
+    # below — same pattern and same suppression as logger_config.py's
+    # `logging.TRACE = TRACE`. No static type covers "an arbitrary attribute
+    # on a function object" without a Protocol this internal marker doesn't
+    # warrant.
+    wrapper._is_ui_mutator = True  # type: ignore[attr-defined]
     return wrapper
 
 
@@ -93,7 +99,7 @@ def not_a_ui_mutator(func: Callable) -> Callable:
     actually correct — this is for the genuine exceptions, and each one
     should be able to justify itself in a comment at the call site.
     """
-    func._is_not_a_ui_mutator = True
+    func._is_not_a_ui_mutator = True  # type: ignore[attr-defined]
     return func
 
 
@@ -106,7 +112,7 @@ def not_a_ui_mutator(func: Callable) -> Callable:
 _MUTATOR_NAME_PREFIXES = ("set_", "append", "clear", "hide_")
 
 
-def _registered_slot_names(cls: type) -> set[str]:
+def _registered_slot_names(cls: type[QObject]) -> set[str]:
     """@brief Every method name registered as a Qt slot on `cls`'s
     meta-object. Requires a live instance (`metaObject()` isn't available on
     the class alone) — constructs one via `__new__`/`QObject.__init__` only,
@@ -125,7 +131,7 @@ def _registered_slot_names(cls: type) -> set[str]:
     }
 
 
-def unprotected_mutators(cls: type) -> list[str]:
+def unprotected_mutators(cls: type[QObject]) -> list[str]:
     """
     @brief Returns the names of every public method reachable on `cls`
     (including inherited ones — e.g. `BaseQmlViewModel.set_ui_mode`) that

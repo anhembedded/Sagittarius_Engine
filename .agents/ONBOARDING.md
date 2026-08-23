@@ -51,11 +51,12 @@ pwsh ./scripts/ci-local.ps1
 **Always read the printed `===CI_LOCAL_RESULT===` block, and open `LOG_FILE` before reporting
 status — never judge from scrollback alone**, per the block's own printed instruction.
 
-**Known current state (2026-08-23, commit `df51202`):** lint and format pass. mypy fails with
-~27 pre-existing errors, confirmed present on `main` before that day's work and unrelated to
-it — tracked in `TASK-021` requirement 5, not yet triaged. If mypy is red with a *different*
-count or *different* files than that, treat it as a real regression, not this known debt —
-check `TASK-021` for the current baseline before assuming it's pre-existing.
+**Known current state (2026-08-23):** all 5 steps pass — `RESULT: PASS`, `FAILED_STEPS: none`.
+mypy's pre-existing debt (28 → 27 → 23 → 0, see `TASK-032`) is fully cleared as of this date. If
+the gate is red for you, it is either a real regression from whatever you just touched, or your
+local toolchain drifting from CI's pinned versions (`TASK-021` — local `ruff`/`mypy` are not
+currently pinned to CI's `0.15.20`/`2.1.0`) — not leftover baseline debt. There is none left to
+blame.
 
 ## 2. Repository layout
 
@@ -243,15 +244,23 @@ followed it found real bugs, not just doc drift — a full account is in each co
   must resolve against the real tree) and `tests/test_all_modules_importable.py` (every module
   must import, and public interface annotations must resolve — this is what would have caught
   `ITaskHandle` on day one).
-- **Next real work, in priority order** (`Tasks/README.md` has the full table):
-  1. `TASK-026` (P1) — a validation middleware silently skips validation when it can't resolve
-     type hints. No log, no error.
-  2. `TASK-017` (P1, pre-existing) — 7-item production-readiness checklist. **Verify each item
-     against the current tree before touching it**: a spot-check on 2026-08-23 found item #3
-     already fixed and unchecked, item #6 half-fixed. Don't trust the checkboxes.
-  3. `TASK-021` remainder — the ~27 pre-existing mypy errors (§1a), CI toolchain pinning,
-     linting `examples/`/`tools/`.
-  4. `TASK-022` (LICENSE file) — blocked on the owner: needs a copyright name/year, deliberately
-     not guessed.
+- `TASK-026` (validation middleware silently skipping on unresolvable hints) and `TASK-017`
+  (7-item production-readiness checklist — 2 of the 7 items turned out already-fixed/wrong-on-
+  inspection when re-verified against the tree, not blindly executed) are both **done**,
+  released as `2.1.0`. `TASK-032` (the mypy baseline) is also done — see §1a. Do not re-derive
+  or re-plan any of these three; check `git log`/`CHANGELOG.md` before assuming something
+  still-listed elsewhere is still open.
+- **Everything genuinely still open** is on the two boards — read them directly rather than
+  trusting a snapshot list here, since this paragraph is exactly the kind of thing that goes
+  stale:
+  - [`Tasks/README.md`](../Tasks/README.md)'s backlog table — as of 2026-08-23: `TASK-019`
+    (`DatabaseExtension` can't reach the raw `Engine`, P2), `TASK-020`/`TASK-021`/`TASK-023`
+    (CI/build tooling gaps, P2-P3), `TASK-022` (missing `LICENSE`, blocked on the owner for a
+    copyright name/year — deliberately not guessed), `TASK-027` (no `py.typed`, P2),
+    `TASK-028`/`TASK-031` (small, P3).
+  - [`Tasks/bug_report/README.md`](../Tasks/bug_report/README.md) — 2 open: `BUG-001` (a
+    phantom class name in a docstring — already catalogued once in `doc-code-sync.md` and never
+    fixed the first time), `BUG-002` (`mkdocs.yml` points at a `docs/` tree deleted months ago;
+    needs a decision — drop the doc site or rebuild it — not a mechanical fix).
 - Two tasks filed on the *other* repo (`Sagittarius_Elite_Warrior/Tasks/backlog/BOT-118`,
   `BOT-119`) from cross-checking its engine usage — see §8, do not action them from here.

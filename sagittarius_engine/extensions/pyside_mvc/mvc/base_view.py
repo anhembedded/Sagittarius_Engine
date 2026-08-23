@@ -1,6 +1,6 @@
 import functools
 
-from PySide6.QtCore import QEvent, QObject
+from PySide6.QtCore import QChildEvent, QEvent, QObject
 from PySide6.QtWidgets import QPushButton, QWidget
 
 # Config key any app built on this framework can set (e.g. via
@@ -72,7 +72,7 @@ class _ButtonClickWatcher(QObject):
             self._connect(button)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Type.ChildAdded:
+        if event.type() == QEvent.Type.ChildAdded and isinstance(event, QChildEvent):
             child = event.child()
             if isinstance(child, QPushButton):
                 self._connect(child)

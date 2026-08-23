@@ -96,7 +96,7 @@ authoritative — and fixing the config without fixing the versions just moves t
    in this repo tonight.**
 4. **Still open.** CI lints neither `examples/` nor `tools/` — the sample app
    `.agents/context/` documents as the reference implementation remains unlinted.
-5. **Split out, 2026-08-23 — see [`TASK-032`](TASK-032_mypy_baseline_cleanup.md).** CI's mypy
+5. **Split out, 2026-08-23 — see [`TASK-032`](../completed/TASK-032_mypy_baseline_cleanup.md).** CI's mypy
    *is* red, independent of everything else in this task: confirmed by stashing tonight's
    changes and running `mypy sagittarius_engine tests --ignore-missing-imports
    --follow-imports=skip` against a clean `main` — 28 errors, before any of that night's edits.
