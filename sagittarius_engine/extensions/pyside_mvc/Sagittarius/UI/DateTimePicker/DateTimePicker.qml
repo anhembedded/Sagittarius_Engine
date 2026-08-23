@@ -164,6 +164,7 @@ Item {
 
     Popup {
         id: calendarPopup
+        objectName: "calendarPopup"
         y: control.height + 4
         x: control.width - width
         width: 260
@@ -356,6 +357,40 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: 4
+                spacing: 6
+
+                // "Today"/"Clear" (found missing 2026-08-23, TASK-036):
+                // reuse the kit's own StatefulButton rather than a third
+                // hand-rolled Button recipe in this file. "Today" only
+                // navigates/selects, matching a day-cell click -- it does
+                // not auto-close, so it stays consistent with every other
+                // way of picking a date here (Apply is the one commit
+                // action). "Clear" has no ambiguous partial state to
+                // preview, so it commits immediately.
+                StatefulButton {
+                    objectName: "btnDateTimePickerToday"
+                    text: "Today"
+                    fontSize: 11
+                    implicitHeight: 24
+                    onClicked: {
+                        control.selectedDate = new Date();
+                        control.updateCalendarFromDate();
+                    }
+                }
+                StatefulButton {
+                    objectName: "btnDateTimePickerClear"
+                    text: "Clear"
+                    fontSize: 11
+                    implicitHeight: 24
+                    onClicked: {
+                        control._updatingText = true;
+                        control.text = "";
+                        control._updatingText = false;
+                        control.textEdited("");
+                        calendarPopup.close();
+                    }
+                }
+
                 Item { Layout.fillWidth: true } // spacer
                 Button {
                     text: "Apply"

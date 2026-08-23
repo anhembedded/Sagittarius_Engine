@@ -40,14 +40,36 @@ BaseCard {
         anchors.margins: 14
         spacing: 10
 
-        Text {
-            text: root.title
-            color: Theme.accent
-            font.pixelSize: 11
-            font.bold: true
-            font.letterSpacing: 1
+        //: Wraps the title so a "Clear" shortcut (TASK-036, found missing
+        //: 2026-08-23) can sit next to it -- a Windows-style range picker
+        //: commonly offers a one-click reset instead of requiring the user
+        //: to clear both fields and the toggle by hand. Only shown once
+        //: there is something to clear.
+        RowLayout {
             Layout.fillWidth: true
             visible: root.title !== ""
+
+            Text {
+                text: root.title
+                color: Theme.accent
+                font.pixelSize: 11
+                font.bold: true
+                font.letterSpacing: 1
+                Layout.fillWidth: true
+            }
+
+            StatefulButton {
+                objectName: "btnClearTimeRange"
+                text: "Clear"
+                fontSize: 10
+                implicitHeight: 20
+                visible: root.useCustomTime || root.fromDateTime !== "" || root.toDateTime !== ""
+                onClicked: {
+                    root.customTimeToggled(false);
+                    root.fromDateTimeEdited("");
+                    root.toDateTimeEdited("");
+                }
+            }
         }
 
         Switch {

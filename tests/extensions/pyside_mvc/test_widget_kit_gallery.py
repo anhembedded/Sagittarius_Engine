@@ -11,7 +11,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtCore import QObject, QtMsgType, QUrl, qInstallMessageHandler
+from PySide6.QtCore import QMetaObject, QObject, QtMsgType, QUrl, qInstallMessageHandler
 from PySide6.QtGui import QColor, QIcon, QPixmap
 
 from sagittarius_engine.extensions.pyside_mvc.runtime import (
@@ -177,6 +177,64 @@ def test_app_data_table_current_index_defaults_unselected_and_is_settable(qtbot)
 
     root.setProperty("currentIndex", 1)
     assert root.property("currentIndex") == 1
+
+
+def test_time_range_card_clear_resets_toggle_and_both_dates(qtbot):
+    """Clear (TASK-036, found missing 2026-08-23) resets the whole range in
+    one click instead of requiring the toggle and both fields cleared by
+    hand."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "time_range_card_probe.qml"))
+    )
+    assert widget.errors() == []
+    root = widget.rootObject()
+    assert root is not None
+
+    clear_button = root.findChild(QObject, "btnClearTimeRange")
+    assert clear_button is not None
+
+    QMetaObject.invokeMethod(clear_button, "clicked")
+
+    assert root.property("useCustomTime") is False
+    assert root.property("fromDateTime") == ""
+    assert root.property("toDateTime") == ""
+
+
+def test_date_time_picker_today_and_clear(qtbot):
+    """Today (TASK-036) navigates the calendar to the current date without
+    committing (matches clicking a day cell); Clear commits an empty value
+    immediately."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "date_time_picker_probe.qml"))
+    )
+    assert widget.errors() == []
+    root = widget.rootObject()
+    assert root is not None
+
+    popup = root.findChild(QObject, "calendarPopup")
+    assert popup is not None
+    QMetaObject.invokeMethod(popup, "open")
+
+    today_button = root.findChild(QObject, "btnDateTimePickerToday")
+    assert today_button is not None
+    QMetaObject.invokeMethod(today_button, "clicked")
+
+    # "Today" navigates the calendar but does not commit -- text unchanged,
+    # matching what clicking a day cell does (Apply is the one commit
+    # action).
+    assert root.property("text") == "2020-01-01 00:00"
+
+    clear_button = root.findChild(QObject, "btnDateTimePickerClear")
+    assert clear_button is not None
+    QMetaObject.invokeMethod(clear_button, "clicked")
+
+    assert root.property("text") == ""
 
 
 def test_app_modal_opens_dynamically_sized_with_its_action_buttons(qtbot):
