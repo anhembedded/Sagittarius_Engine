@@ -26,6 +26,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-024** | Scaffolding feature removed (both commands were broken; feature unused) | SDK / Developer Experience | 2026-08-23 | [TASK-024_getting_started_scaffolders_broken.md](completed/TASK-024_getting_started_scaffolders_broken.md) |
 | **TASK-025** | Dead `infrastructure/persistence/` deleted + import guard test added | Infrastructure / Cleanup | 2026-08-23 | [TASK-025_dead_infrastructure_persistence_package.md](completed/TASK-025_dead_infrastructure_persistence_package.md) |
 | **TASK-026** | `PydanticValidationMiddleware` no longer silently skips validation on hint-resolution failure | Middleware / Correctness | 2026-08-23 | [TASK-026_validation_middleware_silently_self_disables.md](completed/TASK-026_validation_middleware_silently_self_disables.md) |
+| **TASK-030** | `scripts/ci-local.ps1` — log capture, full-run, machine-readable summary (matches Elite) | Build / Developer Experience | 2026-08-23 | [TASK-030_ci_local_script_matching_elite_pattern.md](completed/TASK-030_ci_local_script_matching_elite_pattern.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 

@@ -25,32 +25,37 @@ write code that needs to run on an older Python; there is no fallback path.
 
 ## 1a. The completion gate — run this before calling anything done
 
-`pre_commit.ps1` at the repo root is the actual, authoritative local CI gate (5 steps: ruff
-lint, ruff format check, mypy, pytest+coverage, architecture tests). It exists on disk and was
-not run for four consecutive commits in this repo's history on 2026-08-23, until the user
-directly caught the omission. This is the same failure mode `Sagittarius_Elite_Warrior`
-already had a rule about (its own `scripts/ci-local.ps1 -Full`) — piecemeal
-`pytest`/`ruff`/`mypy` on touched files, even all green, is not evidence the repo passes its
-own gate.
+`scripts/ci-local.ps1` is the actual, authoritative local CI gate — 5 steps: ruff lint, ruff
+format check, mypy, pytest+coverage, architecture-boundary tests. (Moved from `pre_commit.ps1`
+at the repo root 2026-08-23, `TASK-030`, rebuilt on `Sagittarius_Elite_Warrior/scripts/
+ci-local.ps1`'s pattern — the "ci-local.ps1" name and `scripts/` location are now the same in
+both repos, deliberately.) The old version existed on disk and was not run for four consecutive
+commits before the user directly caught the omission — piecemeal `pytest`/`ruff`/`mypy` on
+touched files, even all green, is not evidence the repo passes its own gate; it found 338 lint
+errors across the whole tree that no touched-files check would have seen.
 
-Run it — needs `pwsh` (present via snap on this machine) and the venv on `PATH`:
+The rebuilt script closes two gaps the old one had. It captures every step's full output to
+`logs/ci-local-<timestamp>.log` (+ a `logs/ci-local-latest.log` pointer), which is what makes
+`context/testing.md`'s documented `tail -N` truncation trap actually unreachable instead of
+just warned about. And it runs every step regardless of earlier failures, reporting all of them
+together — the old version stopped at the first red step, which is why finding tonight's lint
+and mypy problems took two runs instead of one.
+
+Run it:
 
 ```bash
 export PATH="$PWD/.venv/bin:$PATH"
-QT_QPA_PLATFORM=offscreen pwsh ./pre_commit.ps1 > /tmp/gate.log 2>&1; echo "exit: $?"
-grep -E "FAILED|failed!|passed successfully" /tmp/gate.log
+pwsh ./scripts/ci-local.ps1
 ```
 
-Piecemeal `pytest`/`ruff`/`mypy` on just the files you touched is not a substitute — it scopes
-lint to a diff, not the tree; the gate found 338 lint errors across the whole repo on
-2026-08-23 that no touched-files check would have seen. Run the real gate before committing,
-not just before reporting done.
+**Always read the printed `===CI_LOCAL_RESULT===` block, and open `LOG_FILE` before reporting
+status — never judge from scrollback alone**, per the block's own printed instruction.
 
-**Known current state (2026-08-23, commit `df51202`):** steps 1–2 (lint, format) pass. Step 3
-(mypy) fails with ~27 pre-existing errors, confirmed present on `main` before that day's work
-and unrelated to it — tracked in `TASK-021` requirement 5, not yet triaged. If mypy is red with
-a *different* count or *different* files than that, treat it as a real regression, not this
-known debt — check `TASK-021` for the current baseline before assuming it's pre-existing.
+**Known current state (2026-08-23, commit `df51202`):** lint and format pass. mypy fails with
+~27 pre-existing errors, confirmed present on `main` before that day's work and unrelated to
+it — tracked in `TASK-021` requirement 5, not yet triaged. If mypy is red with a *different*
+count or *different* files than that, treat it as a real regression, not this known debt —
+check `TASK-021` for the current baseline before assuming it's pre-existing.
 
 ## 2. Repository layout
 

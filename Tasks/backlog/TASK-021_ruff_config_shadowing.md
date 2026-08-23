@@ -101,7 +101,8 @@ authoritative — and fixing the config without fixing the versions just moves t
    `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip` against a
    clean `main` — 28 errors in 10 files, before any of today's edits. (After today's fixes: 27
    — net improvement of 1, not a regression, but the debt is real and predates this task.)
-   `pre_commit.ps1` — the repo's own completion gate — has therefore been failing at the mypy
+   `scripts/ci-local.ps1` (formerly `pre_commit.ps1`, see `TASK-030`) — the repo's own
+   completion gate — has therefore been failing at the mypy
    step regardless of the `ruff.toml` issue. Fixing all 27 is out of scope for this task; each
    needs its own look, not a blanket `--ignore-missing-imports` widening. Nothing in tonight's
    changes should be blocked on this — it was already broken.

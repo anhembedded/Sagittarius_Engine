@@ -233,3 +233,4 @@ docs/kb/metadata.json
 
 # Sample app runtime data (EPIC-002)
 examples/student_management/data/
+logs/

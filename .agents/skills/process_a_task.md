@@ -3,7 +3,7 @@
 ## Working rules
 
 - Continue working until the task is actually complete; do not stop at partial progress reports.
-- A task is only complete when the verification scripts for the touched scope pass. In this repository, the default completion gates are `pre_commit.ps1` at the repo root and `Sagittarius_Elite_Warrior/scripts/run-ui.ps1` for the app UI path.
+- A task is only complete when the verification scripts for the touched scope pass. In this repository, the default completion gates are `scripts/ci-local.ps1` (moved from `pre_commit.ps1` at the repo root, 2026-08-23 — see `TASK-030`) and `Sagittarius_Elite_Warrior/scripts/run-ui.ps1` for the app UI path.
 - Prefer autonomous execution over unnecessary pauses. Do not ask extra clarification questions unless genuinely blocked or a decision belongs to the user.
 - If verification is red, keep fixing the remaining failures instead of reporting status and stopping.
 - Keep the scope aligned with the user’s request. Do not silently widen product scope, but do complete the verification scope required to call the task done.
