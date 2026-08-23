@@ -130,8 +130,14 @@ classDiagram
     }
     class AppDataTable {
       +var columns
-      +alias model
+      +var model
+      +string sortKey
+      +bool sortAscending
+      +alias currentIndex
+      +rowClicked(index, rowData)
+      +rowDoubleClicked(index, rowData)
       -_weightSum() int
+      -_sortedModel() var
     }
     class AppModal {
       <<Popup root>>

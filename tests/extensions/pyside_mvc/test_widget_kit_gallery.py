@@ -130,6 +130,55 @@ def test_app_data_table_renders_every_row_from_its_model(qtbot):
     assert rows_view.property("count") == 2
 
 
+def test_app_data_table_sorts_by_clicked_column_ascending_then_descending(qtbot):
+    """Click-to-sort (found missing 2026-08-23, added to the base component
+    rather than any one screen since every table needs it) must sort the
+    RAW model values, not the formatted display text, and must toggle
+    ascending/descending on a second click of the same column."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "app_data_table_probe.qml"))
+    )
+    assert widget.errors() == []
+    root = widget.rootObject()
+    assert root is not None
+
+    # Fixture data is already ascending by "a" ([1,4]) -- sort descending
+    # first so this test would fail if sorting were a no-op.
+    root.setProperty("sortKey", "a")
+    root.setProperty("sortAscending", False)
+
+    rows_view = root.findChild(QObject, "appDataTableRows")
+    sorted_model = rows_view.property("model")
+    assert [row["a"] for row in sorted_model] == [4, 1]
+
+    root.setProperty("sortAscending", True)
+    sorted_model = rows_view.property("model")
+    assert [row["a"] for row in sorted_model] == [1, 4]
+
+
+def test_app_data_table_current_index_defaults_unselected_and_is_settable(qtbot):
+    """Row selection (found missing alongside sorting, 2026-08-23) mirrors
+    the ListView's own currentIndex so a consumer can read/drive it without
+    reaching into the component's internals."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "app_data_table_probe.qml"))
+    )
+    assert widget.errors() == []
+    root = widget.rootObject()
+    assert root is not None
+
+    assert root.property("currentIndex") == -1
+
+    root.setProperty("currentIndex", 1)
+    assert root.property("currentIndex") == 1
+
+
 def test_app_modal_opens_dynamically_sized_with_its_action_buttons(qtbot):
     widget = create_quick_widget()
     qtbot.addWidget(widget)

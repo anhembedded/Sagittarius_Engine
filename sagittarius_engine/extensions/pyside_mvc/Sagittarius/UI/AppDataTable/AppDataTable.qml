@@ -27,15 +27,50 @@ BaseCard {
     id: root
 
     //: Each entry: { key, title, weight (default 1), align (default
-    //: Text.AlignLeft), formatter (optional value -> string function) }.
+    //: Text.AlignLeft), formatter (optional value -> string function),
+    //: sortable (default true; set false to exclude one column from
+    //: click-to-sort) }.
     property var columns: []
-    property alias model: rows.model
+    property var model: []
     property int rowHeight: 36
     property int headerHeight: 32
     //: Alternating row tint for readability on dense tables. Off for short
     //: tables where it reads as noise rather than a scan aid.
     property bool zebra: true
     property string emptyText: "No data"
+
+    //: Click-to-sort state. Every column sorts by default (unless its own
+    //: spec sets `sortable: false`) — common enough table behaviour that a
+    //: consumer shouldn't have to opt in per screen (found 2026-08-23: a
+    //: real Windows-Explorer-style table always offers this).
+    property string sortKey: ""
+    property bool sortAscending: true
+
+    //: Row selection. `currentIndex` mirrors the ListView's own so a
+    //: consumer can read/drive it without reaching into the component's
+    //: internals; the two click signals carry the row's own data so a
+    //: consumer never has to re-index into `model` itself.
+    property alias currentIndex: rows.currentIndex
+    signal rowClicked(int index, var rowData)
+    signal rowDoubleClicked(int index, var rowData)
+
+    //: Sorts a copy of `model` by `sortKey`/`sortAscending` -- sorting the
+    //: raw (pre-formatter) values, so e.g. a GPA column sorts numerically
+    //: even though its `formatter` renders it as "3.70".
+    function _sortedModel() {
+        if (!root.sortKey || !root.model) return root.model
+        var key = root.sortKey
+        var ascending = root.sortAscending
+        var sorted = root.model.slice()
+        sorted.sort(function(a, b) {
+            var left = a[key]
+            var right = b[key]
+            if (left === right) return 0
+            var result = left < right ? -1 : 1
+            return ascending ? result : -result
+        })
+        return sorted
+    }
 
     //: `title` inherited from BaseCard — left empty by default rather than
     //: invented here: a table's meaning comes from its columns and its
@@ -91,17 +126,36 @@ BaseCard {
                 Repeater {
                     model: root.columns
                     delegate: Text {
+                        id: headerCell
                         required property var modelData
+                        readonly property bool sortable: modelData.sortable !== false
+                        readonly property bool active: root.sortKey === modelData.key
+
                         width: (modelData.weight || 1) / root._weightSum() * headerRow.width
                         height: headerRow.height
                         verticalAlignment: Text.AlignVCenter
                         horizontalAlignment: modelData.align !== undefined ? modelData.align : Text.AlignLeft
-                        text: modelData.title || modelData.key
-                        color: Theme.muted
+                        text: (modelData.title || modelData.key) +
+                              (active ? (root.sortAscending ? " ▲" : " ▼") : "")
+                        color: active ? Theme.textPrimary : Theme.muted
                         font.pixelSize: Theme.fontSizeSm
                         font.bold: true
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: headerCell.sortable
+                            cursorShape: headerCell.sortable ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: {
+                                if (root.sortKey === headerCell.modelData.key) {
+                                    root.sortAscending = !root.sortAscending
+                                } else {
+                                    root.sortKey = headerCell.modelData.key
+                                    root.sortAscending = true
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -114,6 +168,11 @@ BaseCard {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
+            //: ListView otherwise defaults currentIndex to 0 once it has a
+            //: non-empty model, which would render row 0 as "selected"
+            //: before the user has ever clicked anything.
+            currentIndex: -1
+            model: root._sortedModel()
             ScrollBar.vertical: ScrollBar {}
 
             delegate: Rectangle {
@@ -133,7 +192,24 @@ BaseCard {
 
                 width: ListView.view.width
                 height: root.rowHeight
-                color: root.zebra && (rowDelegate.index % 2 === 1) ? Theme.bgCardHeader : "transparent"
+                //: Priority: selected > hovered > zebra > transparent.
+                color: {
+                    if (rowDelegate.index === rows.currentIndex) return Theme.stateActiveTint
+                    if (rowHover.hovered) return Theme.stateHoverBg
+                    return root.zebra && (rowDelegate.index % 2 === 1) ? Theme.bgCardHeader : "transparent"
+                }
+
+                HoverHandler { id: rowHover }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        rows.currentIndex = rowDelegate.index
+                        root.rowClicked(rowDelegate.index, rowDelegate.rowData)
+                    }
+                    onDoubleClicked: root.rowDoubleClicked(rowDelegate.index, rowDelegate.rowData)
+                }
 
                 Row {
                     id: cellsRow
