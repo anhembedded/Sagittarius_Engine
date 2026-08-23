@@ -57,12 +57,17 @@ repo, including `2.0.0` and `2.1.0`**.
 
 ### Known issues
 
-- The gate's mypy step now reports **20** errors in 8 files, down from 24 at `2.1.0` — `BUG-003`
-  fixed the four `union-attr` errors in `kernel/dispatcher.py` that came from a `ILogger | None`
-  annotation contradicting `IEngineContext`'s non-`None` guarantee. Measured with the gate's exact
-  invocation, `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`;
-  remaining work tracked in `TASK-032`, whose title still says 27. Quote a count only with the
-  command that produced it.
+- **The mypy baseline is gone — `Success: no issues found in 260 source files`.** At `2.1.0` this
+  was 24 errors; `BUG-003` removed four (`kernel/dispatcher.py`'s `ILogger | None` annotation
+  contradicting `IEngineContext`'s non-`None` guarantee) and `TASK-032` cleared the remainder.
+  Measured on this release's merged tree with the gate's exact invocation,
+  `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. A red mypy step
+  from here on is a real regression, not inherited debt — there is none left to blame.
+- The gate still reports `RESULT: FAIL` on **one** test,
+  `test_gallery_emits_no_qml_runtime_warnings`. This is **local-environment noise, not a repo
+  defect**: it asserts no QML runtime warnings, and this machine's PySide6 install emits
+  `QFontDatabase: Cannot find font directory ...` because Qt no longer ships fonts. Nothing in
+  this release touches QML.
 - Unchanged: no `LICENSE` despite `pyproject.toml` declaring MIT (`TASK-022`), `mkdocs.yml` points
   at a deleted tree (`BUG-002`), and the package root eagerly imports `extensions.persistence`
   (`TASK-031`).
