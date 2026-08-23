@@ -28,8 +28,10 @@ code.
      to capture, so they should already be visible in this session's replies; consolidate
      them here rather than re-deriving.
 2. Each finding gets a clear disposition: **doc fix** (feeds an EPIC-002D task), **engine gap**
-   (named, out of scope for this epic, flagged to the user), or **working as intended,
-   surprising anyway** (recorded so the next person doesn't re-discover it the hard way).
+   (per `ONBOARDING.md` §3 point 6, this should already be a filed `TASK-XXX` from when
+   EPIC-002A/B hit it — cite that ID here, don't re-describe the gap from scratch as if this
+   were its first mention), or **working as intended, surprising anyway** (recorded so the
+   next person doesn't re-discover it the hard way).
 3. No finding without evidence — a file/line, a command output, or a reproduction. This
    mirrors the standard `design-discipline.md` sets for code fixes: "it seemed off" is not a
    finding, it's a lead.
@@ -43,5 +45,7 @@ code.
 ## 🧪 Verification & Test Coverage
 
 Not applicable in the usual sense — the deliverable is the document. Verification is: every
-claim in `AUDIT_REPORT.md` traces to something checkable (a path, a command, a line number),
-and every item in EPIC-002A/B's own "written account" sections is represented somewhere in it.
+claim in `AUDIT_REPORT.md` traces to something checkable (a path, a command, a line number);
+every design doc under `examples/student_management/docs/` is represented or consolidated
+somewhere in it; and `MODULE_COVERAGE.md`'s Skipped/Gap rows are reflected accurately (not
+re-justified differently here than they were in the ledger).

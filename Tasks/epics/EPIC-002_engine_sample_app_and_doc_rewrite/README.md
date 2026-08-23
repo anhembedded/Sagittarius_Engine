@@ -52,6 +52,36 @@ the rule and the code disagree. This epic applies the same principle to the rest
 engine's documentation: **build something real, let ambiguity show up as build friction, and
 only write the doc once the friction is on record — then add a guard that keeps it honest.**
 
+## 📝 Design docs — one per hard technical topic, written when you hit it
+
+Every real app has its own set of genuinely hard technical questions — how it boots, which
+modules it registers and in what order, how it loads config, how its UI lifecycle ties into
+the engine's, how persistence is wired. **The moment EPIC-002A/B settles one of these
+questions, write it up as its own design doc — right then, not batched at the end of the
+subtask.** User's instruction, 2026-08-23: *"làm tới vấn đề nào thì gen luôn design doc của
+vấn đề đó, có mermaid diagram"* (whichever topic you reach, generate that topic's design doc
+immediately, with a mermaid diagram).
+
+- **Location:** `examples/student_management/docs/` — next to the app, not in this epic's own
+  directory. The app is the permanent reference (see Objective above); a future reader opening
+  it should find "how this boots" right there, not have to know EPIC-002 ever existed. (The
+  deleted old sample already had this instinct — `docs/doc.mermaid`, `docs/gen.md` — this
+  formalizes it as a per-topic convention instead of one grab-bag file.)
+- **One file per topic**, named for the topic (`bootstrap.md`, `module_registration.md`,
+  `config_loading.md`, `ui_extension_lifecycle.md`, …) — not one giant file covering
+  everything, for the same reason `rules/` is split by topic instead of one mega-rule file.
+- **Every file has a Mermaid diagram** — sequence diagram for a flow (boot order, request
+  path), flowchart for a decision/branch, whichever fits the topic.
+- **Written at the moment the topic is settled**, while the reasoning and any friction hit are
+  still fresh — not reconstructed from memory during EPIC-002C. EPIC-002C's job becomes
+  *consolidating* these into `AUDIT_REPORT.md`, not discovering them cold.
+- Candidate topics already visible from scope: for EPIC-002A — composition root/bootstrap
+  sequence, `IExtension` registration order, DI container wiring, event bus wiring, config
+  loading; for EPIC-002B — `pyside_mvc` boot ordering as a real `IExtension` (the
+  `QApplication`-must-exist-first constraint from EPIC-001D), token/theme wiring, screen
+  composition. Not exhaustive — write one for any topic that turns out to be a real decision,
+  skip topics that turned out trivial.
+
 ## 📐 Scope
 
 - **In scope:** a real, running Student Management sample app (Clean Architecture, PySide6 +
@@ -59,9 +89,11 @@ only write the doc once the friction is on record — then add a guard that keep
   of every ambiguity/gap/implicit assumption hit while building it; a rewrite of
   `.agents/context/*.md` grounded in that audit; a regression test that fails when a doc
   references a symbol or path that no longer resolves.
-- **Out of scope:** modifying `sagittarius_engine/` itself to fix anything the audit finds
-  (name it in the report instead — see `ONBOARDING.md` §3.5); touching
-  `Sagittarius_Elite_Warrior`; rewriting `docs/` (that tree's fate is a separate decision, not
+- **Out of scope:** modifying `sagittarius_engine/` itself to fix anything the audit finds —
+  a real gap gets a `TASK-XXX` filed immediately instead (`ONBOARDING.md` §3 points 6–7), not
+  a same-epic patch; modifying `Sagittarius_Elite_Warrior`'s own code or docs (filing a task
+  on its board when a practice check finds a divergence **is** in scope — `ONBOARDING.md` §3
+  point 10 — fixing it is not); rewriting `docs/` (that tree's fate is a separate decision, not
   this epic's — flag it, don't fold it in).
 
 ## 🗂️ Subtasks
@@ -85,5 +117,10 @@ done, then moves to `completed/` with its `Status:` line updated, per this repo'
   per `.agents/rules/surprising-findings.md`'s standard), and each finding maps to either a
   doc fix (EPIC-002D) or an explicitly out-of-scope engine issue named for later.
 - `.agents/context/*.md` no longer contains a claim this epic's own audit disproved.
+- [`MODULE_COVERAGE.md`](MODULE_COVERAGE.md) has zero rows left as "TBD" — every package and
+  extension resolved to Used/Skipped/Gap, `pyside_mvc`'s row specifically resolved to Used.
+- `examples/student_management/docs/` has one design doc per hard technical topic actually
+  hit while building A/B, each with a Mermaid diagram, written at the time — not
+  reconstructed afterward.
 - A test exists that fails if a future doc references a symbol/path that doesn't resolve —
   so this rot cannot silently repeat.

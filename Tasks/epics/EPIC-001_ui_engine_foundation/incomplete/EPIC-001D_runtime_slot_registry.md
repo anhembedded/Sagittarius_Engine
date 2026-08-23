@@ -38,7 +38,12 @@ wrong abstraction with live consumers is far more expensive to correct than dupl
    is the first real consumer built against this decision — its sample app boots
    `pyside_mvc` through the standard `IExtension` path, not `configure_app_qml()` as a bare
    call, and reports back anything the ordering constraint (QApplication must exist first)
-   makes awkward.
+   makes awkward. **That prototype lives in the sample app's own code, not here** — EPIC-002B
+   writes an `IExtension` wrapper as `examples/student_management` code (not
+   `sagittarius_engine/`, since EPIC-002 may not touch engine source). When this subtask
+   finally starts, read `examples/student_management/docs/ui_extension_lifecycle.md` and that
+   wrapper first — it's a real, running answer to this objective's ordering question, not just
+   a design doc. Don't re-derive the ordering from scratch if that prototype already exists.
 
 ---
 
