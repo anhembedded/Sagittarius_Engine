@@ -47,6 +47,26 @@ container.singleton(IConfig, config)
 
 See the sample's `docs/bootstrap.md` for the same point applied to `IEventBus`.
 
+## `DatabaseExtension`: one database or many (`database.url` vs `database.shards`)
+
+`DatabaseExtension` (`extensions/persistence/database_module.py`) reads exactly one of two
+config keys, mutually exclusive:
+
+- **`database.url`** (a string) — the original, single-database shape. Registers `ISession`
+  *and* the raw SQLAlchemy `Engine` as container singletons — `container.resolve(Engine)`
+  works, `container.resolve(ISession)` works.
+- **`database.shards`** (a `dict[str, str]` of `{name: url}`) — added in `EPIC-003` for
+  consumers that need more than one database (the motivating case: a trading bot sharding
+  SQLite per traded symbol). `ISession`/`Engine` are **not** registered as singletons in this
+  case — which shard would `container.resolve(ISession)` even mean? — so shard consumers must
+  resolve `IDatabaseManager` and call `get_session(name)` / `get_engine(name)` explicitly.
+
+Either way, `IDatabaseManager` is always registered — it's the one sanctioned way to reach a
+raw `Engine` for schema creation/DDL/reflection, and it supports adding/removing a database
+*after* boot (`manager.add_database(name, url)` / `manager.remove_database(name)`), verified
+by resolving it from a real, already-booted `App` and mutating it at runtime — see
+`tests/extensions/persistence/test_database_extension_runtime.py`.
+
 ## Extensions with their own config
 
 Some extensions accept parameters directly at construction instead of going through

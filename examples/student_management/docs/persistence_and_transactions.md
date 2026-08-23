@@ -37,29 +37,18 @@ call for the roster report — proof the first dispatch actually persisted, not 
 direct unit test): nothing commits automatically. `tests/infrastructure/test_sqlalchemy_student_repository.py`
 calls `repo._session.commit()` explicitly after every mutation for exactly this reason.
 
-## The schema-creation gap (real engine gap, filed as `TASK-019`)
+## The schema-creation gap — fixed by `EPIC-003B` (was `TASK-019`)
 
-The engine's `DatabaseExtension` builds a SQLAlchemy `Engine` internally to satisfy `ISession`,
-but never exposes that `Engine` anywhere a consumer can reach it — not via the container, not
-as a property on `ISession`/`SQLAlchemySessionAdapter`. Confirmed by reading both files in
-full and grepping for `Engine` registrations in `extensions/persistence/` (zero hits). Filed as
-[`TASK-019`](../../../Tasks/backlog/TASK-019_database_extension_expose_engine.md) rather than
-worked around invisibly — see `ONBOARDING.md` §3 point 6 for why a confirmed gap gets a task
-immediately, not just a note here.
+The engine's `DatabaseExtension` used to build a SQLAlchemy `Engine` internally to satisfy
+`ISession`, but never expose that `Engine` anywhere a consumer could reach it — not via the
+container, not as a property on `ISession`/`SQLAlchemySessionAdapter`. Filed as `TASK-019`
+rather than worked around invisibly — see `ONBOARDING.md` §3 point 6 for why a confirmed gap
+gets a task immediately, not just a note here.
 
-**This app's workaround**, in `StudentManagementExtension.register()`: rebuild a second,
-throwaway `Engine` from the same `database.url` config value, call
-`Base.metadata.create_all()` on it, then `dispose()` it.
-
-### Why that workaround only works for a file-based URL, not `:memory:`
-
-Two separate `Engine` instances created from `sqlite:///:memory:` are two **separate,
-unrelated** in-memory databases — SQLite's `:memory:` special-case means each new connection
-gets its own private database, not a shared one keyed by the URL string. Running
-`create_all()` on the throwaway engine would create tables nobody else can see; the real
-session's database would stay schema-less and fail on first query with a "no such table"
-error. `StudentManagementExtension.register()` raises `ValueError` immediately if
-`database.url` contains `:memory:`, specifically to fail loud at boot instead of failing
-confusingly on the first real query. This is why `main.py` uses a real file
-(`data/student_management.db`) and why tests use a `tempfile` path (`config_loading.md`) —
-never `:memory:`, anywhere in this app.
+`TASK-019` was superseded by `Sagittarius_Engine`'s `EPIC-003B`
+(`Tasks/epics/EPIC-003_database_extension_multi_db/`), which registers the `Engine`
+`DatabaseExtension` itself built as a container singleton (`container.resolve(Engine)`).
+`StudentManagementExtension.register()` now resolves that same `Engine` and calls
+`Base.metadata.create_all()` directly on it — no second, throwaway `Engine`, and no
+`:memory:` special-casing needed: since it's the *same* `Engine` the session uses, there's
+only ever one database, file-based or `:memory:` alike.

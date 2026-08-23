@@ -42,7 +42,6 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
-| **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
 | **TASK-020** | CI `benchmark` job runs a moved path, masked by `continue-on-error` | CI / Build | P3 | [TASK-020_ci_benchmark_job_stale_path.md](backlog/TASK-020_ci_benchmark_job_stale_path.md) |
 | **TASK-023** | CI's single-version matrix is the blind spot (version range now narrowed to 3.14) | CI / Compatibility | P3 | [TASK-023_ci_matrix_hides_312_313_breakage.md](backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) |
 | **TASK-028** | Gate silent-false-positive fixed by `TASK-030`; regression test + doc-accuracy recheck remain | Build / Tooling — Completion Gate | P3 | [TASK-028_pre_commit_gate_false_positive_on_missing_tool.md](backlog/TASK-028_pre_commit_gate_false_positive_on_missing_tool.md) |
@@ -75,6 +74,7 @@ link is kept here; content is not duplicated.
 | :--- | :--- | :---: |
 | **[EPIC-001](epics/EPIC-001_ui_engine_foundation/README.md)** | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (3/4 subtasks done) |
 | **[EPIC-002](epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | ✅ Completed 2026-08-23 (4/4 subtasks done) |
+| **[EPIC-003](epics/EPIC-003_database_extension_multi_db/README.md)** | `DatabaseExtension` Multi-Database Support — named/sharded databases via `IDatabaseManager`, supersedes `TASK-019` | ✅ Completed 2026-08-23 (4/4 subtasks done) |
 
 ---
 
