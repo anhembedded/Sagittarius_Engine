@@ -96,22 +96,19 @@ authoritative — and fixing the config without fixing the versions just moves t
    in this repo tonight.**
 4. **Still open.** CI lints neither `examples/` nor `tools/` — the sample app
    `.agents/context/` documents as the reference implementation remains unlinted.
-5. **Partially answered, still open.** CI's mypy *is* red, independent of everything else in
-   this task: confirmed by stashing all of tonight's changes and running
-   `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip` against a
-   clean `main` — 28 errors in 10 files, before any of today's edits. (After today's fixes: 27
-   — net improvement of 1, not a regression, but the debt is real and predates this task.)
-   `scripts/ci-local.ps1` (formerly `pre_commit.ps1`, see `TASK-030`) — the repo's own
-   completion gate — has therefore been failing at the mypy
-   step regardless of the `ruff.toml` issue. Fixing all 27 is out of scope for this task; each
-   needs its own look, not a blanket `--ignore-missing-imports` widening. Nothing in tonight's
-   changes should be blocked on this — it was already broken.
+5. **Split out, 2026-08-23 — see [`TASK-032`](TASK-032_mypy_baseline_cleanup.md).** CI's mypy
+   *is* red, independent of everything else in this task: confirmed by stashing tonight's
+   changes and running `mypy sagittarius_engine tests --ignore-missing-imports
+   --follow-imports=skip` against a clean `main` — 28 errors, before any of that night's edits.
+   Re-verified today after `TASK-017`'s full close and `TASK-029`'s doc cleanup: still 27, same
+   files, same lines — neither touched this set. 27 distinct type errors is too large and too
+   varied a fix to be one requirement of a config task; `TASK-032` categorizes and triages all
+   27, with `BUG-003` (already filed, 4 of the 27) called out to fix first.
 
-   Getting the local toolchain to match CI's pins (ruff 0.15.20, mypy 2.1.0) is still undone.
-6. `.agents/context/lint.md` still documents the (now-fixed) shadowing as a known trap —
-   update it to describe the single `pyproject.toml` config plainly once the mypy debt
-   (requirement 5) is also resolved, so the two updates land together rather than needing a
-   second pass.
+   **Still this task's own scope:** getting the local toolchain to match CI's pins (`ruff
+   0.15.20`, `mypy 2.1.0`) — undone. Local currently drifts (`ruff 0.16.4`, `mypy 2.3.1`).
+6. `.agents/context/lint.md` still documents "the known 27 mypy errors" (added alongside this
+   task's ruff fix) — update once `TASK-032` closes, per that file's own forward-reference.
 
 ## Priority
 
