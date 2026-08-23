@@ -38,6 +38,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-028** | Gate false-positive fixed + regression test added + ONBOARDING PATH guidance corrected | Build / Tooling — Completion Gate | 2026-08-23 | [TASK-028_pre_commit_gate_false_positive_on_missing_tool.md](completed/TASK-028_pre_commit_gate_false_positive_on_missing_tool.md) |
 | **TASK-031** | Root package no longer imports any extension; incomplete original diagnosis corrected mid-fix | Architecture / Package Boundaries | 2026-08-23 | [TASK-031_top_level_package_eagerly_imports_persistence.md](completed/TASK-031_top_level_package_eagerly_imports_persistence.md) |
 | **TASK-033** | `audit_dashboard.py` renamed to `audit_dashboard_cli.py`; the documented app is reachable under its own name again | Tooling / Package Boundaries | 2026-08-23 | [TASK-033_tools_mypy_errors.md](completed/TASK-033_tools_mypy_errors.md) |
+| **TASK-037** | `IView` dual QML/QWidget rendering backend — enroll-form prototype validated, then rolled out to the full roster screen (`WidgetRosterView`, `run.ps1 -QtWidget`) | Architecture / Presentation Layer | 2026-08-23 | [TASK-037_iview_dual_backend_prototype_validated.md](completed/TASK-037_iview_dual_backend_prototype_validated.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 

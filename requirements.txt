@@ -16,3 +16,6 @@ anyio
 pytest-asyncio
 PySide6
 pyqtgraph
+# examples/student_management's WidgetRosterView (TASK-037, --qtwidget
+# backend) uses qfluentwidgets for its FluentUI-styled controls.
+PySide6-Fluent-Widgets
