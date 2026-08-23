@@ -230,3 +230,6 @@ docs/kb/*.index
 docs/kb/*.faiss
 docs/kb/metadata.json
 .venv_kb/
+
+# Sample app runtime data (EPIC-002)
+examples/student_management/data/

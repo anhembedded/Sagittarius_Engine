@@ -1,7 +1,7 @@
 # EPIC-002A — Sample App Scaffold
 
 **Epic:** [EPIC-002 — Engine Sample App & Doc Rewrite](../README.md)
-**Status:** 🔵 Backlog
+**Status:** ✅ Completed (2026-08-23)
 **Category:** Documentation / Developer Experience
 **Priority:** P1
 **Depends on:** nothing (first subtask)
@@ -52,5 +52,52 @@ against a stable app, not a moving one.
 
 - `pytest examples/student_management/ -q` passes.
 - Every use case reachable and exercised from the CLI entry point.
-- `MODULE_COVERAGE.md` has zero unresolved rows — this is a gate, not a nice-to-have.
+- `MODULE_COVERAGE.md` has zero unresolved rows, **except `pyside_mvc`** — that row is
+  EPIC-002B's own deliverable, not this subtask's.
 - Any row marked "Gap" links a real, filed `TASK-XXX` — not a bare description.
+
+---
+
+## ✅ Completion notes (2026-08-23)
+
+**Shipped:** `examples/student_management/` — domain (`Student`, `Email`, `StudentId` value
+objects), application layer (7 use cases as `command.py`/`handler.py` directories:
+enroll/update/remove/get/list/search/generate-roster-report), infrastructure
+(`SqlAlchemyStudentRepository` + ORM model, real SQLite persistence), `StudentManagementExtension`
+(real `IExtension`, not `IModule`), and `main.py` — a real `argparse` subcommand CLI. 30 tests
+(10 domain, 10 application-with-fake-repo, 6 infrastructure-with-real-sqlite, 4 full-stack
+through the real `App`), all collected by the root suite (588 passed, 5 skipped — was 563
+before this subtask). `ruff`/`mypy` clean.
+
+**Verified by hand, not just by test suite:** ran the actual CLI (`python -m
+examples.student_management.main enroll/update/search/remove/get/list/report`) across two
+separate process invocations, confirming SQLite persistence really survives between runs, not
+just within one Python process's memory.
+
+**Design docs written as each topic settled** (not batched — per `README.md`'s "Design docs"
+convention), all with a Mermaid diagram: `docs/bootstrap.md`, `docs/module_registration.md`,
+`docs/config_loading.md`, and one topic not named up front that turned out non-trivial:
+`docs/persistence_and_transactions.md`.
+
+**Real findings, not fabricated for coverage:**
+1. `App(container, event_bus)` does not register either into the container — resolving
+   `IConfig`/`IEventBus` via `container.resolve()` requires binding them explicitly first.
+   (`docs/bootstrap.md`)
+2. Extension registration order is a real, unenforced dependency:
+   `StudentManagementExtension` resolving `ISession` fails with `DependencyResolutionError:
+   Cannot instantiate abstract class ISession` if `DatabaseExtension` hasn't registered first —
+   confirmed by actually swapping the order and running it, not assumed from reading the code.
+   (`docs/module_registration.md`)
+3. **Real engine gap, filed as [`TASK-019`](../../../backlog/TASK-019_database_extension_expose_engine.md):**
+   `DatabaseExtension` builds a SQLAlchemy `Engine` internally but exposes no way for a
+   consumer to reach it, so there's no sanctioned way to run `create_all()`. Worked around
+   (rebuild a second `Engine` from the same config value) — but that workaround only works for
+   a file-based SQLite URL, not `:memory:`, because two `Engine`s against `:memory:` are two
+   unrelated databases. (`docs/persistence_and_transactions.md`)
+4. `cqrs` extension deliberately skipped, not just unused: `architecture.md`'s own Layer 2
+   guidance says not to import `extensions.cqrs.ICommand`/`IQuery` into the Application layer,
+   so handlers use a plain `execute(dto)` shape instead. Skipping this extension is compliance
+   with this repo's own rule.
+
+**`MODULE_COVERAGE.md`:** every row resolved except `pyside_mvc` (EPIC-002B's own row, by
+design — see the ledger's header note).

@@ -138,27 +138,39 @@ this file.
 
 ## 4. Current state (check this is still accurate before trusting it)
 
-As of 2026-08-23: **planning is done, no app code exists yet.** What's actually in place:
+As of 2026-08-23: **EPIC-002A is done** (moved to `completed/`). What's actually in place:
 
-- `examples/student_management/` (the old one) is deleted and **committed** (`b69ff93`) —
-  not just staged. `git log -- examples/student_management` reaches the old content if ever
-  needed for reference.
-- This epic's own files are all written and fleshed out: `ONBOARDING.md` (this file),
-  `README.md`, all four subtask files in `incomplete/` (`EPIC-002A`–`D`), and
-  `MODULE_COVERAGE.md` — but that ledger is **all "TBD" rows right now**, since no sample-app
-  code exists yet to resolve them against.
-- `examples/student_management/` itself does not exist on disk at all yet — EPIC-002A creates
-  it from zero. There is no partial scaffold to pick up or resume.
+- `examples/student_management/` is a real, running app: domain, application (7 use cases),
+  infrastructure (real SQLite persistence via the engine's `persistence` extension), a
+  `StudentManagementExtension` (`IExtension`, not `IModule`), and `main.py` (an `argparse`
+  subcommand CLI — `enroll`/`update`/`remove`/`get`/`list`/`search`/`report`). 30 tests, all
+  collected by the root suite. Verified by hand, not just by test: run
+  `.venv/bin/python -m examples.student_management.main list` after an `enroll` in a separate
+  process — persistence survives across process boundaries, not just within one run.
+- `MODULE_COVERAGE.md` is filled in for every row except `pyside_mvc` (EPIC-002B's own row —
+  see the ledger's own header note on why that's by design, not an oversight).
+- Four design docs exist in `examples/student_management/docs/`, each with a Mermaid diagram,
+  written as their topic was settled: `bootstrap.md`, `module_registration.md`,
+  `config_loading.md`, `persistence_and_transactions.md` (a topic not named up front —
+  added because it turned out non-trivial, per the epic's own instruction to do that).
+- **One real engine gap found and filed, not worked around invisibly:**
+  [`TASK-019`](../../backlog/TASK-019_database_extension_expose_engine.md) —
+  `DatabaseExtension` exposes no way to reach the raw SQLAlchemy `Engine` it builds
+  internally, so a consumer has no sanctioned way to run schema creation. `EPIC-002A`'s own
+  workaround is documented in `docs/persistence_and_transactions.md`.
 - One cross-repo task is already filed as a first instance of §3 point 10's convention:
   [`BOT-117`](../../../../Sagittarius_Elite_Warrior/Tasks/backlog/BOT-117_stale_pyside_mvc_paths_in_palette_docstring.md)
   in `Sagittarius_Elite_Warrior`.
 
-**The next concrete action is EPIC-002A, from a blank `examples/student_management/`.**
+**The next concrete action is EPIC-002B** — wire `pyside_mvc` into this app's UI, booting it
+as a real `IExtension` (the app-side wrapper described in EPIC-002B's own file, since no
+`IExtension` for `pyside_mvc` exists in the engine itself yet — see that file's "Resolve
+before starting" section before writing any code).
 
-Stale references to the deleted example still exist and need fixing as part of EPIC-002D
-(not A — these are `.agents/`-side references, D's job, not A's app-building job):
+Stale references to the deleted *old* example still exist and need fixing as part of
+EPIC-002D (not A/B — these are `.agents/`-side references, D's job):
 - `readme.md:131` (root) — table row pointing at `examples/student_management/`
-- `.agents/context/examples.md`, `.agents/context/modules.md` — both cite it by name
+- `.agents/context/examples.md`, `.agents/context/modules.md` — both cite the old shape by name
 - `.agents/skills/module_discover.md` — references it as a discovery example
 
 ## 5. Cross-repo boundary

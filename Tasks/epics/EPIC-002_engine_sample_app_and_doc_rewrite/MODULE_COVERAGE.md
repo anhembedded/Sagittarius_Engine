@@ -1,8 +1,10 @@
 # Module Coverage Ledger
 
-**Owner subtask:** [EPIC-002A](incomplete/EPIC-002A_sample_app_scaffold.md) (extended by
-EPIC-002B for `pyside_mvc`). **Gate, not a nice-to-have:** EPIC-002A cannot move to
-`completed/` while any row below reads "TBD."
+**Owner subtask:** [EPIC-002A](completed/EPIC-002A_sample_app_scaffold.md) for every row
+except `pyside_mvc`, which is [EPIC-002B](incomplete/EPIC-002B_pyside_mvc_integration.md)'s
+own deliverable. **Gate, not a nice-to-have:** EPIC-002A cannot move to `completed/` while any
+row *other than* `pyside_mvc` reads "TBD"; EPIC-002B cannot close until `pyside_mvc` itself
+resolves to **Used**.
 
 Why this file exists: prose claims of "honest module coverage" aren't verifiable — see
 `ONBOARDING.md` §3's "not a promise, it's checked against a ledger." Every top-level
@@ -23,27 +25,27 @@ the way `.agents/context/` did.
 
 | Package | Status | Evidence / Reason |
 | :--- | :--- | :--- |
-| `adapters/` | TBD | |
-| `base/` | TBD | |
-| `domain/` | TBD | |
-| `exceptions.py` | TBD | |
-| `infrastructure/` | TBD | |
-| `interfaces/` | TBD | |
-| `kernel/` | TBD | |
-| `middleware/` | TBD | |
-| `runtime/` | TBD | |
-| `sdk/` | TBD | |
-| `utils/` | TBD | |
+| `adapters/` | Skipped | `adapters/cli`'s `CLIInputPort`/`CLIOutputPort` pair with `ApplicationRunner`'s single-command-key REPL loop (`kernel/app_runner.py`, read in full 2026-08-23). This app's 7 subcommands each take distinct typed arguments (`enroll` needs 4 positional args, `update` needs optional flags) — `argparse` subparsers (`main.py`) fit that shape better. A considered alternative, not an oversight. |
+| `base/` | Skipped | `BaseModule` is for the legacy `IModule` path, rejected — see `docs/module_registration.md`. `BaseInputPort`/`BaseOutputPort` only matter if `adapters/cli` were used (also skipped, above). |
+| `domain/` | Used | `domain/events.py` — `StudentEnrolled`/`StudentUpdated`/`StudentRemoved` all subclass `sagittarius_engine.domain.base_event.BaseEvent`. |
+| `exceptions.py` | Skipped | No engine-specific exception type is caught or raised by this app's own code. The container's `DependencyResolutionError` was only *observed* during verification (`docs/module_registration.md`), never referenced in application code. |
+| `infrastructure/` | Used | `main.py:build_app()` — `StdLibContainer`, `MemoryEventBus`, `ConfigManager` + `JsonSource` (via `load_json`) + `EnvSource` (via `load_env`); `StdLogger` registered transitively via `LoggerExtension`. |
+| `interfaces/` | Used | `IContainer`, `IEventBus`, `IConfig`, `ILogger`, `IExtension`, `ISession` — throughout `application/` and `infrastructure/`. |
+| `kernel/` | Used | `App` — construction, `use()`, `use_middleware()`, `boot()`, `dispatch()`, `stop()` all exercised in `main.py` and `tests/test_app_integration.py`. |
+| `middleware/` | Used | `LoggingMiddleware` — `main.py:build_app()`. |
+| `runtime/` | Skipped | No `IHostedService`, `Scheduler`, or `AsyncRuntime` API called directly by this app. (Every `App` instance starts/stops an `AsyncRuntime` loop and `Scheduler` automatically as part of its own lifecycle — observed in boot/stop logs — but that's the engine using its own package, not this app choosing to.) A synchronous CRUD CLI has no background/scheduled work to hand it. |
+| `sdk/` | Skipped | Dev-time project scaffolding, not a runtime dependency. This app was hand-built per the epic's explicit instruction, not `sdk`-generated. |
+| `utils/` | Skipped | `NullLogger` unneeded (a real `StdLogger` is registered via `LoggerExtension`); `PathUtils` unneeded (`main.py`'s path handling is one `pathlib.Path` expression, too trivial to warrant the engine's utility wrapper). |
 
 ## Extensions (`sagittarius_engine/extensions/`)
 
 | Extension | Status | Evidence / Reason |
 | :--- | :--- | :--- |
-| `audit` | TBD | |
-| `cqrs` | TBD | |
-| `fsm` | TBD | |
-| `health` | TBD | |
-| `logger` | TBD | |
-| `persistence` | TBD | |
-| `pyside_mvc` | TBD | Owned by EPIC-002B — must resolve to **Used**, not Skipped. Two prior sample apps in this repo (`student_management`, `tools/audit_dashboard`) both skipped it in favor of plain `QtWidgets`; that precedent is exactly what this ledger exists to prevent repeating. |
-| `thread_manager` | TBD | |
+| `audit` | Skipped | No audit-trail requirement for a student roster CRUD app — forcing one in would fabricate an integration pattern nobody asked for, exactly what `ONBOARDING.md` §3 point 3 warns against. |
+| `cqrs` | Skipped, deliberately | Read `extensions/cqrs/interfaces/{commands,queries}.py` in full 2026-08-23: `ICommand`/`IQuery` are thin `Generic[TInput, TOutput] + IDispatchable` wrappers, mainly valuable for `app.dispatch()`'s mypy return-type inference. **Not used, on purpose** — `architecture.md`'s own Layer 2 guidance says *"Never import engine-specific interfaces (like `sagittarius_engine.extensions.cqrs.ICommand`) into the Application layer. Use the layer's own pure Python `ICommandHandler` interface."* This app's handlers use a plain `execute(dto)` shape instead — structurally compatible with `IDispatchable`/`app.dispatch()` without the coupling. Skipping this extension is *compliance* with this repo's own rule, not an oversight. |
+| `fsm` | Skipped | No state-machine-shaped behavior anywhere in this domain (a student roster has no lifecycle states to transition between). |
+| `health` | Skipped | Health checks fit a long-running server/daemon process; this is a one-shot CLI invocation that exits after each command. |
+| `logger` | Used | `LoggerExtension` — `main.py:build_app()`. |
+| `persistence` | Used | `DatabaseExtension` — `main.py:build_app()`, real SQLite via `ISession`/`SqlAlchemyStudentRepository`. **One real engine gap found and filed**, not silently worked around: [`TASK-019`](../../backlog/TASK-019_database_extension_expose_engine.md) (`DatabaseExtension` exposes no way to reach the raw `Engine` for schema creation) — see `docs/persistence_and_transactions.md` for the workaround applied here. |
+| `pyside_mvc` | TBD — EPIC-002B's own row | Must resolve to **Used**, not Skipped. Two prior sample apps in this repo (`student_management`, `tools/audit_dashboard`) both skipped it in favor of plain `QtWidgets`; that precedent is exactly what this ledger exists to prevent repeating. |
+| `thread_manager` | Skipped | No concurrent or background work to manage — a synchronous CRUD CLI has nothing to hand to a thread pool. |

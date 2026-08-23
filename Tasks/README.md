@@ -35,6 +35,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | --- | --- | --- | --- | --- |
 | **TASK-016** | Formalize `name` Method on Interfaces | Core Architecture / Interfaces | P3 - Low | [TASK-016_interface_name_property.md](backlog/TASK-016_interface_name_property.md) |
 | **TASK-017** | Production Readiness Hardening | Reliability / Security | P1 - Critical | [TASK-017_production_readiness_hardening.md](backlog/TASK-017_production_readiness_hardening.md) |
+| **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
 
 ---
 
