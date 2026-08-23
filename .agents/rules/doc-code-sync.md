@@ -67,7 +67,7 @@ claim this differently now?"
 
 ## Enforcement
 
-A staleness-detection test ([EPIC-002D](../../Tasks/epics/EPIC-002_engine_sample_app_and_doc_rewrite/incomplete/EPIC-002D_doc_rewrite_and_staleness_guard.md))
+A staleness-detection test ([EPIC-002D](../../Tasks/epics/EPIC-002_engine_sample_app_and_doc_rewrite/completed/EPIC-002D_doc_rewrite_and_staleness_guard.md))
 is the mechanical backstop — it catches a path or class name that stops resolving. It cannot
 catch stale *reasoning* (a rule whose premise quietly stopped being true, the way
 `architecture.md`'s old `IEngineContext` constructor rule contradicted the engine's own

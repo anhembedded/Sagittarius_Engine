@@ -191,9 +191,11 @@ disagree, `ui-architecture.md` wins on UI and this file is the one to fix.
 
 ## Clean Architecture Layers (The 4 Layers)
 
-**Applies to a consuming application** (and to the `sdk/templates/clean` and
-`sdk/templates/ddd` scaffolds), not to `sagittarius_engine/`'s own tree. The
-running example is the reference consumer, `Sagittarius_Elite_Warrior`.
+**Applies to a consuming application**, not to `sagittarius_engine/`'s own tree. Two
+references: this repo's own sample, `examples/student_management/`, and the real consumer,
+`Sagittarius_Elite_Warrior`. (This line used to also cite `sdk/templates/clean` and
+`sdk/templates/ddd`; the scaffolding feature was deleted on 2026-08-23 — see
+[TASK-024](../../Tasks/completed/TASK-024_getting_started_scaffolders_broken.md).)
 
 ### Layer 1 & 2: The Core (Lõi hệ thống)
 **Responsibility:** Contains the business rules.

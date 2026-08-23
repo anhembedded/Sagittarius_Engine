@@ -13,7 +13,8 @@ trigger: model_decision
 - **Skip only when:** the change is a pure refactor with no behavior change and is already covered by pre-existing tests (verify by running them), or the change is not reasonably testable (e.g. log wording, a cosmetic constant).
 
 ## Where & Style
-- Mirror the existing layout: `tests/sanity/...` for boot/import-time checks (must run in well under a second, no real I/O), `tests/unit/...` for isolated logic, `tests/integration/...` for cross-component flows. Match the path of the module under test (e.g. `src/foo/bar.py` → `tests/unit/foo/test_bar.py`).
+- **`tests/` mirrors `sagittarius_engine/`'s package layout, not a test-type taxonomy.** The real directories are `base/`, `domain/`, `extensions/`, `infrastructure/`, `interfaces/`, `kernel/`, `middleware/`, `runtime/`, `sdk/`, plus top-level files like `test_architecture.py`. Put a test next to the package it exercises: `sagittarius_engine/kernel/app.py` → `tests/kernel/test_app.py`. (Corrected 2026-08-23, EPIC-002D: this rule previously prescribed `tests/sanity/`, `tests/unit/`, and `tests/integration/` — none of which exist, and none of which have ever existed in this repo. See `../context/testing.md`.)
+- The sample app keeps its own tests under `examples/student_management/tests/`, collected by the same root `pytest` run.
 - Follow the conventions already used in that test file/directory (fixtures, mock patterns, naming) rather than introducing a new one.
 
 ## Qt / PySide6 UI Tests

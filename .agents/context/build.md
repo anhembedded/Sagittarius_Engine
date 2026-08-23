@@ -1,6 +1,7 @@
 # Build & CI/CD Pipeline
 
-The project uses modern Python packaging (`pyproject.toml` + `setup.py`) and standard tools.
+The project uses modern Python packaging — `pyproject.toml` only. (Corrected 2026-08-23: the
+previous version of this file also claimed a `setup.py`; there isn't one, and hasn't been.)
 
 ## Development Commands
 
@@ -31,10 +32,25 @@ The project uses modern Python packaging (`pyproject.toml` + `setup.py`) and sta
 
 Defined in `.github/workflows/ci.yml`. It runs automatically on PRs and merges to `main` / `develop`.
 
-### Pipeline Jobs:
-1. **Lint & Type Check**: Fails fast if Ruff or Mypy catches issues.
-2. **Test Matrix**: Runs Pytest on multiple OSs (Linux, Windows) and Python versions (including 3.14-dev). Minimum 80% coverage enforced.
-3. **Architecture Guard**: Runs `tests/test_architecture.py` to ensure core boundaries aren't violated.
-4. **Example Integration**: Runs tests against `examples/` to ensure the framework doesn't break user-space apps.
-5. **Security Audit**: Uses `bandit` (SAST scan) and `pip-audit` (Vulnerability check).
-6. **Package Build Check**: Runs `python -m build` and `twine check` to validate distribution metadata.
+### Pipeline Jobs
+
+Seven jobs, verified against `ci.yml` on 2026-08-23 (the previous version of this list omitted
+`benchmark` entirely):
+
+1. **Lint & Type Check** — fails fast if Ruff or Mypy catches issues.
+2. **Test Matrix** — Pytest across OSs (Linux, Windows) and Python versions (including
+   3.14-dev). Minimum 80% coverage enforced (`--cov-fail-under=80`).
+3. **Architecture Guard** — runs `tests/test_architecture.py` so core boundaries can't be
+   violated.
+4. **Example Integration** — runs `tests/test_examples.py`, so a framework change that breaks
+   user-space apps fails here.
+5. **Performance Benchmark** — ⚠️ **currently broken and silently so.** It runs
+   `tests/benchmark_runtime.py`, a path that moved to `tests/runtime/benchmark_runtime.py` in
+   commit `843137a`; the step has errored ever since. The job declares
+   `continue-on-error: true`, so the pipeline still goes green and no benchmark has actually
+   run since that reorganization. Tracked as
+   [TASK-020](../../Tasks/backlog/TASK-020_ci_benchmark_job_stale_path.md). Do not read a
+   passing CI run as evidence that performance is unregressed.
+6. **Security Audit** — `bandit` (SAST) and `pip-audit` (vulnerabilities).
+7. **Package Build Check** — `python -m build` + `twine check` to validate distribution
+   metadata.

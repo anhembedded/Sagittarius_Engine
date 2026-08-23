@@ -21,4 +21,8 @@ Handles recurring and delayed jobs.
 ### 4. Hosted Services (`IHostedService`)
 Services that start with the application and run continuously until shutdown.
 - **`BackgroundService`**: An abstract base class implementing `IHostedService`. It automatically hooks into the `TaskManager` to spawn a long-running daemon loop (`run(self, token: CancellationToken)`), completely non-blocking to the main engine thread.
-- Examples include CLI presentation layers (e.g., `TerminalMenu`) or background queue consumers.
+- Examples include background queue consumers or a long-running CLI menu loop. No shipped
+  extension currently subclasses `BackgroundService` for a CLI presentation layer — the sample
+  app's CLI (`examples/student_management`) is a synchronous `argparse` command, not a hosted
+  service; verified 2026-08-23, replacing a previous version that named a `TerminalMenu` class
+  that doesn't exist anywhere in this repo.

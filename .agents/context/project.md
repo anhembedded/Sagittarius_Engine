@@ -42,9 +42,9 @@ Supported architectures include:
 |--------|----------------|
 | Kernel | Host, Context, Dispatcher, Lifecycle, Bootstrap |
 | Runtime | Hosted Services, Scheduler, Tasks, Async, Cancellation |
-| Extensions | SQLAlchemy, CQRS, Persistence, Logging, Metrics, Audit (Telemetry) |
+| Extensions | `audit`, `cqrs`, `fsm`, `health`, `logger`, `persistence` (SQLAlchemy-backed), `pyside_mvc` (PySide6/QML UI), `thread_manager` — exhaustive as of 2026-08-23 |
 | SDK | Templates, Generator, Project Setup |
-| Tools / Apps | Business Logic, Domain, UI (e.g. `audit_dashboard` using PySide6) |
+| Tools / Apps | Business Logic, Domain, UI. Reference: `examples/student_management` (Clean Architecture + `pyside_mvc` QML UI, see `examples.md`); `tools/audit_dashboard` (plain PySide6 QtWidgets) |
 
 ---
 
@@ -82,23 +82,29 @@ Documentation must:
 
 ## Extension Lifecycle
 
+Corrected 2026-08-23 (was missing a whole layer): `initialize`/`start`/`stop`/`dispose` are
+the **orchestrator** layer `ExtensionManager` actually calls — by default each just delegates
+to the **author** layer you implement: `register`/`boot`/`shutdown`. Overriding `start()`
+without calling `super().start(context)` silently skips your `boot()` — see `modules.md` and
+`rules/architecture.md` for the full override-vs-call trap.
+
 ```
-initialize
-    ↓
-start
-    ↓
-stop
-    ↓
-dispose
+register → (initialize delegates here)
+boot     → (start delegates here)
+shutdown → (stop delegates here)
+(dispose has no author-layer counterpart — a genuine 4th phase, safe to override directly)
 ```
 
-Extension metadata:
+Extension metadata (`ExtensionDescriptor`): `dependencies`, `optional_dependencies`,
+`priority`, `name` (defaults to the class name).
 
-- dependencies
-- optional dependencies
-- priority
-
-Dependency order is resolved automatically.
+**Dependency order is resolved automatically — if you declare it.** `dependencies` is a list
+of strings matched against another extension's `descriptor.name`.
+`ExtensionManager._build_and_sort()` topologically sorts by this graph; verified directly
+(`examples/student_management`'s `docs/module_registration.md`): declaring
+`dependencies = ["DatabaseExtension"]` makes boot succeed even if `app.use()` was called in
+the wrong order. Without a declared dependency, `app.use()` call order is the *only* thing
+establishing it, and getting that wrong fails loudly (`DependencyResolutionError`) at boot.
 
 ---
 

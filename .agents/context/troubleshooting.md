@@ -8,7 +8,19 @@ Solutions to common issues.
 
 ## 2. Mypy Type Errors (`Liskov substitution principle violation`)
 - **Cause**: A child class overrides a method with a different signature than the interface.
-- **Fix**: Ensure module `register(self, app: App)` matches `IModule.register(self, app: App)` exactly.
+- **Fix**: For an `IExtension`, ensure `register(self, context: TContext)` matches your
+  declared context Protocol exactly (see `rules/architecture.md`'s narrow-context-Protocol
+  section) — a common cause is widening or narrowing `TContext` in the override. For the
+  legacy `IModule` path, ensure `register(self, app: App)` matches `IModule.register(self,
+  app: App)` exactly.
+
+## 5. `start()`/`stop()` override silently skips your `boot()`/`shutdown()`
+- **Cause**: `IExtension`'s orchestrator methods (`initialize`/`start`/`stop`/`dispose`)
+  delegate to the author methods (`register`/`boot`/`shutdown`) by default. Overriding
+  `start()` without calling `super().start(context)` means `ExtensionManager` never reaches
+  your `boot()` — no error, the extension just doesn't do what it's supposed to.
+- **Fix**: Override the author layer (`register`/`boot`/`shutdown`) unless you specifically
+  need to wrap orchestration — see `modules.md` and `rules/architecture.md`.
 
 ## 3. Tool Dashboard (PySide6) Not Receiving Data
 - **Cause**: The engine's `AuditExtension` websocket might not be running or bound to the correct port.

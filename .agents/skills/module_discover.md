@@ -29,7 +29,10 @@ When the user requests you to "discover", "investigate", or "document" a specifi
 
 ### 4. Synthesize and Write Documentation
 
-Once you have fully understood the module, create a highly detailed Markdown document in `docs/Modules/[ModuleName].md`.
+Once you have fully understood the module, create a highly detailed Markdown document in
+`.agents/context/modules/[ModuleName].md` (create the `modules/` subdirectory if it doesn't
+exist yet — the top-level `docs/Modules/` this skill used to point at was deleted from the repo
+in commit `a338d42` and never rebuilt; see `.agents/context/repository.md`'s `docs/` row).
 The document **must** follow this strict structure:
 
 #### Document Structure Template
@@ -50,4 +53,4 @@ The document **must** follow this strict structure:
 ### 5. Finalize
 
 - Provide a summary to the user outlining the key discoveries you made.
-- Point them to the newly generated documentation file in `docs/Modules/`.
+- Point them to the newly generated documentation file in `.agents/context/modules/`.

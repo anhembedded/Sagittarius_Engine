@@ -1,5 +1,5 @@
 import os
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 from sqlalchemy import create_engine
 
@@ -25,11 +25,17 @@ class StudentManagementExtension(IExtension[IStudentManagementContext]):
     """
     @brief Registers this app's repository and creates its schema.
 
-    @details Depends on the engine's DatabaseExtension having already registered
-    `ISession` — register order in main.py matters:
-    `app.use(DatabaseExtension())` before `app.use(StudentManagementExtension())`.
-    See docs/module_registration.md for why order isn't declarative here.
+    @details Needs the engine's `DatabaseExtension` to have registered `ISession`
+    first. That ordering is declared below rather than left to `app.use()` call
+    order — see docs/module_registration.md.
     """
+
+    #: Matched by class name against another extension's `descriptor.name`
+    #: (see `ExtensionManager._build_and_sort`, which topologically sorts on
+    #: this) — makes boot order robust to `app.use()` call order instead of
+    #: depending on it. Verified: reversing the two `app.use()` calls in
+    #: main.py still boots cleanly with this declared.
+    dependencies: ClassVar[list[str]] = ["DatabaseExtension"]
 
     def register(self, context: IStudentManagementContext) -> None:
         session = context.container.resolve(ISession)

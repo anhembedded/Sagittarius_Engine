@@ -30,10 +30,11 @@ exist in this one).
     workflows/       Long-form process write-ups
     anti-patterns/   Documented failure modes to avoid
 sagittarius_engine/  The package itself — 11 top-level sub-packages, see rules/architecture.md
-examples/            Sample apps demonstrating engine usage (see §5 below — under active rebuild)
+examples/            Sample apps — currently just student_management/ (rebuilt 2026-08-23)
 tests/               Engine's own test suite
+tools/               Standalone utilities on top of the engine (audit_dashboard/)
+scripts/             Developer utility scripts, not part of the installable package
 Tasks/               Kanban board — README.md is the index, epics/ holds multi-task programs
-docs/                Separate, larger doc tree (388 KB, 51 files) — not currently routed to
                      from here; its relationship to .agents/context/ is an open question,
                      tracked under EPIC-002, not yet resolved as of 2026-08-23
 ```
@@ -57,28 +58,41 @@ search comes up empty.
 
 Load only what the task needs.
 
-**A known trap, read before trusting anything in `context/`:** these 16 files were written in
-a single commit, 2026-08-02, and not touched again while the engine gained 9 top-level
-packages and +7000 lines. An audit on 2026-08-23 found `repository.md` naming the wrong repo,
-citing a nonexistent extension, and `modules.md` documenting an interface the engine's own
-code calls "legacy." **[EPIC-002](../Tasks/epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)**
-is rewriting this directory from a real sample app, grounded and guarded against re-rotting.
-Until that epic's `D` subtask lands, verify a `context/` claim against the actual code before
-relying on it for anything you'll act on — `grep`/`ls` it, don't trust it at face value.
+**History, and why this directory is now trustworthy but not infallible:** the original 16
+files here were written in a single commit, 2026-08-02, and never touched again while the
+engine gained 9 top-level packages and +7000 lines. A 2026-08-23 audit found `repository.md`
+naming the wrong repo and citing a nonexistent extension, `modules.md` documenting an
+interface the engine's own code calls "legacy," `api.md` giving `App.boot()`'s parameter the
+wrong type, and `readme.md` listing four example directories that never existed.
+**[EPIC-002](../Tasks/epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** rewrote
+every file in this directory against a real, running sample app
+(`examples/student_management/`) rather than from memory — see that epic's `AUDIT_REPORT.md`
+for the full finding-by-finding account.
+
+Two things now guard it: `rules/doc-code-sync.md` (always-on — a code change must update its
+docs in the same change) and `tests/test_agents_docs_resolve.py`, which fails CI when a
+backtick-quoted class, module, or path in `context/` stops resolving against the real tree.
+That test catches *structural* rot only; a claim that is wrong but well-formed still needs a
+reader. `grep`/`ls` before acting on anything load-bearing.
 
 Always load: `project.md`, `repository.md`.
 
 | Task | Also load |
 |---|---|
 | Feature development | `architectures/architecture.md`, `modules.md` |
-| Bug fix | `runtime.md`, `testing.md` |
+| Bug fix | `runtime.md`, `testing.md`, `troubleshooting.md` |
 | Refactoring | `architectures/architecture.md` |
-| Documentation | `documentation.md` |
-| Deployment | `deployment.md` |
 | Performance | `runtime.md` |
 | API | `api.md` |
 | Configuration | `configuration.md` |
-| Build | `build.md` |
+| Build | `build.md`, `lint.md` |
+| Adding/upgrading a dependency | `dependencies.md` |
+| Writing a new example, or learning the engine by reading one | `examples.md` |
+| Unfamiliar term in a rule or task file | `glossary.md` |
+
+Documentation and Deployment have no `context/` entry — both were pure duplicates of
+`rules/documentation.md` / `rules/deployment.md` (2026-08-23 merge, EPIC-002D) and are now
+covered entirely by the rule files; load those instead (see §5's rule routing table).
 
 ## 5. Rule application (`.agents/rules/`)
 
@@ -108,13 +122,21 @@ Rules are mandatory once loaded; never silently violate one — if a rule and th
 disagree, that's a rule-file change to propose, not a rule to route around
 (`design-discipline.md` §2).
 
-**Known duplication, not yet resolved:** `code-rule.md` and `coding-style.md` overlap
-substantially (both restate all five SOLID principles); `context/testing.md` and
-`rules/testing.md` disagree on the real test directory layout (the `context/` one is
-correct — verified against `tests/` on disk); `context/deployment.md` has real content while
-`rules/deployment.md` is a 3-line stub. Consolidating these is in scope for
-[EPIC-002D](../Tasks/epics/EPIC-002_engine_sample_app_and_doc_rewrite/incomplete/EPIC-002D_doc_rewrite_and_staleness_guard.md) —
-until then, prefer the file with real, verifiable content when two disagree.
+**Known duplication.** Two of the three cases listed here were resolved by
+[EPIC-002D](../Tasks/epics/EPIC-002_engine_sample_app_and_doc_rewrite/completed/EPIC-002D_doc_rewrite_and_staleness_guard.md)
+(2026-08-23):
+
+- ✅ `context/testing.md` vs `rules/testing.md` disagreeing on the test layout — `rules/testing.md`
+  prescribed `tests/sanity/`, `tests/unit/`, `tests/integration/`, none of which exist. Both now
+  describe the real, package-mirroring layout.
+- ✅ `context/deployment.md` (real content) vs `rules/deployment.md` (3-line stub) — merged into
+  the rule file; the context file is deleted.
+- ⬜ **Still open:** `code-rule.md` and `coding-style.md` overlap substantially, both restating
+  all five SOLID principles. Not consolidated. When they disagree, prefer the file with the more
+  specific, example-grounded claim.
+
+General principle when any two docs conflict: prefer the one with real, verifiable content, and
+fix the other in the same change rather than working around it (`rules/doc-code-sync.md`).
 
 ## 6. Skill routing (`.agents/skills/`)
 

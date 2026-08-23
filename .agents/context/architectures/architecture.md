@@ -22,17 +22,27 @@ flowchart LR
 
 ## Extension Model
 
-Extensions act as plugins that hook into the Engine's lifecycle (`initialize`, `start`, `stop`, `dispose`).
+Extensions implement `IExtension` and act as plugins that hook into the Engine's lifecycle.
+**Two layers, corrected 2026-08-23** (see `../modules.md` for the full account): you implement
+`register`/`boot`/`shutdown`; `ExtensionManager` actually calls `initialize`/`start`/`stop`/
+`dispose`, which delegate to your methods by default. Overriding the orchestrator layer
+without calling `super()` silently skips your own lifecycle code.
 They can register background daemon threads (e.g., `WebsocketBroadcaster` in `AuditExtension`) and listen to the `EventBus` to stream telemetry or intercept commands asynchronously without blocking the main engine thread.
 
 ## Tool Dashboard Architecture (PySide6)
 
-Tools built around the engine (like `audit_dashboard`) strictly follow Clean Architecture:
+Tools built around the engine (like `audit_dashboard`) strictly follow Clean Architecture.
+Names corrected 2026-08-23 against the real source in `tools/audit_dashboard/` (the previous
+version guessed at plausible-sounding names that don't exist in the code):
 
-- **Domain**: Core UI models and interfaces (`IConnector`).
-- **Application**: Use Cases (`ReceiveAuditUseCase`) orchestrating data flow.
-- **Infrastructure**: Concrete adapters (`WebsocketConnector`) communicating with the engine.
-- **Presentation**: PySide6 Widgets (`MainWindow`) reacting to state updates via Qt Signals.
+- **Domain**: Core UI models (`tools/audit_dashboard/Domain/entities.py`) and interfaces —
+  `IRealtimeConnector` (not `IConnector`), in `tools/audit_dashboard/Domain/ports.py`.
+- **Application**: Use cases orchestrating data flow — `StartRealtimeListenerCommand` (not
+  `ReceiveAuditUseCase`), in `tools/audit_dashboard/application/receive_audit_use_case.py`.
+- **Infrastructure**: Concrete adapters — `WebsocketConnector`, in
+  `tools/audit_dashboard/infra/websocket_connector.py`, communicating with the engine.
+- **Presentation**: PySide6 widgets — `MainWindow`, in
+  `tools/audit_dashboard/presentation/main_window.py`, reacting to state updates via Qt Signals.
 
 ## EngineContext Subsystem Composition
 

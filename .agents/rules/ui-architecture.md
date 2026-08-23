@@ -8,7 +8,7 @@ trigger: model_decision
 
 This document governs `sagittarius_engine.extensions.pyside_mvc` — the engine's opinionated
 UI framework for PySide6 + QML applications. It replaces the previous QtWidgets/QFrame/QSS
-doctrine (retired 2026-08-22, see [`EPIC-001A`](../../Tasks/epics/EPIC-001_ui_engine_foundation/incomplete/EPIC-001A_architecture_rule_rewrite.md))
+doctrine (retired 2026-08-22, see [`EPIC-001A`](../../Tasks/epics/EPIC-001_ui_engine_foundation/completed/EPIC-001A_architecture_rule_rewrite.md))
 which described a pre-QML shape of this extension that no longer matches what ships.
 
 **Scope discipline:** this file describes what the **engine** provides and requires of any

@@ -20,11 +20,21 @@ flowchart LR
 
 `StudentManagementExtension.register()` does `context.container.resolve(ISession)` — that
 call fails immediately (`DependencyResolutionError`) unless `DatabaseExtension.register()`
-already ran and bound `ISession`. `IExtension` itself declares no `dependencies` mechanism
-that's enforced automatically at `app.use()` time (there's a `dependencies`/`priority`
-attribute pattern visible in `ExtensionDescriptor`, but nothing in this app's three extensions
-declares or needs it — the ordering here is a straight line, not a graph, so `app.use()` call
-order is sufficient and simpler than reaching for that mechanism).
+already ran and bound `ISession`.
+
+**Correction, 2026-08-23 (found while cross-checking `.agents/context/project.md`'s claim
+"dependency order is resolved automatically" against this exact scenario — the claim is true,
+this file's first version was incomplete, not the engine):** `ExtensionManager._build_and_sort`
+does a real topological sort, keyed on `descriptor.dependencies` — a list of **strings**
+matched against another extension's `descriptor.name` (which defaults to the class name).
+Verified directly: adding `dependencies = ["DatabaseExtension"]` as a class attribute on
+`StudentManagementExtension` makes `app.boot()` succeed even with `app.use()` called in the
+*wrong* order — the sort reorders it correctly before any `register()` runs. This app now
+declares that dependency (`infrastructure/persistence/extension.py`) instead of relying on
+`app.use()` call order alone — the declarative form doesn't depend on every future maintainer
+remembering an unenforced ordering rule; `app.use()` order stops mattering the moment you
+have more than a trivial straight line. The `app.use()`-order-only path below is kept as a
+record of the failure mode this correction avoids, not as the recommended pattern.
 
 ## What actually happens if the order is wrong
 

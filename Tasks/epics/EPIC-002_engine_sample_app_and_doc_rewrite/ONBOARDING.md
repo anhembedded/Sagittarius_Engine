@@ -14,7 +14,10 @@ human would after being briefed — this document is that briefing.
 written. The result is not "a bit stale" — it is **actively wrong**: `repository.md` opens
 with *"The `Sagittarius_ForkBoy` repository"* (wrong repo name), lists an extension
 (`extensions/sqlalchemy`) that doesn't exist, and omits `docs/` (388 KB, 51 files) and
-`scripts/` entirely. `modules.md` documents `IModule` as the module model while the engine's
+`scripts/` entirely. *(Postscript, EPIC-002D: `docs/` was itself deleted — all 53 files — in
+commit `a338d42`, hours after this paragraph was written. The claim was true when made and
+false by the end of the day. Left as written, because a doc going stale mid-epic is the
+sharpest possible illustration of the problem this epic exists to fix.)* `modules.md` documents `IModule` as the module model while the engine's
 own code calls it *"a legacy IModule"* (`kernel/extension_manager.py:22`) and never mentions
 `IExtension` — the interface every shipped extension actually implements. Hand-written
 summaries of a moving codebase rot; there is no mechanism that keeps them honest. Writing

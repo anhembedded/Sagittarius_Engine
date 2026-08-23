@@ -1,6 +1,6 @@
 # EPIC-002 — Engine Sample App & Doc Rewrite
 
-**Status:** 🟡 In Progress (3/4 subtasks done)
+**Status:** ✅ Completed 2026-08-23 (4/4 subtasks done)
 **Category:** Documentation / Developer Experience
 **Priority:** P1 — `.agents/context/` is actively misleading every AI session that loads it
 **Depends on:** [EPIC-001](../EPIC-001_ui_engine_foundation/README.md) (needs a stable
@@ -30,7 +30,7 @@ the repo, stay passing, and stay current the same way the rest of the engine's t
 | :--- | :--- |
 | `repository.md` opening line: *"The `Sagittarius_ForkBoy` repository"* | Wrong repo name |
 | `repository.md` lists `extensions/sqlalchemy` | Does not exist; real package is `persistence` |
-| `repository.md` / `modules.md` omit `docs/` and `scripts/` | `docs/` alone is 388 KB, 51 files — larger than all of `.agents/context/` combined and not routed to from `.agents/ONBOARDING.md` |
+| `repository.md` / `modules.md` omit `docs/` and `scripts/` | `docs/` alone is 388 KB, 51 files — larger than all of `.agents/context/` combined and not routed to from `.agents/ONBOARDING.md` **— superseded: `docs/` was deleted entirely (53 files) in commit `a338d42`, later the same day this was written. Kept as written to preserve the record; see EPIC-002D's outcome notes.** |
 | `modules.md` documents `IModule` as the module model | The engine's own code calls it *"a legacy `IModule`"* (`kernel/extension_manager.py:22`); `IExtension` (8 real implementers) is not mentioned at all |
 | `.agents/context/*.md` — 16 files | All from **one commit**, `0bd461b`, 2026-08-02; 267 commits and `+7028/-430` lines have landed in `sagittarius_engine/` since, adding 9 top-level packages |
 | `interfaces/i_engine_context.py:30` docstring names `AppRunner` | No such class exists anywhere in the package (confirmed the real orchestrator, `ApplicationRunner`, takes ports, never a context) |
@@ -103,7 +103,7 @@ immediately, with a mermaid diagram).
 | **EPIC-002A** | Scaffold the sample app — domain, Clean Architecture layers, `IExtension`-based module registration, honest (not forced) engine-module coverage | ✅ Completed (2026-08-23) |
 | **EPIC-002B** | Wire the full `pyside_mvc` widget kit into the sample's UI, booting it as a real `IExtension` per the EPIC-001D decision | ✅ Completed (2026-08-23) |
 | **EPIC-002C** | Write `AUDIT_REPORT.md` from the build experience — every ambiguity, implicit assumption, and rough edge, with evidence, not impressions | ✅ Completed (2026-08-23) |
-| **EPIC-002D** | Rewrite `.agents/context/*.md` from the audit; add a staleness-detection test; fix the 4 dangling references to the deleted old sample | 🔵 Backlog |
+| **EPIC-002D** | Rewrite `.agents/context/*.md` from the audit; add a staleness-detection test; fix the 4 dangling references to the deleted old sample | ✅ Completed (2026-08-23) |
 
 Sequencing is strictly `A → B → C → D` — each subtask's file lives in `incomplete/` until
 done, then moves to `completed/` with its `Status:` line updated, per this repo's
