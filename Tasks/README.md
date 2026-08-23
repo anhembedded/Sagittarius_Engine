@@ -49,6 +49,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | --- | --- | --- | --- | --- |
 | **TASK-034** | `extensions/__init__.py` is a barrel that eagerly imports all six extensions together | Architecture / Package Boundaries | P3 | [TASK-034_extensions_barrel_eager_imports_everything.md](backlog/TASK-034_extensions_barrel_eager_imports_everything.md) |
 | **TASK-035** | `AppDataTable`'s columns render with no horizontal gap — a right-aligned column touches the next one | UI / Widget Kit (`pyside_mvc`) | P3 | [TASK-035_appdatatable_columns_have_no_horizontal_gap.md](backlog/TASK-035_appdatatable_columns_have_no_horizontal_gap.md) |
+| **TASK-036** | Audit every widget-kit card for missing Windows-Explorer-style utility actions (survey done, decisions/implementation pending) | UI / Widget Kit (`pyside_mvc`) | P2 | [TASK-036_audit_widget_kit_for_missing_windows_style_actions.md](backlog/TASK-036_audit_widget_kit_for_missing_windows_style_actions.md) |
 
 ---
 
