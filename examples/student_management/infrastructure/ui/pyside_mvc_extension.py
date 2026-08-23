@@ -1,7 +1,7 @@
 from typing import Protocol
 
-from examples.student_management.presentation.icon_loader import SimpleIconLoader
-from examples.student_management.presentation.palette import (
+from examples.student_management.presentation.theme.icon_loader import SimpleIconLoader
+from examples.student_management.presentation.theme.palette import (
     STUDENT_MANAGEMENT_ICON_PALETTE,
     STUDENT_MANAGEMENT_PALETTE,
 )

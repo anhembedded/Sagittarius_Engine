@@ -6,8 +6,10 @@ from examples.student_management.infrastructure.ui.pyside_mvc_extension import (
     PySideMvcExtension,
 )
 from examples.student_management.main import build_app
-from examples.student_management.presentation.roster_presenter import RosterPresenter
-from examples.student_management.presentation.roster_view import RosterView
+from examples.student_management.presentation.roster.roster_presenter import (
+    RosterPresenter,
+)
+from examples.student_management.presentation.roster.roster_view import RosterView
 
 
 def main() -> int:
