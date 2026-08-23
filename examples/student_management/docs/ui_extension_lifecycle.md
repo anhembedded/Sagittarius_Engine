@@ -40,7 +40,7 @@ version — not a substitute for it.
 
 ## `pyside_mvc` used for real, not for coverage
 
-- **Tokens**: `presentation/palette.py` supplies all 10 `REQUIRED_COLOUR_TOKENS`, distinct from
+- **Tokens**: `presentation/theme/palette.py` supplies all 10 `REQUIRED_COLOUR_TOKENS`, distinct from
   the reference consumer's own palette (deliberately — this sample is its own thing).
 - **Widget kit**: `RosterScreen.qml` composes `AppDataTable` (the roster), `BaseCard` (stats
   summary, with a real `Switch` bound to `viewModel.compactMode` — not just two static

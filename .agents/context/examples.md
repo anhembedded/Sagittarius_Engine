@@ -28,13 +28,17 @@ A real, running Clean Architecture app with a QML UI, backend and frontend both.
 - **`gui.py`**: real entry point. Constructs `QApplication` *before* `App.boot()` —
   load-bearing order for booting `pyside_mvc` as an `IExtension`, see `ui-architecture.md` and
   the sample's own `docs/ui_extension_lifecycle.md`.
-- **`presentation/`**: `RosterView` (`QmlHostView`), `RosterPresenter` (`BasePresenter`, no
-  FSM — a roster screen has no lifecycle states), `RosterViewModel` (`BaseQmlViewModel`).
-  `PySideMvcExtension` — an app-side `IExtension` wrapper booting `pyside_mvc` (no such class
-  ships in the engine yet).
-- **`presentation/qml/RosterScreen.qml`**: composes `AppDataTable` (roster rows), `BaseCard`
-  (stats summary, with a real compact-mode toggle bound to the ViewModel), `AppModal` (enroll
-  form) — the widget kit used for real, not for coverage.
+- **`presentation/`** splits by abstraction level, not just by name (2026-08-23 — the two used
+  to sit flat in one directory): `presentation/roster/` is the roster screen's own MVP triad —
+  `RosterView` (`QmlHostView`), `RosterPresenter` (`BasePresenter`, no FSM — a roster screen has
+  no lifecycle states), `RosterViewModel` (`BaseQmlViewModel`) — while `presentation/theme/`
+  holds app-wide UI configuration consumed only by `infrastructure/ui/pyside_mvc_extension.py`
+  (`PySideMvcExtension`, the app-side `IExtension` wrapper booting `pyside_mvc` — no such class
+  ships in the engine yet), never by the screen itself: `palette.py`'s colour tokens and
+  `icon_loader.py`'s `SimpleIconLoader`.
+- **`presentation/roster/qml/RosterScreen.qml`**: composes `AppDataTable` (roster rows),
+  `BaseCard` (stats summary, with a real compact-mode toggle bound to the ViewModel), `AppModal`
+  (enroll form) — the widget kit used for real, not for coverage.
 
 ### Patterns demonstrated
 

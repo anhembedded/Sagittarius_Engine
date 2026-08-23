@@ -28,7 +28,9 @@ from examples.student_management.domain.events import (
     StudentRemoved,
     StudentUpdated,
 )
-from examples.student_management.presentation.roster_view_model import RosterViewModel
+from examples.student_management.presentation.roster.roster_view_model import (
+    RosterViewModel,
+)
 from sagittarius_engine.extensions.pyside_mvc import BasePresenter
 from sagittarius_engine.interfaces.i_container import IContainer
 
