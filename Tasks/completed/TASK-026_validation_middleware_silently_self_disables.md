@@ -125,7 +125,7 @@ Middleware / Correctness
 
 ## Related
 
-- [TASK-023](TASK-023_ci_matrix_hides_312_313_breakage.md) — the `ITaskHandle` bug and the
+- [TASK-023](../backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) — the `ITaskHandle` bug and the
   Python-version blind spot that hid it.
 - [TASK-025](../completed/TASK-025_dead_infrastructure_persistence_package.md) — the import/annotation guard
   test added alongside this finding.

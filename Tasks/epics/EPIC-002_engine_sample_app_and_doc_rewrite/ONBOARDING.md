@@ -136,7 +136,7 @@ this file.
     "Cross-repo boundary" — still holds for code changes; filing a task on Elite's board is
     the one thing this point explicitly carves out as in scope). First instance already done
     2026-08-23:
-    [`BOT-117`](../../../../Sagittarius_Elite_Warrior/Tasks/backlog/BOT-117_stale_pyside_mvc_paths_in_palette_docstring.md)
+    [`BOT-117`](../../../../Sagittarius_Elite_Warrior/Tasks/completed/BOT-117_stale_pyside_mvc_paths_in_palette_docstring.md)
     — `palette.py`'s docstring still names the pre-reorg `QmlShared` paths.
 
 ## 4. Current state (check this is still accurate before trusting it)
@@ -167,7 +167,7 @@ actually in place:
   internally, so a consumer has no sanctioned way to run schema creation. `EPIC-002A`'s own
   workaround is documented in `docs/persistence_and_transactions.md`.
 - One cross-repo task is already filed as a first instance of §3 point 10's convention:
-  [`BOT-117`](../../../../Sagittarius_Elite_Warrior/Tasks/backlog/BOT-117_stale_pyside_mvc_paths_in_palette_docstring.md)
+  [`BOT-117`](../../../../Sagittarius_Elite_Warrior/Tasks/completed/BOT-117_stale_pyside_mvc_paths_in_palette_docstring.md)
   in `Sagittarius_Elite_Warrior`.
 
 - [`AUDIT_REPORT.md`](AUDIT_REPORT.md) (epic root) consolidates everything above, plus a

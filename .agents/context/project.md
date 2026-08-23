@@ -32,7 +32,6 @@ Supported architectures include:
 - Kernel provides capabilities
 - Runtime orchestrates execution
 - Extensions integrate technologies
-- SDK accelerates development
 
 ---
 
@@ -43,8 +42,12 @@ Supported architectures include:
 | Kernel | Host, Context, Dispatcher, Lifecycle, Bootstrap |
 | Runtime | Hosted Services, Scheduler, Tasks, Async, Cancellation |
 | Extensions | `audit`, `cqrs`, `fsm`, `health`, `logger`, `persistence` (SQLAlchemy-backed), `pyside_mvc` (PySide6/QML UI), `thread_manager` — exhaustive as of 2026-08-23 |
-| SDK | Templates, Generator, Project Setup |
 | Tools / Apps | Business Logic, Domain, UI. Reference: `examples/student_management` (Clean Architecture + `pyside_mvc` QML UI, see `examples.md`); `tools/audit_dashboard` (plain PySide6 QtWidgets) |
+
+There was a fifth row here, `SDK | Templates, Generator, Project Setup` — the scaffolding
+feature (`sagittarius_engine.sdk`, `tools/scaffold.py`) was deleted entirely on 2026-08-23
+(`TASK-024`): both its documented invocations were broken, and it shipped no replacement.
+See `CHANGELOG.md`'s `2.0.0` entry.
 
 ---
 

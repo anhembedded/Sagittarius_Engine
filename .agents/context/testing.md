@@ -27,7 +27,6 @@ tests/
 ├── kernel/          tests for kernel/ (App, Bootstrap, ExtensionManager, Dispatcher, ...)
 ├── middleware/      tests for middleware/
 ├── runtime/         tests for runtime/ (async_runtime, hosted, scheduler, tasks)
-├── sdk/             tests for sdk/ (scaffolding, templates)
 └── test_architecture.py   Enforces Clean Architecture boundaries — e.g., domain/ must not
                             import infrastructure/. Run in CI as its own "architecture" job.
 ```

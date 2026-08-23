@@ -65,3 +65,39 @@ Documentation / Doc-Code Sync
 - [EPIC-002](../epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md) — the program that
   rewrote `.agents/context/` against real code in the first place; this is exactly the kind of
   drift it was meant to prevent recurring.
+
+---
+
+## ✅ Outcome — completed 2026-08-23
+
+All 5 files fixed, plus one thing the task didn't anticipate.
+
+- `rules/architecture.md` — removed the `sdk/` bullet from the "exhaustive" Engine Package
+  Layout list entirely (it was self-contradicting: the same file's own Clean-Architecture-Layers
+  note already said scaffolding was deleted). List is now 10 entries, matching the real
+  `sagittarius_engine/*/` count on disk.
+- `rules/testing.md` — dropped `sdk/` from the real-directories list in the tests-mirror-source
+  rule.
+- `context/testing.md` — dropped the `sdk/` row from the `tests/` tree diagram.
+- `context/project.md` — dropped the "SDK accelerates development" philosophy bullet and the
+  `SDK | Templates, Generator, Project Setup` architecture-table row; replaced the row with a
+  short note explaining the deletion and pointing at `CHANGELOG.md`'s `2.0.0` entry, per
+  `doc-code-sync.md` (state plainly that a feature was removed, don't just delete the line).
+- `context/repository.md` — "11 top-level packages" corrected to "10".
+
+**Unplanned finding while verifying:** `sagittarius_engine/sdk/__pycache__/` and
+`tests/sdk/__pycache__/` still existed on disk — untracked build artifacts left over from before
+`TASK-024`'s deletion, never caught because `git status`/`git ls-files` correctly show nothing
+(they were never tracked). `ls -d sagittarius_engine/*/` was reporting 11 directories because of
+this, which is what caused the double-check in the first place — good thing to verify against
+disk, not against the task's own claim. Deleted; already covered by the existing
+`__pycache__` gitignore entry, so this shouldn't recur.
+
+Requirement 3 (extend the staleness guard to catch bare-prose claims like "SDK accelerates
+development") — **not done**, left as noted for whoever next touches that guard. The two
+deleted-feature paths quoted in `project.md`'s new explanatory note
+(`sagittarius_engine.sdk`, `tools/scaffold.py`) were added to `IGNORE_TOKENS` instead, same
+pattern already used for `IConnector`/`TerminalMenu`.
+
+Verified: `tests/test_agents_docs_resolve.py` — 2 passed. `scripts/ci-local.ps1` — lint/format
+green, mypy at the known 27 baseline (unchanged by this task).
