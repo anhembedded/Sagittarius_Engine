@@ -7,6 +7,72 @@ their history is in `git log`.
 
 ---
 
+## [2.2.0] — 2026-08-23
+
+Ships the PEP 561 marker (`TASK-027`), so consumers finally get the engine's types. Also fixes a
+packaging defect found while verifying that — one that affected **every wheel built from this
+repo, including `2.0.0` and `2.1.0`**.
+
+### Added
+
+- **`sagittarius_engine/py.typed`.** The package is fully annotated and enforces strict typing on
+  itself, but under PEP 561 none of that reached consumers: without this marker a type checker
+  ignores an installed package's inline annotations and treats the whole library as `Any`.
+
+  Expect your own type checker to surface **new errors in your code** after upgrading. They were
+  always there — engine symbols were `Any`, so nothing could be checked against them. The primary
+  consumer carries an explicit `ignore_missing_imports` override for `sagittarius_engine` whose
+  own comment notes the failure "cascades into dependents", quietly shrinking how many of its
+  files were fully checked. That override can now be dropped.
+
+### Fixed
+
+- **Wheels shipped stale files that do not exist in the source tree.** `setuptools` copies
+  `build/lib/` into the wheel wholesale; `package-data` governs what is copied *into* that
+  directory, but never removes what an earlier build left behind. Because `build/` is gitignored,
+  this was invisible to `git status` and persisted indefinitely.
+
+  Measured on 2026-08-23: a wheel built without cleaning contained **9 stale assets** under
+  `extensions/pyside_mvc/QmlShared/` — `BaseCard.qml`, `LogPanel.qml`, `StatefulButton.qml`,
+  `StyledCheck.qml`, `TimeRangeCard.qml`, `DateTimePicker.qml`, `FieldBackground.qml`,
+  `OverlayHost.qml` and `qmldir` — all left over from the `2.0.0` rename that deleted them, and
+  none present in the source tree. `rm -rf build dist` before building drops that to **0**.
+
+  The practical effect: a wheel was not reproducible from its source, and it re-registered the
+  `QmlShared` QML module that `2.0.0` explicitly removed — partially undoing the documented
+  rename for anyone installing the wheel. `2.0.0` and `2.1.0` wheels are affected if they were
+  built on a dirty tree; **rebuild them clean if you distributed either.**
+
+  Guarded now by `tests/test_py_typed_marker.py`, which asserts both that the marker reaches the
+  wheel and that no stale `QmlShared` asset does.
+
+### Internal / tooling
+
+- **New rule: `.agents/rules/release.md`** — the release process, with each step tied to the
+  failure that motivated it: choose the version from `git diff <last-tag>..HEAD` rather than from
+  memory (how `2.0.0` missed its own largest breaking change), always build clean (above), verify
+  the wheel's contents instead of trusting `package-data`, and push tags explicitly because
+  `git push` does not push them (how `v2.1.0` ended up local-only while its release commit was
+  public). Routed from `ONBOARDING.md` §5.
+
+### Known issues
+
+- The gate's mypy step now reports **20** errors in 8 files, down from 24 at `2.1.0` — `BUG-003`
+  fixed the four `union-attr` errors in `kernel/dispatcher.py` that came from a `ILogger | None`
+  annotation contradicting `IEngineContext`'s non-`None` guarantee. Measured with the gate's exact
+  invocation, `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`;
+  remaining work tracked in `TASK-032`, whose title still says 27. Quote a count only with the
+  command that produced it.
+- Unchanged: no `LICENSE` despite `pyproject.toml` declaring MIT (`TASK-022`), `mkdocs.yml` points
+  at a deleted tree (`BUG-002`), and the package root eagerly imports `extensions.persistence`
+  (`TASK-031`).
+
+`TASK-027`'s remaining requirement — dropping the `sagittarius_engine` override from the
+consuming app's `pyproject.toml` and fixing what that reveals — is **not** done here: that is a
+different repository, and this repo never writes to it (`ONBOARDING.md` §8).
+
+---
+
 ## [2.1.0] — 2026-08-23
 
 Production-readiness hardening (`TASK-017`): seven reliability and security issues, each with a
