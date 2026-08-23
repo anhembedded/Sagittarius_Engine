@@ -86,6 +86,51 @@ def test_task_manager_cleanup():
     assert len(manager.tasks) == 55
 
 
+def test_task_manager_cleanup_respects_configured_max_retained_tasks():
+    """@brief TASK-017 issue 5 regression: the finished-task retention limit
+    must be configurable via IConfig instead of a hardcoded 50."""
+    from sagittarius_engine.interfaces.i_config import IConfig
+    from sagittarius_engine.runtime.tasks.background_task import (
+        BackgroundTask,
+        TaskState,
+    )
+
+    class FakeConfig(IConfig):
+        def __init__(self, values):
+            self._values = values
+
+        def get(self, key, default=None, cast=None):
+            return self._values.get(key, default)
+
+        def get_all(self):
+            return dict(self._values)
+
+        def set(self, key, value):
+            self._values[key] = value
+
+    class ConfiguredContext(MockContext):
+        def __init__(self, max_retained: int):
+            super().__init__()
+            self.container = Mock()
+            self.container.resolve.return_value = FakeConfig(
+                {"task_manager.max_retained_tasks": max_retained}
+            )
+
+    context = ConfiguredContext(max_retained=5)
+    manager = TaskManager(context)
+
+    for i in range(20):
+        t = BackgroundTask(f"completed_task_{i}")
+        t.status = TaskState.COMPLETED
+        manager.tasks[t.id] = t
+        manager._finished_task_ids.append(t.id)
+
+    manager._cleanup_old_tasks()
+
+    assert len(manager._finished_task_ids) == 5
+    assert len(manager.tasks) == 5
+
+
 def test_task_manager_get_active_tasks():
     from sagittarius_engine.runtime.tasks.background_task import (
         BackgroundTask,

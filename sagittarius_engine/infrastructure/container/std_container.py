@@ -85,7 +85,15 @@ class StdLibContainer(IContainer):
                     # After this factory returns, the caller (_resolve) will store the
                     # result in _instances, so the factory is never invoked again.
                     c._factories.pop(_abstract, None)
-                    return c._resolve(_cls, set())
+                    try:
+                        return c._resolve(_cls, set())
+                    except Exception:
+                        # _resolve failed (e.g. a dependency is temporarily
+                        # unavailable) — restore the factory so a later
+                        # resolve() can retry once the condition is fixed,
+                        # instead of the registration being lost permanently.
+                        c._factories[_abstract] = _lazy_factory
+                        raise
 
                 self._factories[abstract] = _lazy_factory
             elif callable(instance_or_factory):

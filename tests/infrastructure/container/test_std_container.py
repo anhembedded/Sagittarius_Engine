@@ -103,6 +103,39 @@ def test_singleton_lazy_class():
     assert instance1 is instance2
 
 
+class FlakyService:
+    """A class-registered singleton whose first construction attempt fails,
+    simulating a dependency that is temporarily unavailable (TASK-017 issue 2)."""
+
+    should_fail = True
+
+    def __init__(self) -> None:
+        if FlakyService.should_fail:
+            raise RuntimeError("dependency temporarily unavailable")
+        self.value = "ready"
+
+
+def test_singleton_class_factory_survives_a_failed_resolve_and_retries():
+    container = StdLibContainer()
+    container.singleton(FlakyService, FlakyService)
+
+    FlakyService.should_fail = True
+    try:
+        with pytest.raises(RuntimeError, match="dependency temporarily unavailable"):
+            container.resolve(FlakyService)
+
+        # Fixing the condition and retrying must still work — the failed
+        # attempt must not have permanently dropped the registration.
+        FlakyService.should_fail = False
+        instance = container.resolve(FlakyService)
+        assert instance.value == "ready"
+
+        # The successful resolution is now cached as the singleton instance.
+        assert container.resolve(FlakyService) is instance
+    finally:
+        FlakyService.should_fail = True
+
+
 def test_resolve_with_dependencies():
     container = StdLibContainer()
     container.bind(IService, ConcreteService)

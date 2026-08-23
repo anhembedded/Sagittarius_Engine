@@ -11,13 +11,24 @@ class IPCBroker:
     @brief Broker for events to multiple subscriber queues.
     """
 
-    def __init__(self, publish_queue: Queue, logger: ILogger | None = None):
+    _DEFAULT_SUBSCRIBER_PUT_TIMEOUT_SECONDS = 0.1
+
+    def __init__(
+        self,
+        publish_queue: Queue,
+        logger: ILogger | None = None,
+        subscriber_put_timeout: float = _DEFAULT_SUBSCRIBER_PUT_TIMEOUT_SECONDS,
+    ):
         self._publish_queue = publish_queue
         self._subscriber_queues: list[Queue] = []
         self._logger = logger
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        # A hung/full subscriber must not block every other subscriber (or
+        # add_subscriber/remove_subscriber, which share this lock) — bound
+        # the put() and drop the event instead of blocking indefinitely.
+        self._put_timeout = subscriber_put_timeout
 
     def add_subscriber(self, sub_queue: Queue) -> None:
         """Adds a subscriber queue to receive broadcasted events."""
@@ -70,7 +81,16 @@ class IPCBroker:
                 with self._lock:
                     for sub_queue in self._subscriber_queues:
                         try:
-                            sub_queue.put((event_name, data))
+                            sub_queue.put((event_name, data), timeout=self._put_timeout)
+                        except queue.Full:
+                            if self._logger:
+                                self._logger.warning(
+                                    f"Subscriber queue full — dropping event {event_name}"
+                                )
+                            else:
+                                logging.warning(
+                                    f"Subscriber queue full — dropping event {event_name}"
+                                )
                         except Exception as e:
                             if self._logger:
                                 self._logger.error(
