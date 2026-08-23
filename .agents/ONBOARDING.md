@@ -194,6 +194,14 @@ One primary skill per task; run secondary skills after, not interleaved.
 `ONBOARDING.md` before its `README.md` if one exists; it carries decisions already made that
 a fresh session shouldn't re-derive. See `rules/task-tracking.md` for the full lifecycle.
 
+**Defects go on a separate board**: [`Tasks/bug_report/README.md`](../Tasks/bug_report/README.md)
+(`BUG-XXX`, `incomplete/` → `completed/`), created 2026-08-23 and mirroring the app repo's
+convention so the same habit works in both. The split exists because the task board only ever
+shows a bug *after* it's fixed — an open bug had nowhere to be listed. Rule of thumb: **BUG** =
+something is wrong, or states something untrue about the code; **TASK** = something is missing
+or should change. Check that board too before assuming the engine is clean — 3 open as of
+2026-08-23.
+
 ## 8. Two `.agents/` trees — don't read the wrong one
 
 `Sagittarius_Engine` (this repo) and `Sagittarius_Elite_Warrior` (the app that consumes it)

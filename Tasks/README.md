@@ -48,6 +48,20 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 
 ---
 
+## 🐞 Bugs
+
+Defects are tracked separately on the **[Bug Board](bug_report/README.md)** (`BUG-XXX`), so that
+*open* bugs are visible somewhere — this board only ever shows a bug once it's been fixed and
+becomes a completed task. Bugs are **not** counted in the task numbers above.
+
+Currently **3 open**, all found in the 2026-08-23 post-`EPIC-002` audit. Same convention as
+`Sagittarius_Elite_Warrior/Tasks/bug_report/`, independent board.
+
+Rule of thumb: **BUG** = something is wrong or states something untrue; **TASK** = something is
+missing or should change.
+
+---
+
 ## 🏛️ Epics — Multi-Task Programs
 
 Full detail lives in each epic's own `README.md` under `Tasks/epics/` — see
@@ -77,6 +91,10 @@ Tasks/
 │       │   └── EPIC-001C_widget_kit_expansion.md
 │       └── incomplete/
 │           └── EPIC-001D_runtime_slot_registry.md
+├── bug_report/                         # 🐞 Bug Board — see bug_report/README.md
+│   ├── README.md                       #    open + fixed tables, BUG-vs-TASK guidance
+│   ├── incomplete/                     #    BUG-XXX not yet fixed (new bugs start here)
+│   └── completed/                      #    BUG-XXX fixed, with evidence
 ├── issue-report/                       # High-impact Architecture Issue Report
 │   └── issue.md
 ├── in_progress/                        # Actively Worked On Specifications (standalone tasks only)
