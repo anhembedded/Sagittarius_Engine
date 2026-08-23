@@ -27,6 +27,10 @@ When starting or finishing a complex task, you MUST follow this workflow:
 
 ### 1. Starting a Task
 If the user assigns you a new task or asks you to work on an existing task from the backlog:
+- **Sync & Branch First**: `git pull` (fast-forward the base branch — `main`) and create a new
+  branch for the task before making any change, e.g. `task/TASK-XXX-short-slug`. Task work is
+  never committed directly to `main`, including the task-file move and Kanban-board edit below —
+  those are part of the task's own branch/commit, not a separate main-branch step.
 - **Move/Create the Task File**: Move the corresponding `TASK-XXX_name.md` file from `Tasks/backlog/` to `Tasks/in_progress/` (or create a new one in `in_progress/` if it's a new complex task).
 - **Update the Kanban Board**: Edit `Tasks/README.md` to move the row from the `Backlog` table to the `In Progress` table. Ensure you update the relative links in the table!
 - **File Naming**: Use the format `TASK-XXX_short_description.md` (e.g., `TASK-001_background_service.md`).
