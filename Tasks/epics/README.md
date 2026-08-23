@@ -36,4 +36,4 @@ Tasks/epics/
 | ID | Name | Status |
 | :--- | :--- | :---: |
 | **[EPIC-001](EPIC-001_ui_engine_foundation/README.md)** ([onboarding](EPIC-001_ui_engine_foundation/ONBOARDING.md)) | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (3/4 subtasks done) |
-| **[EPIC-002](EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** ([onboarding](EPIC-002_engine_sample_app_and_doc_rewrite/ONBOARDING.md)) | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | 🟡 In Progress (2/4 subtasks done) |
+| **[EPIC-002](EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** ([onboarding](EPIC-002_engine_sample_app_and_doc_rewrite/ONBOARDING.md)) | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | 🟡 In Progress (3/4 subtasks done) |

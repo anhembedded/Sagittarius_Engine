@@ -151,7 +151,7 @@ actually in place:
   invocations (persistence survives) and ran the real GUI with `QT_QPA_PLATFORM=offscreen`.
 - `MODULE_COVERAGE.md` is filled in for **every** row, `pyside_mvc` included — resolved to
   Used, not Skipped, unlike the two prior sample apps in this repo.
-- Six design docs exist in `examples/student_management/docs/`, each with a Mermaid diagram,
+- Five design docs exist in `examples/student_management/docs/`, each with a Mermaid diagram,
   written as their topic was settled: `bootstrap.md`, `module_registration.md`,
   `config_loading.md`, `persistence_and_transactions.md`, `ui_extension_lifecycle.md` — the
   last one also documents a real methodology correction (a filed engine task that turned out
@@ -167,9 +167,15 @@ actually in place:
   [`BOT-117`](../../../../Sagittarius_Elite_Warrior/Tasks/backlog/BOT-117_stale_pyside_mvc_paths_in_palette_docstring.md)
   in `Sagittarius_Elite_Warrior`.
 
-**The next concrete action is EPIC-002C** — consolidate everything above into
-`AUDIT_REPORT.md`. Read the epic README's Definition of Done and `EPIC-002C`'s own file before
-starting; this subtask is pure writing, no code.
+- [`AUDIT_REPORT.md`](AUDIT_REPORT.md) (epic root) consolidates everything above, plus a
+  **newly found** `context/api.md` error (discovered writing the report, not before) —
+  `auto_discover` documented as `bool`, actually `str | None`; `IExtension` omitted from "Key
+  Interfaces" entirely despite being what every real extension in this codebase implements.
+
+**The next concrete action is EPIC-002D** — rewrite `.agents/context/*.md` from
+`AUDIT_REPORT.md`, add the staleness-detection test, fix the 4 dangling references to the
+deleted old example. Read `AUDIT_REPORT.md` in full before starting; it's the source of truth
+for what needs to change and why, not this file's summary of it.
 
 Stale references to the deleted *old* example still exist and need fixing as part of
 EPIC-002D (not A/B — these are `.agents/`-side references, D's job):

@@ -1,7 +1,7 @@
 # EPIC-002C — Audit Report
 
 **Epic:** [EPIC-002 — Engine Sample App & Doc Rewrite](../README.md)
-**Status:** 🔵 Backlog
+**Status:** ✅ Completed (2026-08-23)
 **Category:** Documentation / Developer Experience
 **Priority:** P1
 **Depends on:** EPIC-002A, EPIC-002B (needs the build experience to report on)
@@ -49,3 +49,21 @@ claim in `AUDIT_REPORT.md` traces to something checkable (a path, a command, a l
 every design doc under `examples/student_management/docs/` is represented or consolidated
 somewhere in it; and `MODULE_COVERAGE.md`'s Skipped/Gap rows are reflected accurately (not
 re-justified differently here than they were in the ledger).
+
+---
+
+## ✅ Completion notes (2026-08-23)
+
+**Shipped:** [`AUDIT_REPORT.md`](../AUDIT_REPORT.md) (epic root). Covers: the 5 already-known
+`.agents/context/` errors (re-confirmed, not just carried forward); one **newly found** error
+in `context/api.md` (discovered while writing this report, not before) — `auto_discover`
+documented as `bool` when it's `str | None`, `IExtension` omitted entirely from "Key
+Interfaces" despite being the interface every real extension in this app and the engine
+implements, `IEngineContext`/`IModule`/`IContainer` all documented with missing members; 6
+implicit assumptions with evidence; the one real, filed engine gap (`TASK-019`); the retracted
+`QmlHostView` finding, kept for the record per `surprising-findings.md`'s "I was wrong is
+reportable"; module-coverage reasoning restated; 3 reasonable-vs-required divergences.
+
+**All 5 design docs represented:** `bootstrap.md`, `module_registration.md`,
+`config_loading.md`, `persistence_and_transactions.md`, `ui_extension_lifecycle.md` — each
+consolidated into §2 or §3/§4, not just linked.
