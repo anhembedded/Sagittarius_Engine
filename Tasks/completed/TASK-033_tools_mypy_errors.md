@@ -9,7 +9,34 @@
 > (`sagittarius_engine tests examples tools`) reports `Success: no issues found in 330 source
 > files`. The original 9-error reading was taken under `mypy 2.1.0` before that fix landed.
 >
-> Only the name clash remains open.
+> **Fully closed 2026-08-23.**
+>
+> - **Req 1 — renamed** `tools/audit_dashboard.py` → `tools/audit_dashboard_cli.py`, over the
+>   other two options. Deleting was rejected: the file still works as a standalone lightweight
+>   viewer and nothing established it was dead code, only that it clashed. Adding `__init__.py`
+>   to the directory was rejected per the bug's own reasoning — it flips resolution silently,
+>   a behaviour change disguised as a cleanup. Renaming is the only option that disambiguates
+>   without changing what either app does.
+>
+>   Supporting evidence for choosing the `.py` file as the one to move, not the directory:
+>   `git log` shows the directory's PySide6/WebSocket app arrived via a later commit
+>   (`f0247bd`, "refactor telemetry to use websockets and integrate PySide6 dashboard") —
+>   the `.py` file's `urllib.request.urlopen` HTTP-GET polling is the older mechanism the
+>   WebSocket-based `ITelemetryBroadcaster`/`WebsocketBroadcaster` superseded. Both
+>   `architecture.md` and `configuration.md` already exclusively documented the directory as
+>   canonical, and only the directory has a launcher (`run_dashboard.ps1`) — the `.py` file has
+>   neither. Whether the renamed CLI script still actually connects successfully against the
+>   current WebSocket-based telemetry endpoint was not verified (a plain HTTP GET against a
+>   WebSocket server would not get a valid response) — noted honestly rather than claimed;
+>   out of scope for a rename.
+> - **Verified the fix, not just the rename:** `import audit_dashboard` from `tools/` now
+>   resolves to the directory (`audit_dashboard.__path__` points at
+>   `tools/audit_dashboard/`), and `from audit_dashboard.Domain import entities` resolves
+>   correctly — the app the architecture docs describe is now actually reachable under its own
+>   name.
+> - **Req 2 — nothing to update.** Neither `architecture.md` nor `configuration.md` ever
+>   referenced the `.py` file (both already named only the directory), so the rename introduces
+>   no doc drift. `ruff`/`mypy`/format all still pass on the renamed file.
 
 ## Description
 

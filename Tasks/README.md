@@ -37,6 +37,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-023** | CI matrix/`requires-python` rule written into `release.md`; the `ITaskHandle` story it exists to prevent recorded | CI / Compatibility | 2026-08-23 | [TASK-023_ci_matrix_hides_312_313_breakage.md](completed/TASK-023_ci_matrix_hides_312_313_breakage.md) |
 | **TASK-028** | Gate false-positive fixed + regression test added + ONBOARDING PATH guidance corrected | Build / Tooling — Completion Gate | 2026-08-23 | [TASK-028_pre_commit_gate_false_positive_on_missing_tool.md](completed/TASK-028_pre_commit_gate_false_positive_on_missing_tool.md) |
 | **TASK-031** | Root package no longer imports any extension; incomplete original diagnosis corrected mid-fix | Architecture / Package Boundaries | 2026-08-23 | [TASK-031_top_level_package_eagerly_imports_persistence.md](completed/TASK-031_top_level_package_eagerly_imports_persistence.md) |
+| **TASK-033** | `audit_dashboard.py` renamed to `audit_dashboard_cli.py`; the documented app is reachable under its own name again | Tooling / Package Boundaries | 2026-08-23 | [TASK-033_tools_mypy_errors.md](completed/TASK-033_tools_mypy_errors.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
@@ -47,7 +48,6 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
 | **TASK-034** | `extensions/__init__.py` is a barrel that eagerly imports all six extensions together | Architecture / Package Boundaries | P3 | [TASK-034_extensions_barrel_eager_imports_everything.md](backlog/TASK-034_extensions_barrel_eager_imports_everything.md) |
-| **TASK-033** | `tools/` ships two different apps both named `audit_dashboard` | Tooling / Package Boundaries | P3 | [TASK-033_tools_mypy_errors.md](backlog/TASK-033_tools_mypy_errors.md) |
 
 ---
 
