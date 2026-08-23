@@ -99,3 +99,93 @@ def test_roster_screen_toggles_compact_mode(qtbot, tmp_path):
     presenter.view_model.compactMode = True
     assert presenter.view_model.compactMode is True
     app.stop()
+
+
+def test_roster_screen_date_filter_narrows_visible_students(qtbot, tmp_path):
+    app = _boot(tmp_path)
+    view = RosterView()
+    qtbot.addWidget(view)
+    presenter = RosterPresenter(view, app.container)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    presenter.view_model.requestEnroll("Alice Nguyen", "alice@example.com", "CS", 3.7)
+    for _ in range(5):
+        qtbot.wait(1)
+    assert len(presenter.view_model.students) == 1
+
+    # A custom range entirely in the future excludes a student enrolled "now".
+    presenter.view_model.setUseCustomTime(True)
+    presenter.view_model.setFromDateTime("2099-01-01 00:00")
+    presenter.view_model.setToDateTime("2099-12-31 00:00")
+    for _ in range(5):
+        qtbot.wait(1)
+    assert presenter.view_model.useCustomTime is True
+    assert presenter.view_model.students == []
+
+    # A wide-open custom range includes them again.
+    presenter.view_model.setFromDateTime("2000-01-01 00:00")
+    presenter.view_model.setToDateTime("2100-01-01 00:00")
+    for _ in range(5):
+        qtbot.wait(1)
+    assert len(presenter.view_model.students) == 1
+
+    # Turning the filter off restores the unfiltered list too.
+    presenter.view_model.setUseCustomTime(False)
+    for _ in range(5):
+        qtbot.wait(1)
+    assert presenter.view_model.useCustomTime is False
+    assert len(presenter.view_model.students) == 1
+    app.stop()
+
+
+def test_roster_screen_enrolling_appends_to_activity_log(qtbot, tmp_path):
+    app = _boot(tmp_path)
+    view = RosterView()
+    qtbot.addWidget(view)
+    presenter = RosterPresenter(view, app.container)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    log_model = presenter.view_model.logModel
+    assert log_model.rowCount() == 0
+
+    presenter.view_model.requestEnroll("Alice Nguyen", "alice@example.com", "CS", 3.7)
+    for _ in range(5):
+        qtbot.wait(1)
+
+    assert log_model.rowCount() == 1
+    entry = log_model.entries[0]
+    assert "Alice Nguyen" in entry.message
+    assert entry.level == "success"
+    app.stop()
+
+
+def test_roster_screen_a_filtered_view_survives_an_unrelated_enrollment(
+    qtbot, tmp_path
+):
+    """A date filter narrowing the table to zero rows must not be silently
+    discarded just because a new student enrolls elsewhere in time."""
+    app = _boot(tmp_path)
+    view = RosterView()
+    qtbot.addWidget(view)
+    presenter = RosterPresenter(view, app.container)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    presenter.view_model.setUseCustomTime(True)
+    presenter.view_model.setFromDateTime("2099-01-01 00:00")
+    presenter.view_model.setToDateTime("2099-12-31 00:00")
+    for _ in range(5):
+        qtbot.wait(1)
+
+    presenter.view_model.requestEnroll("Alice Nguyen", "alice@example.com", "CS", 3.7)
+    for _ in range(5):
+        qtbot.wait(1)
+
+    assert presenter.view_model.useCustomTime is True
+    assert presenter.view_model.students == []
+    app.stop()

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from examples.student_management.application.ports.student_repository import (
     IStudentRepository,
 )
@@ -26,3 +28,13 @@ class FakeStudentRepository(IStudentRepository):
     def search_by_name(self, name_contains: str) -> list[Student]:
         needle = name_contains.lower()
         return [s for s in self._store.values() if needle in s.full_name.lower()]
+
+    def list_by_enrollment_date(
+        self, from_dt: datetime | None, to_dt: datetime | None
+    ) -> list[Student]:
+        return [
+            s
+            for s in self._store.values()
+            if (from_dt is None or s.enrolled_at >= from_dt)
+            and (to_dt is None or s.enrolled_at <= to_dt)
+        ]

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 
 from examples.student_management.application.exceptions import StudentNotFoundError
@@ -25,6 +27,12 @@ from examples.student_management.application.use_cases.list_students.command imp
 from examples.student_management.application.use_cases.list_students.handler import (
     ListStudentsHandler,
 )
+from examples.student_management.application.use_cases.list_students_by_enrollment_date.command import (
+    ListStudentsByEnrollmentDateQuery,
+)
+from examples.student_management.application.use_cases.list_students_by_enrollment_date.handler import (
+    ListStudentsByEnrollmentDateHandler,
+)
 from examples.student_management.application.use_cases.remove_student.command import (
     RemoveStudentCommand,
 )
@@ -48,6 +56,7 @@ from examples.student_management.domain.events import (
     StudentRemoved,
     StudentUpdated,
 )
+from examples.student_management.domain.student import Email, Student
 from examples.student_management.tests.application.fake_repository import (
     FakeStudentRepository,
 )
@@ -145,6 +154,44 @@ def test_list_students_returns_all(repo, event_bus):
     result = ListStudentsHandler(repo).execute(ListStudentsQuery())
 
     assert len(result) == 2
+
+
+def test_list_students_by_enrollment_date_filters_inclusive_range(repo):
+    early = Student.enroll("Early", Email("early@x.com"), "CS", 3.0)
+    early.enrolled_at = datetime(2026, 1, 1)
+    mid = Student.enroll("Mid", Email("mid@x.com"), "CS", 3.0)
+    mid.enrolled_at = datetime(2026, 6, 1)
+    late = Student.enroll("Late", Email("late@x.com"), "CS", 3.0)
+    late.enrolled_at = datetime(2026, 12, 1)
+    for s in (early, mid, late):
+        repo.add(s)
+
+    result = ListStudentsByEnrollmentDateHandler(repo).execute(
+        ListStudentsByEnrollmentDateQuery(
+            from_dt=datetime(2026, 2, 1), to_dt=datetime(2026, 7, 1)
+        )
+    )
+
+    assert [s.full_name for s in result] == ["Mid"]
+
+
+def test_list_students_by_enrollment_date_open_ended_bounds(repo):
+    early = Student.enroll("Early", Email("early@x.com"), "CS", 3.0)
+    early.enrolled_at = datetime(2026, 1, 1)
+    late = Student.enroll("Late", Email("late@x.com"), "CS", 3.0)
+    late.enrolled_at = datetime(2026, 12, 1)
+    repo.add(early)
+    repo.add(late)
+
+    only_after_june = ListStudentsByEnrollmentDateHandler(repo).execute(
+        ListStudentsByEnrollmentDateQuery(from_dt=datetime(2026, 6, 1), to_dt=None)
+    )
+    assert [s.full_name for s in only_after_june] == ["Late"]
+
+    no_bounds = ListStudentsByEnrollmentDateHandler(repo).execute(
+        ListStudentsByEnrollmentDateQuery(from_dt=None, to_dt=None)
+    )
+    assert len(no_bounds) == 2
 
 
 def test_search_students_by_name_is_case_insensitive(repo, event_bus):

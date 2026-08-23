@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from examples.student_management.domain.student import Student, StudentId
 
@@ -21,3 +22,11 @@ class IStudentRepository(ABC):
 
     @abstractmethod
     def search_by_name(self, name_contains: str) -> list[Student]: ...
+
+    @abstractmethod
+    def list_by_enrollment_date(
+        self, from_dt: datetime | None, to_dt: datetime | None
+    ) -> list[Student]:
+        """@brief Students enrolled within [from_dt, to_dt]. Either bound may
+        be None for an open-ended range; both None returns everyone."""
+        ...

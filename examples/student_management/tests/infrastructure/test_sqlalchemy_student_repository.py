@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -93,3 +95,31 @@ def test_search_by_name_is_case_insensitive(repo):
 
     assert len(result) == 1
     assert result[0].full_name == "Alice Nguyen"
+
+
+def test_list_by_enrollment_date_filters_inclusive_range(repo):
+    early = Student.enroll("Early", Email("early@b.com"), "CS", 3.0)
+    early.enrolled_at = datetime(2026, 1, 1)
+    mid = Student.enroll("Mid", Email("mid@b.com"), "CS", 3.0)
+    mid.enrolled_at = datetime(2026, 6, 1)
+    late = Student.enroll("Late", Email("late@b.com"), "CS", 3.0)
+    late.enrolled_at = datetime(2026, 12, 1)
+    for s in (early, mid, late):
+        repo.add(s)
+    _commit(repo)
+
+    result = repo.list_by_enrollment_date(
+        from_dt=datetime(2026, 2, 1), to_dt=datetime(2026, 7, 1)
+    )
+
+    assert [s.full_name for s in result] == ["Mid"]
+
+
+def test_list_by_enrollment_date_with_no_bounds_returns_everyone(repo):
+    repo.add(Student.enroll("Alice", Email("a@b.com"), "CS", 3.0))
+    repo.add(Student.enroll("Bob", Email("b@b.com"), "Math", 3.5))
+    _commit(repo)
+
+    result = repo.list_by_enrollment_date(from_dt=None, to_dt=None)
+
+    assert len(result) == 2

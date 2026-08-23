@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from examples.student_management.application.ports.student_repository import (
     IStudentRepository,
 )
@@ -70,3 +72,13 @@ class SqlAlchemyStudentRepository(IStudentRepository):
             .all()
         )
         return [_to_domain(r) for r in records]
+
+    def list_by_enrollment_date(
+        self, from_dt: datetime | None, to_dt: datetime | None
+    ) -> list[Student]:
+        query = self._session.query(StudentRecord)
+        if from_dt is not None:
+            query = query.filter(StudentRecord.enrolled_at >= from_dt)
+        if to_dt is not None:
+            query = query.filter(StudentRecord.enrolled_at <= to_dt)
+        return [_to_domain(r) for r in query.all()]
