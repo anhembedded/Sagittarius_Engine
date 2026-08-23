@@ -61,6 +61,13 @@ When you finish implementing and verifying the task:
 - **Move the Task File**: Move the task file from `Tasks/in_progress/` to `Tasks/completed/`.
 - **Update Task File Metadata**: Inside the file, change the `Status` to `✅ Completed` and add `Completed Date: YYYY-MM-DD`.
 - **Update the Kanban Board**: Edit `Tasks/README.md` to move the task from the `In Progress` table to the `Completed` table. Update the relative link to point to `completed/TASK-XXX_...md`.
+- **Propose the next task.** After the board is updated and the gate is green, do not just stop
+  and wait — read `Tasks/README.md`'s backlog table and `Tasks/bug_report/README.md`'s open
+  table (real, current state, not memory) and name a specific next candidate: which one, why
+  that one over the others (priority, a dependency the task you just closed unblocks, or a
+  finding surfaced while doing this task that turned into a new entry), and let the user
+  confirm or redirect before starting it. Never auto-start the next task without that
+  confirmation — proposing is not the same as beginning.
 
 ---
 
