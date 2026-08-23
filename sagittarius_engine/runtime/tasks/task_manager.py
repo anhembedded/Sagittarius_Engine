@@ -5,7 +5,7 @@ import weakref
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, Optional, Union
-from sagittarius_engine.interfaces.i_task_manager import ITaskManager
+from sagittarius_engine.interfaces.i_task_manager import ITaskHandle, ITaskManager
 from sagittarius_engine.runtime.tasks.background_task import BackgroundTask
 from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
 from sagittarius_engine.runtime.tasks.events import (
