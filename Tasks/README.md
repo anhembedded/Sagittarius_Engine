@@ -77,6 +77,7 @@ link is kept here; content is not duplicated.
 | **[EPIC-001](epics/EPIC-001_ui_engine_foundation/README.md)** | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (3/4 subtasks done) |
 | **[EPIC-002](epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | ✅ Completed 2026-08-23 (4/4 subtasks done) |
 | **[EPIC-003](epics/EPIC-003_database_extension_multi_db/README.md)** | `DatabaseExtension` Multi-Database Support — named/sharded databases via `IDatabaseManager`, supersedes `TASK-019` | ✅ Completed 2026-08-23 (4/4 subtasks done) |
+| **[EPIC-004](epics/EPIC-004_sqlite_shard_manager_and_elite_migration/README.md)** | Sharded-SQLite Manager & Elite Migration — absorb the consuming app's generic sharding layer into the engine, then migrate it onto it | ✅ Completed 2026-08-23 (3/3 subtasks done) |
 
 ---
 

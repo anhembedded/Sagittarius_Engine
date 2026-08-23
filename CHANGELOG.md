@@ -7,6 +7,49 @@ their history is in `git log`.
 
 ---
 
+## [2.3.0] — 2026-08-23
+
+Makes `DatabaseExtension` able to own more than one database (`EPIC-003`), then absorbs a
+consuming app's hand-rolled sharded-SQLite layer into the engine as reusable infrastructure
+(`EPIC-004`). No breaking changes for single-database consumers.
+
+### Added
+
+- **`IDatabaseManager` + `SqlAlchemyDatabaseManager`** (`EPIC-003A/B`). `DatabaseExtension`
+  previously supported exactly one database — one `database.url`, one `ISession` singleton — and
+  never exposed the SQLAlchemy `Engine` it built (`TASK-019`, now superseded). It now always
+  registers an `IDatabaseManager`, which owns a *named* map of engines/sessions and is the
+  sanctioned way to reach a raw `Engine` for schema creation, DDL, or reflection.
+
+  A new `database.shards` config key (a `dict[str, str]` of name → URL) registers several
+  databases at once. In that mode `ISession`/`Engine` are deliberately **not** registered as
+  container singletons — which shard would `resolve(ISession)` mean? — so shard consumers go
+  through `IDatabaseManager.get_session(name)` / `get_engine(name)`. The legacy `database.url`
+  path is untouched and still registers both singletons.
+
+- **`SqliteShardManager` + `SqliteShardConfig`** (`EPIC-004A`) — one SQLite file per shard name,
+  created lazily on first use, with the parts that are easy to get wrong built in: WAL +
+  `synchronous=NORMAL` pragmas applied per connection (not once at engine creation, which is the
+  common bug), `check_same_thread=False` and a lock timeout so pooled connections survive
+  threads, shard-name validation, path-traversal containment, and `list_shards`/`remove_shard`/
+  `purge_all`/`vacuum`/`dispose_all` file management. Generalized from
+  `Sagittarius_Elite_Warrior`'s own `DatabaseManager`, which sharded per traded symbol; nothing
+  in it is trading-specific.
+
+- **`ISession.connection()`** — the Core-connection escape hatch. Without it an `ISession`
+  consumer had no way to drive a bulk `INSERT … ON CONFLICT` without per-row ORM overhead.
+
+- **`IDatabaseManager.dispose_all()`** — closes every engine at shutdown or test teardown.
+  Previously each database had to be removed one at a time, and forgetting left SQLite handles
+  open (`ResourceWarning: unclosed database`).
+
+### Changed
+
+- **`IDatabaseManager.add_database()` accepts `**engine_options`**, forwarded to
+  `create_engine`. Without this a caller could not set `connect_args`, so SQLite's
+  `check_same_thread`/`timeout` were unreachable — unusable for any threaded app. This changes
+  the signature of an interface added earlier the same day and never released.
+
 ## [2.2.0] — 2026-08-23
 
 Ships the PEP 561 marker (`TASK-027`), so consumers finally get the engine's types. Also fixes a

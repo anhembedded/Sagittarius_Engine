@@ -33,14 +33,14 @@ class SqlAlchemyDatabaseManager(IDatabaseManager):
         self._entries: dict[str, _DatabaseEntry] = {}
         self._lock = threading.RLock()
 
-    def add_database(self, name: str, url: str) -> None:
+    def add_database(self, name: str, url: str, **engine_options: Any) -> None:
         with self._lock:
             if name in self._entries:
                 raise ValueError(
                     f"Database {name!r} is already registered. Call remove_database() "
                     "first if you intend to replace it."
                 )
-            engine = create_engine(url)
+            engine = create_engine(url, **engine_options)
             session_factory = sessionmaker(bind=engine)
             session = scoped_session(session_factory)
             self._entries[name] = _DatabaseEntry(
@@ -71,3 +71,9 @@ class SqlAlchemyDatabaseManager(IDatabaseManager):
     def names(self) -> list[str]:
         with self._lock:
             return list(self._entries.keys())
+
+    def dispose_all(self) -> None:
+        with self._lock:
+            for entry in self._entries.values():
+                entry.engine.dispose()
+            self._entries.clear()

@@ -35,6 +35,9 @@ class SQLAlchemySessionAdapter(ISession):
     def delete(self, entity: Any) -> None:
         self.session.delete(entity)
 
+    def connection(self) -> Any:
+        return self.session.connection()
+
     def close(self) -> None:
         if hasattr(self.session, "remove"):
             self.session.remove()
