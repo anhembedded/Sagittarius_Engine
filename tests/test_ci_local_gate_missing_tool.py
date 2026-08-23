@@ -27,10 +27,23 @@ _PWSH = shutil.which("pwsh")
 
 
 @pytest.mark.skipif(_PWSH is None, reason="pwsh not available on PATH")
-def test_gate_reports_failure_when_a_required_tool_is_missing():
-    # A minimal PATH containing only what's needed to launch pwsh and basic
-    # OS utilities -- deliberately excludes anything that could resolve
-    # ruff/mypy/pytest, reproducing the missing-tool scenario directly.
+def test_gate_reports_failure_when_a_required_tool_is_missing(tmp_path):
+    # Stripping PATH alone is NOT enough to hide the tools, and asserting on it
+    # made this test vacuous: the gate resolves ruff/mypy/pytest from
+    # `<repoRoot>/.venv/bin` directly (ci-local.ps1's $venvBinDir), and only falls
+    # back to bare names -- the PATH-resolved ones -- when no .venv is found. With
+    # the real repo as $repoRoot the venv always wins, so the gate ran the real
+    # tools and correctly passed, while this test insisted it should have failed.
+    #
+    # $repoRoot is `Split-Path -Parent $scriptDir`, so running a copy of the script
+    # from `<tmp>/scripts/` makes $repoRoot a directory with no .venv. That forces
+    # the bare-name fallback, which the minimal PATH below then cannot resolve --
+    # genuinely reproducing the scenario TASK-028 is about.
+    sandbox_scripts = tmp_path / "scripts"
+    sandbox_scripts.mkdir()
+    sandbox_gate = sandbox_scripts / GATE_SCRIPT.name
+    shutil.copy2(GATE_SCRIPT, sandbox_gate)
+
     system_root = os.environ.get("SystemRoot", "")
     candidate_dirs = [
         os.path.dirname(_PWSH),
@@ -43,10 +56,12 @@ def test_gate_reports_failure_when_a_required_tool_is_missing():
 
     env = dict(os.environ)
     env["PATH"] = minimal_path
+    # A venv on VIRTUAL_ENV would be another way for the tools to stay reachable.
+    env.pop("VIRTUAL_ENV", None)
 
     result = subprocess.run(
-        [_PWSH, "-NoProfile", str(GATE_SCRIPT), "-SkipTests"],
-        cwd=REPO_ROOT,
+        [_PWSH, "-NoProfile", str(sandbox_gate), "-SkipTests"],
+        cwd=tmp_path,
         env=env,
         capture_output=True,
         text=True,
