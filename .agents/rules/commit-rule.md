@@ -1,7 +1,5 @@
 ---
 name: Commit Rules
----
-name: Commit Rules
 description: Guidelines for committing and pushing code.
 trigger: model_decision
 ---

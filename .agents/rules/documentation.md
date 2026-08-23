@@ -1,4 +1,6 @@
 ---
+name: Documentation Style
+description: Markdown structure, writing style, and diagram conventions for project documentation. Load when writing or editing docs. See doc-code-sync.md for the update-with-code obligation — not restated here.
 trigger: model_decision
 ---
 
@@ -25,9 +27,7 @@ trigger: model_decision
 
 ## 4. Maintenance & Updates
 
-* **Atomic Updates:** Documentation must be updated alongside the code changes in the same context/commit.
-* **NO Zombie Docs:** If a feature is deprecated or removed, delete or update its documentation immediately. Never leave stale or misleading information.
-
-## 5. Project-Specific Rules
-
-* *[TBD - Project-specific documentation constraints and structures will be added here]*
+The full obligation — update docs in the same change as the code, keep every claim
+traceable to something real — lives in `doc-code-sync.md`, not here, so it has exactly one
+home instead of drifting copies. The short version: **no zombie docs.** If a feature is
+deprecated or removed, its documentation goes with it in the same change.

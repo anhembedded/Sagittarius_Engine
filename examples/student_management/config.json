@@ -1,9 +1,0 @@
-{
-  "database.path": "students.db",
-  "log.level": "INFO",
-  "log.file": "student_app.log",
-  "log.viewer.enabled": true,
-  "log.viewer.host": "localhost",
-  "log.viewer.port": 9999,
-  "log.viewer.module": "student-management"
-}

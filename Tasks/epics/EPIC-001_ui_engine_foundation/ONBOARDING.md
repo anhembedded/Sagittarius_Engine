@@ -25,7 +25,7 @@ pass would drift again the same way. The fix is a UI Engine that makes the wrong
 | 2 | [`README.md`](README.md) (this epic's own) | Full context, measured evidence, the 4-subtask breakdown, what's explicitly out of scope |
 | 3 | [`../../../.agents/rules/ui-architecture.md`](../../../.agents/rules/ui-architecture.md) | The binding rule this epic exists to satisfy. Every subtask's deliverable is judged against this file. |
 | 4 | The relevant subtask file (`completed/` or `incomplete/`) | Your actual work item |
-| 5 | `../../../.agents/PLAYBOOK.md` | Standard engine-repo entry point — context/rule routing, general engineering process. Load *after* the above, not instead of it — this epic has enough specific context that the generic routing table alone will miss it. |
+| 5 | `../../../.agents/ONBOARDING.md` | Standard engine-repo entry point — context/rule routing, general engineering process. Load *after* the above, not instead of it — this epic has enough specific context that the generic routing table alone will miss it. Renamed from `PLAYBOOK.md`/`manifest.yml` 2026-08-23. |
 
 Do not skip to step 4. The rule in step 3 encodes decisions (§3 below) that look arbitrary
 without the reasoning in step 2 — an agent that starts at the subtask file alone tends to

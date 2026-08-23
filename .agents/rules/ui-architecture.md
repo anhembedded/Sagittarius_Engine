@@ -1,4 +1,6 @@
 ---
+name: UI Engine Architecture
+description: Ownership boundaries, component-boundary law, and enforcement guards for the pyside_mvc (PySide6 + QML) extension. Load for any UI / QML work.
 trigger: model_decision
 ---
 
@@ -27,7 +29,7 @@ remembering a convention.
 | Layer | Engine owns | Consumer may |
 | :--- | :--- | :--- |
 | **Tokens** | Every visual value: colour, spacing, radius, typography, motion | Supply its own palette **dict** once, at bootstrap, filling the engine's fixed semantic vocabulary (§2). Never a literal at point of use. |
-| **Widget Kit** | The QML components (`QmlShared`) that render those tokens | Compose them into screens. Never author a raw visual primitive (`Rectangle`, bare `Button`, etc.) except through the escape hatch (§1.1). |
+| **Widget Kit** | The QML components (`Sagittarius/UI/`) that render those tokens | Compose them into screens. Never author a raw visual primitive (`Rectangle`, bare `Button`, etc.) except through the escape hatch (§1.1). |
 | **Runtime** | Shell, regions, navigation, screen lifecycle (`mount`/`unmount`/`ui_mode`) | Declare what a screen contributes and how it reacts to lifecycle/state. Never hand-build layout geometry that belongs to a region. |
 
 **The test for whether a consumer is honouring this boundary:** change one token — accent
@@ -51,7 +53,8 @@ permitted, through exactly one mechanism:
   purpose of having a boundary at all.
 - A **repeated** escape for the same need is a signal to promote it into the kit proper, not
   to keep re-deriving it ad hoc. If the same escape appears in more than one consumer
-  screen, it belongs in `QmlShared`.
+  screen, it belongs in the kit — a new component directory under
+  `Sagittarius/UI/`, registered in its `qmldir` (§8.1).
 
 What this does **not** permit: deriving from `Rectangle`/`Item` directly, hardcoding a
 visual value inside a derived component, or building a component that does not go through

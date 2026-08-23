@@ -29,11 +29,16 @@ wrong abstraction with live consumers is far more expensive to correct than dupl
 3. A uniform screen lifecycle — mount, unmount, ui_mode, shutdown — with one conformance
    test suite every screen must pass, including screens not yet written.
 4. Navigation derived from screen self-description, not wired by hand.
-5. **Open question, not yet decided (found 2026-08-23, see §"Two lifecycles" below):** does
-   the UI Engine's own runtime lifecycle become a real `IExtension`/`IModule` of Sagittarius
-   Engine itself, or does it stay deliberately outside that system? Must be settled before
-   the shell's lifecycle contract is finalized — it changes what "boot" and "shutdown" mean
-   for this layer.
+5. **Decided 2026-08-23:** the UI Engine's own runtime lifecycle **becomes a real
+   `IExtension`** of Sagittarius Engine, rather than staying deliberately outside the
+   extension system. Follows the `AssetValidatorExtension` precedent (§"Two lifecycles"
+   below) rather than leaving `pyside_mvc` the odd one out. See
+   §"Two lifecycles" for the problem this resolves and the ordering constraint it must
+   still satisfy. **[EPIC-002](../../EPIC-002_engine_sample_app_and_doc_rewrite/README.md)**
+   is the first real consumer built against this decision — its sample app boots
+   `pyside_mvc` through the standard `IExtension` path, not `configure_app_qml()` as a bare
+   call, and reports back anything the ordering constraint (QApplication must exist first)
+   makes awkward.
 
 ---
 

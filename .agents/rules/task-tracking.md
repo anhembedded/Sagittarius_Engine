@@ -1,4 +1,6 @@
 ---
+name: Task Tracking
+description: Kanban board layout, epic/subtask conventions, and task lifecycle for Tasks/. Load for complex multi-phase work.
 trigger: model_decision
 ---
 
