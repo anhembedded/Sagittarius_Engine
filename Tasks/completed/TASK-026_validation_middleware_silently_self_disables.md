@@ -1,5 +1,44 @@
 # TASK-026: `PydanticValidationMiddleware` silently skips validation when hint resolution fails
 
+> **Closed 2026-08-23.** Requirement 1 done — `logging.getLogger(__name__)` in
+> `pydantic_validation_middleware.py` logs at WARNING when `get_type_hints()` raises (names the
+> handler and the exception) and at ERROR at the moment validation is actually skipped as its
+> consequence, so the two can be traced together instead of vanishing. Requirement 2 done —
+> policy chosen deliberately: **fail open, loudly**, not fail-closed. Reason: this middleware is
+> typically installed globally across every command/query, not scoped to Pydantic-validated
+> ones, so raising would break any handler whose `execute()` carries an unrelated unresolvable
+> annotation even when it never intended Pydantic validation at all — an excessive blast radius
+> for a library with consumers. Fail-closed-at-boot (option 3) would need a handler-registry/boot
+> hook this per-call middleware pipeline doesn't have; out of scope here. Requirement 3 done —
+> falls back to `inspect.signature(execute).parameters[...].annotation` (raw, unresolved) before
+> giving up, mirroring `StdLibContainer`'s fallback. Requirement 4 done — added
+> `test_auto_infers_model_class_from_resolvable_type_hints` (a path with zero prior coverage:
+> every existing test set `model_class` explicitly) and two tests for the unresolvable-hint path,
+> one proving the WARNING+ERROR pair fires and dispatch proceeds unvalidated, one proving a DTO
+> that is already a `BaseModel` instance still gets validated despite the resolution failure
+> (`tests/middleware/test_pydantic_validation_middleware.py`). The unresolvable-hint test
+> reproduces the real bug shape — a name importable only under `TYPE_CHECKING`, real to mypy,
+> undefined at runtime — rather than a plain undefined name, so it doesn't trip the mypy gate.
+> Requirement 5 done — audited all three sites:
+> `extensions/health/health_module.py`'s `boot()` had the same silent-swallow-of-a-whole-feature
+> shape (logging *and* event-emission both vanished on any exception) and now logs via
+> `logger.exception(...)` before continuing (still doesn't re-raise — a health check failing
+> must not abort engine bootstrap); regression test added
+> (`tests/test_edge_cases.py::test_health_module__boot_raises__logs_instead_of_swallowing_silently`).
+> `extensions/health/health_check_query.py`'s two `try/except: pass` blocks (DB-session
+> resolution, and the dynamic-registration scan) were judged **not** bugs of this pattern — both
+> already surface their outcome through the returned status dict (`"not configured"` /
+> `"database connection failed"` / etc.), so nothing is silently hidden; no code change made
+> there, only the audit conclusion recorded here.
+>
+> Full gate run: `pre_commit.ps1` steps 1–2 (ruff lint, format) pass; step 3 (mypy) is
+> pre-existing red (24 errors, none in a file this task touched — matches `TASK-021`'s tracked,
+> untriaged baseline, confirmed by diffing against clean `main`) and halts the script before
+> steps 4–5 run automatically, so those were run directly: `pytest tests/` — 698 passed, 2
+> pre-failing (unrelated: a QML-warnings test and `.agents/context/repository.md`'s `sdk/`
+> doc-staleness check, both confirmed pre-existing via `git stash`) — plus this task's own 5 new
+> tests, all passing; `pytest tests/test_architecture.py` — 3 passed.
+
 ## Description
 
 `sagittarius_engine/middleware/pydantic_validation_middleware.py:67-76`:

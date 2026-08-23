@@ -8,6 +8,7 @@ logger, and automatically emits HealthUpdatedEvent via the EventBus on boot.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
 from sagittarius_engine.domain.base_event import BaseEvent
@@ -17,6 +18,8 @@ from sagittarius_engine.interfaces.i_extension import IExtension
 
 if TYPE_CHECKING:
     from sagittarius_engine.interfaces.i_event_bus import IEventBus
+
+logger = logging.getLogger(__name__)
 
 
 class HealthUpdatedEvent(BaseEvent):
@@ -70,8 +73,13 @@ class HealthExtension(IExtension[IHealthContext]):
                 context.event_bus.emit(
                     HealthUpdatedEvent.event_name, HealthUpdatedEvent(status)
                 )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            # Audited under TASK-026 requirement 5: a health extension that fails
+            # to report health must not do so silently — that is worse than no
+            # health extension, because the system is assumed to have one. Logged,
+            # not raised: boot() failing here must not abort engine bootstrap over
+            # a health check that couldn't run.
+            logger.exception("HealthExtension.boot() failed to report health status")
 
     def shutdown(self, context: IHealthContext) -> None:
         """@brief Shuts down the Health Extension."""

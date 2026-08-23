@@ -453,6 +453,31 @@ def test_health_module__no_isession_configured__returns_not_configured(
     assert "not configured" in status["components"]["database"]
 
 
+def test_health_module__boot_raises__logs_instead_of_swallowing_silently(
+    app, container, event_bus, caplog
+):
+    """@brief Regression test for TASK-026 requirement 5: HealthExtension.boot()
+    must not swallow a failure silently — it must log it and still not raise."""
+    module = HealthExtension()
+    module.register(app)
+
+    container.singleton(IEventBus, event_bus)
+    container.singleton(IContainer, container)
+
+    class RaisingQuery:
+        def execute(self, *_args, **_kwargs):
+            raise RuntimeError("health check blew up")
+
+    container.singleton(HealthCheckQuery, RaisingQuery())
+
+    with caplog.at_level("ERROR"):
+        module.boot(app)  # must not raise
+
+    assert any(
+        "HealthExtension.boot() failed" in record.message for record in caplog.records
+    )
+
+
 # --- 7. Config Edge Cases ---
 
 
