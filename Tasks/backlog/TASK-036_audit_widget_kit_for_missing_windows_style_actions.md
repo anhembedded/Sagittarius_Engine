@@ -56,6 +56,35 @@ leave it as a blind "review everything":
    `examples/student_management`'s real usage, the same way `AppDataTable`'s fix was verified with
    an actual screenshot, not just passing tests.
 
+## Progress so far
+
+- **`AppDataTable`**: shipped — click-to-sort columns, row selection/hover (see the "gains
+  click-to-sort columns and row selection" commit).
+- **`TimeRangeCard`**, **`DateTimePicker`**: shipped — Clear (both), Today (calendar popup) (see
+  the "gains Clear/Today actions" commit).
+- **External-library spike (2026-08-23, `experiment/qml-external-date-picker` branch, not
+  merged)**: user asked whether an external library should replace `DateTimePicker`'s hand-rolled
+  popup rather than keep extending it. Researched and hands-on tested two real candidates:
+  - `PySide6-FluentUI-QML` (wraps the C++ `zhuzichu520/FluentUI` project, which does have
+    `FluDatePicker`/`FluCalendarPicker`) — requires `git clone --recursive` and likely local C++
+    compilation, pins Python 3.11 (this repo targets 3.14-dev in CI), and the project itself
+    displays a deprecation notice pointing at an unreleased "FluentUI Pro" successor. Not
+    installed/tested further given these blockers.
+  - `PySide6-Fluent-Widgets` (`qfluentwidgets`) — installs cleanly via plain `pip install`,
+    actively maintained (v1.11.3), and its `DatePicker`/`CalendarPicker`/`FastCalendarPicker`
+    genuinely work and look good (verified with real screenshots on both offscreen and real
+    Windows platforms). **But it is QWidget-based, not QML** — every other kit component composes
+    inside a `.qml` file via `import Sagittarius.UI`; these would have to live as sibling
+    `QWidget`s outside the QML tree instead, breaking that pattern for anyone who used them.
+    Installing it also silently upgraded PySide6/shiboken6 6.11.1 → 6.11.2 system-wide (no `.venv`
+    on the machine this was tested on) — a real practical risk worth knowing about even though the
+    version bump itself tested fine. Reverted afterward; nothing from this spike is on `main`.
+  - **Conclusion**: no external QML-native date-picker library was found that's both
+    low-friction to adopt (pure pip install, no C++ toolchain, compatible Python pin) and fits the
+    kit's "compose inside `.qml`" architecture. Keeping `DateTimePicker` hand-rolled (on Qt's own
+    `MonthGrid`/`DayOfWeekRow` primitives, which it already uses) remains the right call unless
+    that architectural constraint changes.
+
 ## Priority
 
 P2 — not a defect, but a real, user-requested UX completeness gap across a shared component
