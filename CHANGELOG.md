@@ -7,6 +7,97 @@ their history is in `git log`.
 
 ---
 
+## [2.1.0] — 2026-08-23
+
+Production-readiness hardening (`TASK-017`): seven reliability and security issues, each with a
+regression test (suite 698 → 706). Additive for anyone using the documented entry points — every
+new parameter has a default preserving the previous behaviour. One narrow removal, below.
+
+Each checklist item was re-verified against the tree before being changed, and two of the seven
+did not match their own description: **issue 3 was already fixed** (`TransactionMiddleware` had
+already moved to `extensions/persistence/`), and **issue 6's premise was wrong** — the audit
+WebSocket already bound to `127.0.0.1`, not `0.0.0.0`.
+
+### ⚠️ Breaking (narrow)
+
+- **`DaemonThreadPoolExecutor` is removed** from `sagittarius_engine.runtime.tasks.task_manager`.
+  It appears in no `__all__` and was an implementation detail of `TaskManager`, so consumers using
+  the documented surface are unaffected — but a direct
+  `from sagittarius_engine.runtime.tasks.task_manager import DaemonThreadPoolExecutor` now raises
+  `ImportError`. There is no replacement: `TaskManager` uses the standard library's
+  `ThreadPoolExecutor` directly.
+
+  It subclassed `ThreadPoolExecutor` to start *daemon* worker threads by calling private CPython
+  internals (`concurrent.futures.thread._worker`, `._threads_queues`), justified as making
+  background threads "safe to kill on exit."
+
+  **Measured on 2026-08-23, that justification did not hold.** A process that spawns a background
+  task and exits without calling `TaskManager.shutdown()` blocks for the task's full duration —
+  *identically* with the old class and with the plain stdlib executor (20s for a 20s task, both
+  measured against the pre-change commit in a separate worktree). `concurrent.futures.thread._python_exit`
+  joins every thread registered in `_threads_queues`, and the old class registered into it too, so
+  the daemon flag never influenced interpreter shutdown at all. The class was reaching into
+  private internals to achieve nothing. Exit-hang behaviour is therefore **unchanged** by this
+  release — if you relied on `shutdown()` being called, you still must call it.
+
+### Added
+
+- **`App.stop(step_timeout: float = 10.0)`.** Each of the six shutdown steps now runs on its own
+  bounded daemon thread. Previously a single extension whose `stop()` hung blocked every later
+  step forever; now the step is logged as timed out and shutdown continues. Default preserves
+  prior behaviour for anything that stops promptly.
+- **`WebsocketBroadcaster(..., auth_token: str | None = None)`.** When set, a client must supply a
+  matching `?token=...` query parameter; otherwise the connection is closed with code `4401`
+  before any telemetry is sent. Defaults to `None` (accept any client), so existing deployments
+  are unchanged — **set it explicitly for anything reachable beyond localhost.**
+- **`IPCBroker(..., subscriber_put_timeout: float = 0.1)`.** Bounds how long the broker will wait
+  on one subscriber's queue.
+- **`task_manager.max_retained_tasks` configuration key**, read via `IConfig`, replacing a
+  hardcoded cap of 50 finished tasks. Resolved lazily (`IConfig` is registered during boot, after
+  `TaskManager.__init__` has run) and memoised; falls back to 50 when no `IConfig` is registered.
+
+### Fixed
+
+- **IPC broker deadlock.** `IPCBroker._run` called `sub_queue.put(...)` with no timeout while
+  holding the broker lock. One full or hung subscriber blocked the broadcast loop indefinitely,
+  starving every *other* subscriber as well as `add_subscriber`/`remove_subscriber`. The put is
+  now bounded and `queue.Full` is caught.
+- **DI container permanently losing a factory on a failed resolve.** `StdLibContainer.singleton()`
+  registers a class as a lazy factory that pops itself first to break the `abstract == concrete`
+  cycle. If `_resolve()` then raised — a dependency temporarily unavailable, say — the
+  registration was gone for good and every later `resolve()` failed with "unregistered
+  dependency". The factory is now restored on failure, so the call is retryable.
+- **`HealthExtension`/task-manager cleanup paths** no longer depend on the removed executor hack.
+
+### Changed — behaviour
+
+- **The IPC broker now drops an event destined for a full subscriber queue**, logging a `WARNING`,
+  rather than blocking until space is available. This is the deadlock fix, but it is an observable
+  change: under sustained backpressure delivery is no longer guaranteed. Raise
+  `subscriber_put_timeout` if a slow subscriber should be waited on rather than skipped.
+
+### Known issues
+
+Carried forward from `2.0.0`, none introduced here:
+
+- The gate's own mypy step (`mypy sagittarius_engine tests --ignore-missing-imports
+  --follow-imports=skip`) reports **24** errors across 9 files. None are in a file this release
+  touched — verified. Tracked in `TASK-032`, split out of `TASK-021` req. 5;
+  `scripts/ci-local.ps1` fails on this step.
+
+  Note the number: `TASK-032` is titled "the 27-error mypy baseline" and states 27 "re-verified
+  today", but the gate command measures **24** — confirmed three separate times on 2026-08-23,
+  including on this release's merged tree. The 12-error figure elsewhere is `sagittarius_engine`
+  alone, without `tests`. Whoever picks up `TASK-032` should re-measure with the gate's exact
+  invocation before trusting any of these counts.
+- No `py.typed` marker (`TASK-027`); no `LICENSE` file though `pyproject.toml` declares MIT
+  (`TASK-022`); `mkdocs.yml` points at a deleted `docs/` tree (`BUG-002`).
+- `sagittarius_engine/__init__.py` eagerly imports `extensions.persistence` for its
+  `BaseRepository` re-export, so the package root pulls in an optional extension on any import
+  (`TASK-031`). No error today — the extension guards its own `sqlalchemy` import.
+
+---
+
 ## [2.0.0] — 2026-08-23
 
 38 commits since `1.5.0`, and the release is genuinely breaking in several directions. **If you
