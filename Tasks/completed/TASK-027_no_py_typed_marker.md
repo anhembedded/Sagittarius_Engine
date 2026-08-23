@@ -84,7 +84,7 @@ engine's missing marker is quietly degrading type safety in the app that depends
    `binance` entry, drop the `sagittarius_engine` entries) and run its mypy. Expect new errors:
    they were always there, just unreported. Fixing them is the point.
 5. Note that adding `py.typed` makes the engine's own type errors visible to consumers — worth
-   sequencing after [TASK-021](TASK-021_ruff_config_shadowing.md)'s mypy cleanup, so consumers
+   sequencing after [TASK-021](../backlog/TASK-021_ruff_config_shadowing.md)'s mypy cleanup, so consumers
    don't inherit a wave of engine-side noise on day one.
 
 ## Priority

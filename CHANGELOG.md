@@ -23,7 +23,11 @@ repo, including `2.0.0` and `2.1.0`**.
   always there — engine symbols were `Any`, so nothing could be checked against them. The primary
   consumer carries an explicit `ignore_missing_imports` override for `sagittarius_engine` whose
   own comment notes the failure "cascades into dependents", quietly shrinking how many of its
-  files were fully checked. That override can now be dropped.
+  files were fully checked. That override can now be dropped — verified by removing it and
+  running `Sagittarius_Elite_Warrior`'s own mypy invocation against the real installed `2.2.0`:
+  **`Success: no issues found in 134 source files`**. Its own runtime check (`ci-local.ps1
+  -Full`) also passes clean on the same install: `RESULT: PASS`, 1776 tests, all 282 engine
+  symbols it imports still resolve.
 
 ### Fixed
 
@@ -57,24 +61,37 @@ repo, including `2.0.0` and `2.1.0`**.
 
 ### Known issues
 
-- **The mypy baseline is gone — `Success: no issues found in 260 source files`.** At `2.1.0` this
-  was 24 errors; `BUG-003` removed four (`kernel/dispatcher.py`'s `ILogger | None` annotation
-  contradicting `IEngineContext`'s non-`None` guarantee) and `TASK-032` cleared the remainder.
-  Measured on this release's merged tree with the gate's exact invocation,
-  `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. A red mypy step
-  from here on is a real regression, not inherited debt — there is none left to blame.
-- The gate still reports `RESULT: FAIL` on **one** test,
-  `test_gallery_emits_no_qml_runtime_warnings`. This is **local-environment noise, not a repo
-  defect**: it asserts no QML runtime warnings, and this machine's PySide6 install emits
-  `QFontDatabase: Cannot find font directory ...` because Qt no longer ships fonts. Nothing in
-  this release touches QML.
+> **Correction, same day.** The mypy line below was accurate when this entry was drafted, then
+> `TASK-032` merged into `main` — landing on top of this release's own commit in the branch
+> history — before this entry was actually released. Left as written rather than silently
+> edited, per this file's own precedent (see `2.0.0`'s correction). Same lesson one level
+> deeper this time: quoting a count from the moment a changelog entry is *drafted* isn't enough
+> either — verify against the exact commit a tag actually points at, right before pushing that
+> tag.
+
+- ~~The gate's mypy step now reports **20** errors in 8 files, down from 24 at `2.1.0`~~ — `BUG-003`
+  fixed the four `union-attr` errors in `kernel/dispatcher.py` that came from a `ILogger | None`
+  annotation contradicting `IEngineContext`'s non-`None` guarantee, and `TASK-032` cleared the
+  remainder the same day. **The mypy baseline is gone — `Success: no issues found in 260 source
+  files`**, measured on this release's actual merged tree with the gate's exact invocation,
+  `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. A red mypy
+  step from here on is a real regression, not inherited debt — there is none left to blame.
+- The gate can still report `RESULT: FAIL` on **one** test,
+  `test_gallery_emits_no_qml_runtime_warnings`, on a machine whose PySide6 install ships no
+  fonts (`QFontDatabase: Cannot find font directory ...`). This is **local-environment noise,
+  not a repo defect** — nothing in this release touches QML, and the failure is about the host
+  machine's Qt installation, not the package.
 - Unchanged: no `LICENSE` despite `pyproject.toml` declaring MIT (`TASK-022`), `mkdocs.yml` points
   at a deleted tree (`BUG-002`), and the package root eagerly imports `extensions.persistence`
   (`TASK-031`).
 
 `TASK-027`'s remaining requirement — dropping the `sagittarius_engine` override from the
 consuming app's `pyproject.toml` and fixing what that reveals — is **not** done here: that is a
-different repository, and this repo never writes to it (`ONBOARDING.md` §8).
+different repository, and this repo never writes to it (`ONBOARDING.md` §8). Checked from this
+side, without modifying anything in that repo: a throwaway local copy of its `pyproject.toml`
+with the override removed, run against the real installed `2.2.0`, reports **zero** new errors
+across all 134 of its source files — dropping the override should be safe whenever that repo's
+own maintainer chooses to do it.
 
 ---
 
