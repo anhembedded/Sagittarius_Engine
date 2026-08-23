@@ -242,7 +242,13 @@ if (-not $SkipTests) {
     Write-Step "Pytest — Full Suite (coverage gated at 80%)"
     Push-Location $repoRoot
     try {
-        & $pytestExe tests/ `
+        # examples/student_management/tests/ added here 2026-08-23: neither
+        # this gate nor .github/workflows/ci.yml's "examples" job ever ran
+        # it -- that job's own tests/test_examples.py is misleadingly named
+        # and only runs unrelated stress tests + the benchmark script, never
+        # the sample app's own ~48 tests. They had been silently unprotected
+        # by any CI/gate since the app was built (EPIC-002).
+        & $pytestExe tests/ examples/student_management/tests/ `
             --ignore=tests/runtime/benchmark_runtime.py `
             --cov=sagittarius_engine --cov-report=xml --cov-report=term-missing --cov-fail-under=80 `
             -q 2>&1 | Tee-Object -FilePath $runLogFile

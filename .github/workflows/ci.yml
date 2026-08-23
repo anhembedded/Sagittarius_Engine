@@ -80,8 +80,13 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run tests with coverage
+        # examples/student_management/tests/ added 2026-08-23: neither this
+        # step nor the "examples" job below ever ran it -- that job's own
+        # tests/test_examples.py is misleadingly named and only runs
+        # unrelated stress tests + the benchmark script, never the sample
+        # app's own ~48 tests. Unprotected by any CI job since EPIC-002.
         run: |
-          pytest tests/ \
+          pytest tests/ examples/student_management/tests/ \
             --cov=sagittarius_engine \
             --cov-report=xml \
             --cov-report=term-missing \

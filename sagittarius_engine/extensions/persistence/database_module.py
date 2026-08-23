@@ -126,7 +126,20 @@ class DatabaseExtension(IExtension[IDatabaseContext]):
         pass
 
     def shutdown(self, context: IDatabaseContext) -> None:
-        pass
+        """@brief Disposes every registered database's engine (closes its
+        connection pool). Without this, an sqlite:/// file's OS-level file
+        handle stays open after App.stop() — harmless on POSIX (which allows
+        deleting an open file), but on Windows a caller that then tries to
+        remove the database file (e.g. a test's tempfile.TemporaryDirectory
+        cleanup) gets PermissionError. Found 2026-08-23: register() already
+        builds an IDatabaseManager and registers it as a singleton — this
+        was previously a no-op that never reached it to call the dispose_all()
+        it already provides."""
+        try:
+            manager = context.container.resolve(IDatabaseManager)
+        except Exception:
+            return  # register() never got far enough to register one.
+        manager.dispose_all()
 
     def _get_logger(self, context: IDatabaseContext) -> ILogger | None:
         try:
