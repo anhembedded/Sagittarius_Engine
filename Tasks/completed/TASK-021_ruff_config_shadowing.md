@@ -1,5 +1,41 @@
 # TASK-021: Two ruff configs, and the intended one is dead
 
+> **Closed 2026-08-23.** Requirements 1-3 were already done; 4, 5 and 6 finished here.
+>
+> - **Req 4 — done.** `examples/` and `tools/` are now in the ruff lint *and* format scope, in
+>   both `.github/workflows/ci.yml` and `scripts/ci-local.ps1`. They had never been checked,
+>   which was awkward given `.agents/context/` calls `examples/student_management/` the reference
+>   implementation. Bringing them in surfaced **31 findings** — import sorting, `typing.Dict`/
+>   `List` -> `dict`/`list`, `Optional[X]` -> `X | None`, an unnecessary `elif` after `return` —
+>   all in `tools/`; `examples/` was already lint-clean and needed only formatting. All were safe
+>   autofixes; the unsafe-fix caution in req 3 did not need to be invoked. Verified the fixes
+>   changed nothing: the suite is 713 passing / 1 failing both before and after, that one failure
+>   being the local QML font-directory issue unrelated to any of this.
+>
+>   mypy scope was extended to `examples/` only (already clean, 56 files). `tools/` has 9
+>   pre-existing errors and is deliberately excluded — folding them in would have re-broken
+>   `TASK-032`'s zero baseline the same day it was achieved. Split out as
+>   [`TASK-033`](TASK-033_tools_mypy_errors.md), the same way `TASK-032` was split out of this
+>   task.
+>
+> - **Req 5 — done, and the premise turned out to be stale.** This task recorded local drift to
+>   `ruff 0.16.4` / `mypy 2.3.1` against CI's pinned `0.15.20` / `2.1.0`. Measured today, the
+>   local tools are **exactly the pinned versions** — the drift reading came from a `.venv` that
+>   no longer exists in this checkout. Rather than treat a stale measurement as fixed, the real
+>   gap (nothing ever *checked*) is now closed mechanically: `scripts/ci-local.ps1` compares
+>   installed `ruff`/`mypy` against `requirements-dev.txt` on every run and warns on mismatch. It
+>   warns rather than fails, so it cannot block someone deliberately running a newer tool.
+>
+> - **Req 6 — done.** `.agents/context/lint.md` updated: the lint/mypy commands now match the
+>   widened scope, the "nothing enforces pins locally" note is replaced by a description of the
+>   new check, and the stale drift figures are corrected with the reason they were wrong.
+>
+> **Also found, filed not fixed:** `tools/` contains both `audit_dashboard.py` and
+> `audit_dashboard/` — two different applications under one name, where `import audit_dashboard`
+> resolves to the `.py` module because the directory has no `__init__.py` and namespace packages
+> rank below regular modules. Recorded in `TASK-033`; changing it is a behaviour change, not a
+> cleanup, so it was not done silently here.
+
 ## Description
 
 The repo has ruff configured in two places:

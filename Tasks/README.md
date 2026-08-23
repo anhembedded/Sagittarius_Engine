@@ -47,6 +47,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-023** | CI's single-version matrix is the blind spot (version range now narrowed to 3.14) | CI / Compatibility | P3 | [TASK-023_ci_matrix_hides_312_313_breakage.md](backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) |
 | **TASK-028** | Gate silent-false-positive fixed by `TASK-030`; regression test + doc-accuracy recheck remain | Build / Tooling — Completion Gate | P3 | [TASK-028_pre_commit_gate_false_positive_on_missing_tool.md](backlog/TASK-028_pre_commit_gate_false_positive_on_missing_tool.md) |
 | **TASK-031** | `sagittarius_engine/__init__.py` eagerly imports `extensions.persistence` | Architecture / Package Boundaries | P3 | [TASK-031_top_level_package_eagerly_imports_persistence.md](backlog/TASK-031_top_level_package_eagerly_imports_persistence.md) |
+| **TASK-033** | `tools/` ships two different apps both named `audit_dashboard` | Tooling / Package Boundaries | P3 | [TASK-033_tools_mypy_errors.md](backlog/TASK-033_tools_mypy_errors.md) |
 
 ---
 

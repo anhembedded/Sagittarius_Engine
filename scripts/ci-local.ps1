@@ -144,14 +144,62 @@ if (-not $venvRoot) {
 
 $failed = @()
 
+#: TASK-021 req. 5 — requirements-dev.txt pins ruff and mypy to the versions CI
+#: installs, but nothing ever checked that the *local* tools match. They drifted
+#: silently (local ruff 0.16.4 / mypy 2.3.1 vs CI's 0.15.20 / 2.1.0 on
+#: 2026-08-23), which means a green local gate is not evidence CI will be green:
+#: ruff's default rule set widens every release, and a newer mypy reports errors
+#: an older one does not. This is a warning, not a failure — it must not block
+#: someone who deliberately runs a newer tool — but the drift is now visible
+#: instead of invisible.
+function Test-ToolchainPins {
+    $reqFile = Join-Path $repoRoot "requirements-dev.txt"
+    if (-not (Test-Path $reqFile)) { return }
+
+    $checks = @(
+        @{ Name = "ruff"; Exe = $ruffExe; Args = @("--version") },
+        @{ Name = "mypy"; Exe = $mypyExe; Args = @("--version") }
+    )
+
+    foreach ($check in $checks) {
+        $pinLine = Select-String -Path $reqFile -Pattern "^$($check.Name)==(.+)$"
+        if (-not $pinLine) { continue }
+        $pinned = $pinLine.Matches[0].Groups[1].Value.Trim()
+
+        try {
+            $raw = & $check.Exe @($check.Args) 2>&1 | Select-Object -First 1
+        } catch {
+            Write-Host "  ⚠️  $($check.Name) — not runnable; cannot compare against pin $pinned" -ForegroundColor Yellow
+            continue
+        }
+
+        $m = [regex]::Match([string]$raw, '(\d+\.\d+\.\d+)')
+        if (-not $m.Success) { continue }
+        $installed = $m.Groups[1].Value
+
+        if ($installed -ne $pinned) {
+            Write-Host "  ⚠️  $($check.Name) $installed installed, but requirements-dev.txt pins $pinned" -ForegroundColor Yellow
+            Write-Host "      A green run here is not proof CI is green. Reinstall with:" -ForegroundColor DarkGray
+            Write-Host "      pip install -r requirements-dev.txt" -ForegroundColor DarkGray
+        } else {
+            Write-Host "  ✅  $($check.Name) $installed matches the CI pin" -ForegroundColor Green
+        }
+    }
+}
+
+if (-not $SkipLint) {
+    Write-Step "Toolchain — local versions vs requirements-dev.txt pins"
+    Test-ToolchainPins
+}
+
 # ---------------------------------------------------------------------------
 # Lint
 # ---------------------------------------------------------------------------
 if (-not $SkipLint) {
-    Write-Step "Ruff — Lint Check (ruff check sagittarius_engine tests)"
+    Write-Step "Ruff — Lint Check (ruff check sagittarius_engine tests examples tools)"
     Push-Location $repoRoot
     try {
-        & $ruffExe check sagittarius_engine tests
+        & $ruffExe check sagittarius_engine tests examples tools
         if ($LASTEXITCODE -ne 0) { $failed += "Ruff Lint"; Write-Failure "Ruff Lint" }
         else { Write-Success "Ruff Lint" }
     } catch {
@@ -159,10 +207,10 @@ if (-not $SkipLint) {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
     } finally { Pop-Location }
 
-    Write-Step "Ruff — Format Check (ruff format --check sagittarius_engine tests)"
+    Write-Step "Ruff — Format Check (ruff format --check sagittarius_engine tests examples tools)"
     Push-Location $repoRoot
     try {
-        & $ruffExe format --check sagittarius_engine tests
+        & $ruffExe format --check sagittarius_engine tests examples tools
         if ($LASTEXITCODE -ne 0) { $failed += "Ruff Format"; Write-Failure "Ruff Format" }
         else { Write-Success "Ruff Format" }
     } catch {
@@ -173,7 +221,7 @@ if (-not $SkipLint) {
     Write-Step "Mypy — Static Type Check"
     Push-Location $repoRoot
     try {
-        & $mypyExe sagittarius_engine tests --ignore-missing-imports --follow-imports=skip
+        & $mypyExe sagittarius_engine tests examples tools --ignore-missing-imports --follow-imports=skip
         if ($LASTEXITCODE -ne 0) { $failed += "Mypy"; Write-Failure "Mypy" }
         else { Write-Success "Mypy" }
     } catch {

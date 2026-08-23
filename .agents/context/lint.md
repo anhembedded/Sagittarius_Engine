@@ -31,6 +31,10 @@ isolated probe venv that this is mypy's own overload resolution improving, not a
 `object.__new__(cls)` would silently be a different, wrong call). Re-check `ruff --version` /
 `mypy --version` against this file whenever a local/CI gate disagrees.
 
+`scripts/ci-local.ps1` now does that comparison for you: it reads the pins out of
+`requirements-dev.txt` and warns on every run when the installed `ruff`/`mypy` differ. It warns
+rather than fails, so it cannot block someone deliberately running a newer tool (TASK-021 req. 5).
+
 - Run `ruff check sagittarius_engine tests examples tools` to lint and
   `ruff format sagittarius_engine tests examples tools` to format — the exact commands CI runs
   (`.github/workflows/ci.yml`). `examples/` and `tools/` were added to CI's scope 2026-08-23

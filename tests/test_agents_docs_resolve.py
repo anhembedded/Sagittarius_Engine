@@ -66,6 +66,11 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         "getattr",
         "dataclasses",
         "TypeError",  # Python builtin, quoted in lint.md's UP045 corruption story.
+        # Builtin/typing type names quoted in lint.md's description of the UP006
+        # and UP035 rules (`typing.Dict`/`List` -> `dict`/`list`) — they name
+        # Python's own types, not anything resolvable in this repo's tree.
+        "List",
+        "dict",
         "Optional",
         "Union",
         "TypeVar",
