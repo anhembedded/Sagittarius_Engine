@@ -65,10 +65,12 @@ def test_overlay_matches_parent_and_exposes_qml_overlay_dimensions(
     _load_probe(host)
 
     qtbot.waitUntil(lambda: host.content_item is not None)
+    content_item = host.content_item
+    assert content_item is not None
 
     assert host.quick_widget.geometry() == parent_widget.rect()
     assert host.overlay_size == (_INITIAL_WIDTH, _INITIAL_HEIGHT)
-    assert host.content_item.property("suppliedLabel") == _CONTEXT_LABEL
+    assert content_item.property("suppliedLabel") == _CONTEXT_LABEL
 
     parent_widget.resize(_RESIZED_WIDTH, _RESIZED_HEIGHT)
     qtbot.waitUntil(lambda: host.overlay_size == (_RESIZED_WIDTH, _RESIZED_HEIGHT))
@@ -83,12 +85,14 @@ def test_qml_modal_state_controls_click_through_without_python_state(
     _load_probe(host)
 
     qtbot.waitUntil(lambda: host.content_item is not None)
+    content_item = host.content_item
+    assert content_item is not None
     assert host.is_click_through is True
 
-    host.content_item.setProperty("hasOpenModal", True)
+    content_item.setProperty("hasOpenModal", True)
     qtbot.waitUntil(lambda: host.is_click_through is False)
 
-    host.content_item.setProperty("hasOpenModal", False)
+    content_item.setProperty("hasOpenModal", False)
     qtbot.waitUntil(lambda: host.is_click_through is True)
 
 
@@ -104,7 +108,9 @@ def test_open_modal_visually_overlays_the_parent_widget(
     _load_probe(host)
 
     qtbot.waitUntil(lambda: host.content_item is not None)
-    host.content_item.setProperty("hasOpenModal", True)
+    content_item = host.content_item
+    assert content_item is not None
+    content_item.setProperty("hasOpenModal", True)
 
     center = parent_widget.rect().center()
 
@@ -119,7 +125,9 @@ def test_clearing_content_restores_click_through(parent_widget: QWidget, qtbot) 
     host = OverlayHost(parent_widget)
     _load_probe(host)
     qtbot.waitUntil(lambda: host.content_item is not None)
-    host.content_item.setProperty("hasOpenModal", True)
+    content_item = host.content_item
+    assert content_item is not None
+    content_item.setProperty("hasOpenModal", True)
     qtbot.waitUntil(lambda: host.is_click_through is False)
 
     host.clear_content()

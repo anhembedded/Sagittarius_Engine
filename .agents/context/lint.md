@@ -38,13 +38,13 @@ Check `ruff --version` / `mypy --version` before chasing a diff that isn't there
   `TypeVar` is still current for `Generic[T]`; PEP 695 (`class Foo[T]:`) is available on this
   repo's Python 3.14 floor but not yet applied everywhere — see `UP046` findings tracked in
   TASK-021 for the classes still pending a deliberate (not autofixed) conversion.
-- Run `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. ⚠️ This
-  currently reports **23 pre-existing errors**, unrelated to any config issue. History: 28
-  before `TASK-017`, 27 after it, 23 after `BUG-003`'s fix (2026-08-23) narrowed two wrongly-
-  optional `ILogger` annotations. Categorized and tracked in
-  [TASK-032](../../Tasks/backlog/TASK-032_mypy_baseline_cleanup.md) (split out of `TASK-021`).
-  Do not treat new mypy output as your own regression without checking whether the specific
-  error is already in that count.
+- Run `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. **Clean —
+  `Success: no issues found in 259 source files`**, as of 2026-08-23
+  ([TASK-032](../../Tasks/completed/TASK-032_mypy_baseline_cleanup.md), split out of
+  `TASK-021`). History: 28 pre-existing errors before that day's `TASK-017`, 27 after it, 23
+  after `BUG-003`'s `ILogger` annotation fix, 0 after `TASK-032`'s category-by-category
+  cleanup. `scripts/ci-local.ps1` passing its mypy step is now a real signal — any red mypy
+  output from here on is a genuine regression, not baseline debt.
 
 ## Python Best Practices
 - **Data Structures**: Use `dataclasses` (with `frozen=True` preferred) or `Pydantic` models instead of raw dictionaries.

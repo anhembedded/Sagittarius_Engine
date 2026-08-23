@@ -72,7 +72,10 @@ class BasePresenter(QObject):
         # is always set before it matters.
         set_thread_affinity_dev_mode(dev_mode)
 
-        # State Machine for UI
+        # State Machine for UI. DeclarativeStateMachine is a real subclass of
+        # BaseStateMachine (extensions/fsm/declarative_state_machine.py), so
+        # this one declaration covers both branches below.
+        self.fsm: BaseStateMachine | None = None
         if self.INITIAL_STATE is not None:
             if (
                 hasattr(self, "UI_TRANSITION_MATRIX")
@@ -83,8 +86,6 @@ class BasePresenter(QObject):
             else:
                 self.fsm = BaseStateMachine(self.INITIAL_STATE)
             self._bind_fsm_to_ui()
-        else:
-            self.fsm = None
 
         # Load UI Matrix from config and apply to view if applicable
         try:

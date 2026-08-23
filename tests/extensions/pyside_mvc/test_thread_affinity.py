@@ -41,8 +41,8 @@ class _Target(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self.value = None
-        self.called_from_thread = None
+        self.value: int | None = None
+        self.called_from_thread: threading.Thread | None = None
 
     @ui_mutator
     def set_value(self, value: int) -> None:

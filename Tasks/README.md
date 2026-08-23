@@ -28,6 +28,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-029** | `TASK-024`'s `sdk/` deletion left stale "SDK" references in 5 `.agents/` files | Documentation / Doc-Code Sync | 2026-08-23 | [TASK-029_sdk_deletion_left_stale_docs.md](completed/TASK-029_sdk_deletion_left_stale_docs.md) |
 | **TASK-026** | `PydanticValidationMiddleware` no longer silently skips validation on hint-resolution failure | Middleware / Correctness | 2026-08-23 | [TASK-026_validation_middleware_silently_self_disables.md](completed/TASK-026_validation_middleware_silently_self_disables.md) |
 | **TASK-030** | `scripts/ci-local.ps1` — log capture, full-run, machine-readable summary (matches Elite) | Build / Developer Experience | 2026-08-23 | [TASK-030_ci_local_script_matching_elite_pattern.md](completed/TASK-030_ci_local_script_matching_elite_pattern.md) |
+| **TASK-032** | mypy baseline cleared — `Success: no issues found in 259 source files`, gate `RESULT: PASS` | Kernel / Typing / Tech Debt | 2026-08-23 | [TASK-032_mypy_baseline_cleanup.md](completed/TASK-032_mypy_baseline_cleanup.md) |
 | **TASK-017** | Production Readiness Hardening — 7 reliability/security issues + 7 regression tests | Reliability / Security | 2026-08-23 | [TASK-017_production_readiness_hardening.md](completed/TASK-017_production_readiness_hardening.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
@@ -41,7 +42,6 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-019** | `DatabaseExtension` exposes no way to reach the raw `Engine` | Extensions / Persistence | P2 | [TASK-019_database_extension_expose_engine.md](backlog/TASK-019_database_extension_expose_engine.md) |
 | **TASK-020** | CI `benchmark` job runs a moved path, masked by `continue-on-error` | CI / Build | P3 | [TASK-020_ci_benchmark_job_stale_path.md](backlog/TASK-020_ci_benchmark_job_stale_path.md) |
 | **TASK-021** | `ruff.toml` shadows `pyproject.toml` — the intended rule set never runs | Build / Tooling | P2 | [TASK-021_ruff_config_shadowing.md](backlog/TASK-021_ruff_config_shadowing.md) |
-| **TASK-032** | Triage and clear the remaining 23-error mypy baseline (split out of `TASK-021`) | Kernel / Typing / Tech Debt | P3 | [TASK-032_mypy_baseline_cleanup.md](backlog/TASK-032_mypy_baseline_cleanup.md) |
 | **TASK-022** | Package declares MIT but ships no `LICENSE` file | Packaging / Legal | P2 | [TASK-022_missing_license_file.md](backlog/TASK-022_missing_license_file.md) |
 | **TASK-023** | CI's single-version matrix is the blind spot (version range now narrowed to 3.14) | CI / Compatibility | P3 | [TASK-023_ci_matrix_hides_312_313_breakage.md](backlog/TASK-023_ci_matrix_hides_312_313_breakage.md) |
 | **TASK-027** | Engine ships no `py.typed` — consumers get zero type information | Packaging / Typing | P2 | [TASK-027_no_py_typed_marker.md](backlog/TASK-027_no_py_typed_marker.md) |

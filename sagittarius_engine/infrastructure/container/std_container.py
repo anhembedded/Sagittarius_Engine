@@ -1,7 +1,7 @@
 import inspect
 import threading
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from sagittarius_engine.exceptions import DependencyResolutionError
 from sagittarius_engine.infrastructure.container.scope_context import ScopeContext
@@ -184,7 +184,11 @@ class StdLibContainer(IContainer):
 
         try:
             if getattr(concrete, "__init__", None) is object.__init__:
-                return concrete()
+                # `concrete` is `type` here (see `_bindings: dict[type, type]` above) --
+                # the invariant that it constructs a `T` is a runtime contract this
+                # container enforces via correct bind()/singleton() usage, not
+                # something mypy can see through the erased dict value type.
+                return cast(T, concrete())
 
             # Check cache first to avoid slow inspect.signature and get_type_hints calls
             # CPython dictionary gets are atomic and GIL-protected. Lock-free read.
@@ -196,7 +200,7 @@ class StdLibContainer(IContainer):
                 except ValueError:
                     with self._lock:
                         self._resolution_cache[concrete] = {}
-                    return concrete()
+                    return cast(T, concrete())
 
                 import typing
 
@@ -244,6 +248,6 @@ class StdLibContainer(IContainer):
                             f"Failed to resolve '{name}' for {concrete.__name__}: {str(e)}"
                         )
 
-            return concrete(**dependencies)
+            return cast(T, concrete(**dependencies))
         finally:
             resolving.remove(concrete)
