@@ -6,6 +6,12 @@
 > now correct rather than negligent. What remains is requirement 3 below — the missing
 > guard — plus the record of how the bug hid. Priority dropped P1 → P3.
 
+> **Fully closed 2026-08-23.** Requirement 4 ("keep the rule") is now written down in
+> `.agents/rules/release.md` §3, in the release rule where a version-floor change actually
+> gets decided — not a standalone note that would need its own routing. It states the rule
+> plainly (a `requires-python` change must land with a matching CI matrix entry, in the same
+> change) and carries this task's own `ITaskHandle` story as the cited evidence for why.
+
 ## Description
 
 `pyproject.toml` declares:
