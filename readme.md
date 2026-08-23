@@ -110,13 +110,14 @@ removed on 2026-08-23: none of those directories exist, and none is planned.
 
 ## Documentation
 
-**The `docs/` tree this section used to describe does not exist** — it was deleted in commit
-`a338d42` ("Remove outdated tutorials and examples") and never rebuilt (confirmed 2026-08-23,
-`git ls-tree -r HEAD` shows 0 files under `docs/`). `mkdocs.yml` still declares `docs_dir: docs`,
-so `mkdocs serve` will fail until either the tree is rebuilt or `mkdocs.yml`/
-`requirements-docs.txt` are removed. Until then, treat `.agents/context/` (start at
-[`.agents/ONBOARDING.md`](.agents/ONBOARDING.md)) as the authoritative documentation for this
-repository.
+There is no separate doc site. The `docs/`/MkDocs tree this section used to describe was deleted
+in commit `a338d42` ("Remove outdated tutorials and examples"), and the leftover `mkdocs.yml` /
+`requirements-docs.txt` / `scripts/docs.{sh,bat}` that still pointed at it were removed rather
+than rebuilt (`BUG-002`) — `.agents/context/` is comprehensive and current, and there is no
+present intent to publish a public doc site.
+
+Treat `.agents/context/` (start at [`.agents/ONBOARDING.md`](.agents/ONBOARDING.md)) as the
+authoritative documentation for this repository.
 
 For the one real sample app's own design notes, see `examples/student_management/docs/`.
 

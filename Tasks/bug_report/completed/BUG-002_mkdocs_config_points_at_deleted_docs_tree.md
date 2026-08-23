@@ -1,5 +1,21 @@
 # BUG-002 — `mkdocs.yml` builds from a `docs/` tree that no longer exists
 
+> **Closed 2026-08-23 — Option A (drop the doc site).** Chose the simpler, non-destructive-in-
+> spirit end state described in this file's own §4: `mkdocs.yml`, `requirements-docs.txt`,
+> `scripts/docs.sh`, `scripts/docs.bat` deleted. `.agents/context/` is comprehensive and current
+> (`EPIC-002`), `readme.md` already told readers to use it, and there is no present intent to
+> publish a separate public doc site — nothing here needed to exist for the repo to keep working
+> exactly as it already does. Everything deleted stays fully recoverable from git history if a
+> public doc site is ever actually wanted (see `TASK-022`'s LICENSE question for the same
+> "is this meant to be publicly consumable" thread).
+>
+> Updated in the same change, per `rules/doc-code-sync.md`: `.agents/context/repository.md`'s
+> `docs/` row, `readme.md`'s Documentation section, `CONTRIBUTING.md`'s doc-build step, and
+> `.agents/ONBOARDING.md`'s stale task/bug snapshot (which listed two tasks as open that had
+> already closed the same day — fixed by pointing at the boards instead of re-copying a list
+> that goes stale on its own).
+
+
 **Reported date:** 2026-08-23
 **Severity:** Medium (documented workflow is broken; no runtime impact on the shipped package)
 **Status:** 🔴 Open

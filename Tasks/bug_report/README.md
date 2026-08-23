@@ -37,8 +37,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 2 |
-| ✅ **Fixed** | 1 |
+| 🔴 **Open** | 0 |
+| ✅ **Fixed** | 3 |
 | 📈 **Total** | **3** |
 
 All three were found on 2026-08-23 during the engine audit that followed `EPIC-002`. Defects
@@ -50,10 +50,7 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 
 ## 🔴 Open
 
-| ID | Title | Severity | Reported | Note |
-| :--- | :--- | :---: | :---: | :--- |
-| **[BUG-002](incomplete/BUG-002_mkdocs_config_points_at_deleted_docs_tree.md)** | `mkdocs.yml` builds from a `docs/` tree deleted in `a338d42` | Medium | 2026-08-23 | Config, `requirements-docs.txt` and `scripts/docs.{sh,bat}` all left behind. Needs a decision: drop the doc site, or rebuild it. |
-| **[BUG-001](incomplete/BUG-001_phantom_apprunner_in_iengincontext_docstring.md)** | `IEngineContext` docstring names a nonexistent `AppRunner` class | Low | 2026-08-23 | Already catalogued in `doc-code-sync.md:63` as a known finding — and never fixed. Real class is `ApplicationRunner`, and it takes no context at all. |
+*(none — all three defects filed since this board's creation are fixed)*
 
 ---
 
@@ -62,3 +59,5 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
 | **[BUG-003](completed/BUG-003_get_logger_annotation_contradicts_iengincontext_contract.md)** | `_get_logger()` declared `ILogger \| None` against a contract that guarantees non-None | Low | 2026-08-23 | Fixed 2026-08-23: 4 mypy errors resolved (27→23). Also removed 6 dead `if logger:` guards in `bootstrap.py`, by explicit user decision. 757 passed, 0 failed. |
+| **[BUG-001](completed/BUG-001_phantom_apprunner_in_iengincontext_docstring.md)** | `IEngineContext` docstring names a nonexistent `AppRunner` class | Low | 2026-08-23 | Fixed 2026-08-23: mention dropped (not renamed) — `ApplicationRunner` takes no context at all, per its real constructor. `doc-code-sync.md:63`'s row marked closed in place. |
+| **[BUG-002](completed/BUG-002_mkdocs_config_points_at_deleted_docs_tree.md)** | `mkdocs.yml` builds from a `docs/` tree deleted in `a338d42` | Medium | 2026-08-23 | Fixed 2026-08-23: Option A chosen — `mkdocs.yml`, `requirements-docs.txt`, `scripts/docs.{sh,bat}` deleted rather than rebuilt. `.agents/context/` remains the sole documentation. |

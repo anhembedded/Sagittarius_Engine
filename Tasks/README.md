@@ -57,8 +57,9 @@ Defects are tracked separately on the **[Bug Board](bug_report/README.md)** (`BU
 *open* bugs are visible somewhere — this board only ever shows a bug once it's been fixed and
 becomes a completed task. Bugs are **not** counted in the task numbers above.
 
-Currently **3 open**, all found in the 2026-08-23 post-`EPIC-002` audit. Same convention as
-`Sagittarius_Elite_Warrior/Tasks/bug_report/`, independent board.
+See that board's own Overview table for the current open count — don't trust a number copied
+here, it drifts. Same convention as `Sagittarius_Elite_Warrior/Tasks/bug_report/`, independent
+board.
 
 Rule of thumb: **BUG** = something is wrong or states something untrue; **TASK** = something is
 missing or should change.

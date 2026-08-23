@@ -28,7 +28,12 @@ class IEngineContext(ABC):
     ✅ VALID usage of IEngineContext:
     - Inside IExtension.register(), boot(), shutdown() methods.
     - Inside IHostedService.start() and stop() methods.
-    - Inside the Kernel's Bootstrap and AppRunner orchestrators.
+    - Inside the Kernel's Bootstrap orchestrator.
+    - Constructor-held by the engine's own closed set of orchestrators
+      (EngineContext's own set — see architecture.md's "IEngineContext — God
+      Object Prevention"). kernel.app_runner.ApplicationRunner is NOT one of
+      these: it takes App + IInputPort + IOutputPort and never receives a
+      context at all — do not add one.
 
     ❌ INVALID usage of IEngineContext:
     - Inside domain entities or value objects.

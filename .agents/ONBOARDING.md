@@ -201,8 +201,8 @@ a fresh session shouldn't re-derive. See `rules/task-tracking.md` for the full l
 convention so the same habit works in both. The split exists because the task board only ever
 shows a bug *after* it's fixed — an open bug had nowhere to be listed. Rule of thumb: **BUG** =
 something is wrong, or states something untrue about the code; **TASK** = something is missing
-or should change. Check that board too before assuming the engine is clean — 3 open as of
-2026-08-23.
+or should change. Check that board too before assuming the engine is clean — do not trust this
+count, it drifts; read `Tasks/bug_report/README.md`'s own Overview table for the current number.
 
 ## 8. Two `.agents/` trees — don't read the wrong one
 
@@ -245,23 +245,17 @@ followed it found real bugs, not just doc drift — a full account is in each co
   must resolve against the real tree) and `tests/test_all_modules_importable.py` (every module
   must import, and public interface annotations must resolve — this is what would have caught
   `ITaskHandle` on day one).
-- `TASK-026` (validation middleware silently skipping on unresolvable hints) and `TASK-017`
-  (7-item production-readiness checklist — 2 of the 7 items turned out already-fixed/wrong-on-
-  inspection when re-verified against the tree, not blindly executed) are both **done**,
-  released as `2.1.0`. `TASK-032` (the mypy baseline) is also done — see §1a. Do not re-derive
-  or re-plan any of these three; check `git log`/`CHANGELOG.md` before assuming something
-  still-listed elsewhere is still open.
-- **Everything genuinely still open** is on the two boards — read them directly rather than
-  trusting a snapshot list here, since this paragraph is exactly the kind of thing that goes
-  stale:
-  - [`Tasks/README.md`](../Tasks/README.md)'s backlog table — as of 2026-08-23: `TASK-019`
-    (`DatabaseExtension` can't reach the raw `Engine`, P2), `TASK-020`/`TASK-021`/`TASK-023`
-    (CI/build tooling gaps, P2-P3), `TASK-022` (missing `LICENSE`, blocked on the owner for a
-    copyright name/year — deliberately not guessed), `TASK-027` (no `py.typed`, P2),
-    `TASK-028`/`TASK-031` (small, P3).
-  - [`Tasks/bug_report/README.md`](../Tasks/bug_report/README.md) — 2 open: `BUG-001` (a
-    phantom class name in a docstring — already catalogued once in `doc-code-sync.md` and never
-    fixed the first time), `BUG-002` (`mkdocs.yml` points at a `docs/` tree deleted months ago;
-    needs a decision — drop the doc site or rebuild it — not a mechanical fix).
+- A run of tasks closed the same day, each verified against the real tree rather than executed
+  from its checklist blindly — several turned out partially or fully already fixed, or built on
+  a stale premise, and said so rather than re-doing settled work: `TASK-017`, `TASK-021`,
+  `TASK-022`, `TASK-026`, `TASK-027`, `TASK-032`. Released as `2.1.0` and `2.2.0` — check
+  `CHANGELOG.md` before assuming something still-listed elsewhere is still open.
+- **Everything genuinely still open** is on the two boards — read them directly, don't trust a
+  snapshot list here or anywhere else in `.agents/`. This exact paragraph has already gone stale
+  once (an earlier version showed two closed tasks as open); it is not special, it is not
+  exempt, and neither is any other list of task/bug IDs you find in this tree. If you're about to
+  copy one, stop and read the board instead:
+  - [`Tasks/README.md`](../Tasks/README.md)'s backlog table.
+  - [`Tasks/bug_report/README.md`](../Tasks/bug_report/README.md)'s Overview table.
 - Two tasks filed on the *other* repo (`Sagittarius_Elite_Warrior/Tasks/backlog/BOT-118`,
   `BOT-119`) from cross-checking its engine usage — see §8, do not action them from here.

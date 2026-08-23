@@ -47,12 +47,8 @@ pytest --cov=sagittarius_engine
 ### 5. Documentation
 If your changes affect public APIs or runtime behaviors:
 - Update docstrings (`@brief`, `@param`, `@details`).
-- Update relevant Markdown files under `docs/`.
-- Verify MkDocs builds without errors:
-  ```bash
-  pip install -r requirements-docs.txt
-  mkdocs build
-  ```
+- Update the relevant files under `.agents/context/` — that is this repo's documentation; there
+  is no separate `docs/`/MkDocs site (`BUG-002`).
 
 ---
 
