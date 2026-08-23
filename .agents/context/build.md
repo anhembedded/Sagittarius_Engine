@@ -44,13 +44,13 @@ Seven jobs, verified against `ci.yml` on 2026-08-23 (the previous version of thi
    violated.
 4. **Example Integration** — runs `tests/test_examples.py`, so a framework change that breaks
    user-space apps fails here.
-5. **Performance Benchmark** — ⚠️ **currently broken and silently so.** It runs
-   `tests/benchmark_runtime.py`, a path that moved to `tests/runtime/benchmark_runtime.py` in
-   commit `843137a`; the step has errored ever since. The job declares
-   `continue-on-error: true`, so the pipeline still goes green and no benchmark has actually
-   run since that reorganization. Tracked as
-   [TASK-020](../../Tasks/backlog/TASK-020_ci_benchmark_job_stale_path.md). Do not read a
-   passing CI run as evidence that performance is unregressed.
+5. **Performance Benchmark** — runs `tests/runtime/benchmark_runtime.py` (path corrected
+   2026-08-23, `TASK-020`; it had silently pointed at `tests/benchmark_runtime.py`, moved away
+   in commit `843137a`, since that reorganization). `continue-on-error: true` is kept
+   deliberately — a timing-based benchmark on shared GitHub Actions runners is expected to be
+   noisy, and failing the build on that noise would produce false-positive breaks unrelated to
+   code correctness. That flag was not the actual cause of the months-long silent breakage
+   (nobody was reading the job's output either way); it stays informational rather than gating.
 6. **Security Audit** — `bandit` (SAST) and `pip-audit` (vulnerabilities).
 7. **Package Build Check** — `python -m build` + `twine check` to validate distribution
    metadata.

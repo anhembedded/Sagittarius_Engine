@@ -1,5 +1,25 @@
 # TASK-020: CI benchmark job runs a path that no longer exists (silently)
 
+> **Closed 2026-08-23.**
+>
+> - **Req 1 — done.** `ci.yml:176` now runs `tests/runtime/benchmark_runtime.py`.
+> - **Req 2 — the stale `--ignore` deleted, not updated.** Verified rather than assumed: pytest's
+>   default `python_files` pattern (`test_*.py`) never matched `benchmark_runtime.py` at either
+>   path, so the flag was a genuine no-op at the old location and would stay one at the new — a
+>   correct-but-pointless flag invites the same "why is this here" confusion later. Confirmed
+>   identical collection (720 tests) with and without it.
+> - **Req 3 — confirmed, no rot found.** Ran `tests/runtime/benchmark_runtime.py` directly; it
+>   completes and produces real timing output for all 6 benchmarks. It had silently not run in CI
+>   for months, but nothing about the move itself broke it.
+> - **Req 4 — kept `continue-on-error: true`, decision written into `ci.yml` as a comment.**
+>   Reasoning: shared GitHub Actions runners have variable performance, so a timing-based
+>   benchmark failing the build would produce false-positive breaks unrelated to code
+>   correctness — and that flag was not what let this hide for months; nobody reading the job's
+>   output was the actual cause, which the path fix addresses directly.
+> - **Req 5 — done.** `.agents/context/build.md`'s job-5 entry updated to describe the fixed
+>   state and the `continue-on-error` reasoning, replacing the "currently broken and silently so"
+>   warning.
+
 ## Description
 
 `.github/workflows/ci.yml`'s `benchmark` job runs:
