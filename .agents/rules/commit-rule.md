@@ -7,8 +7,12 @@ trigger: model_decision
 # Rules: Commit
 
 ## CI/CD Validation
-Before committing and pushing code related to the Binance Bot, you MUST ensure that the local CI/CD pipeline passes completely.
-Always run `Sagittarius_Elite_Warrior\scripts\ci-local.ps1` and fix any issues before proceeding with a commit.
+Before committing and pushing code, you MUST ensure that the local CI/CD pipeline passes completely.
+Always run `scripts/ci-local.ps1` and fix any issues before proceeding with a commit. See
+`.agents/ONBOARDING.md` §1a for exact invocation and how to read its output.
 
 ## Architectural Integrity
-Ensure that commits do not violate Clean Architecture boundaries. A commit should never introduce an Infrastructure dependency (e.g., SQLAlchemy, network SDKs, sagittarius_engine) into the Domain or Application layers.
+Ensure that commits do not violate Clean Architecture boundaries. A commit should never introduce
+a concrete infrastructure dependency (e.g., SQLAlchemy, a network SDK) into `sagittarius_engine/domain/`,
+`sagittarius_engine/interfaces/`, or `sagittarius_engine/kernel/` — see `rules/architecture.md`'s
+"Engine Package Layout" for the full per-package dependency rules.

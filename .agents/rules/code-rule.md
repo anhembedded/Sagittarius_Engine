@@ -46,7 +46,7 @@ Follow SOLID wherever it's practical — apply it to improve clarity/testability
    - **Single-Scope Cohesion & Colocation (Gom chung các thành phần liên quan vào cùng 1 Scope / Single Source of Truth):** Tightly coupled components that define the same domain lifecycle, state machine, or feature configuration MUST be co-located within the same single file or module scope (e.g., FSM State Enum + FSM Event Enum + Transition Matrix + UI Mode mappings in a single `*_fsm_matrix.py`). Do NOT fragment tightly coupled definitions across multiple scattered files where understanding or modifying a single feature lifecycle requires jumping across 4-5 distant modules. Related enums, schemas, transition tables, and constants belonging to a single concept must reside together as a single source of truth.
 
 6. **Local CI/CD Enforcement:**
-   - Always run the local CI/CD script (`Sagittarius_Elite_Warrior\scripts\ci-local.ps1`) to validate your code before committing and pushing changes. It ensures linting, formatting, and tests pass.
+   - Always run the local CI/CD script (`scripts/ci-local.ps1`) to validate your code before committing and pushing changes. It ensures linting, formatting, and tests pass.
 
 7. **Clean Architecture Layer Enforcement:**
    - Always strictly respect the 4 Layers: Domain (Pure), Application (Use Cases/Ports), Interface Adapters (CLI/UI), and Infrastructure (DB/API/Frameworks).

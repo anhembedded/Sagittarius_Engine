@@ -1,63 +1,55 @@
 ---
+name: Install & Environment Setup
+description: How to set up and verify a dev environment for working inside the Sagittarius Engine repo itself.
 trigger: always_on
 ---
 
-# Sagittarius Engine & Dependency Installation Guidelines
+# Sagittarius Engine — Dev Environment Setup Guidelines
 
-All developers and AI assistants working on this repository MUST strictly follow these installation options and guidelines when setting up the environment or resolving `sagittarius_engine` dependencies.
+All developers and AI assistants working **inside this repository** (`Sagittarius_Engine` —
+developing the engine itself, not consuming it) MUST strictly follow these guidelines when
+setting up or verifying the environment.
 
----
-
-## 1. Sagittarius Engine Installation Options
-
-### Option 1: Install from GitHub Repository (Production / Shared / CI)
-When installing in fresh environments, CI pipelines, or when sharing builds, install `sagittarius_engine` directly from the official GitHub repository:
-
-```bash
-pip install git+https://github.com/anhembedded/Sagittarius-Engine.git
-```
-
-For editable / upgrade mode from GitHub:
-```bash
-pip install --upgrade --force-reinstall git+https://github.com/anhembedded/Sagittarius-Engine.git
-```
+Corrected 2026-08-23: this file previously described installing `sagittarius_engine` as a
+*dependency* of another project (`pip install git+https://.../Sagittarius-Engine.git`,
+`.\scripts\run.ps1` / `run-ui.ps1`, `ci-local.ps1 -UnitOnly`) — Elite Warrior's content,
+copy-pasted wholesale. None of those scripts or that installation model exist in this repo; you
+cannot `pip install` this package into itself. That consumer-facing guidance belongs in
+`readme.md`'s own Installation section (where it correctly already lives) and in the *consuming*
+app's own `install-rule.md`, not here.
 
 ---
 
-### Option 2: Local Editable Installation (Development & Debugging)
-When actively developing or debugging both the engine and the bot concurrently in a local monorepo / submodule setup:
+## 1. Setting up this repo for development
 
 ```bash
-# From workspace root
-pip install -e Sagittarius-Engine
-```
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
 
----
-
-## 2. Full Environment Bootstrap
-
-To install all application dependencies and tools:
-
-```bash
-# 1. Base requirements
 pip install -r requirements.txt
-
-# 2. Sagittarius Engine (GitHub)
-pip install git+https://github.com/anhembedded/Sagittarius-Engine.git
+pip install -r requirements-dev.txt
+pip install -e .                   # editable install, so `import sagittarius_engine`
+                                    # resolves to this working tree
 ```
 
-Or run the automated setup scripts:
-- **Windows (PowerShell):** `.\scripts\run.ps1` or `.\scripts\run-ui.ps1`
-- **Verification:** `.\scripts\ci-local.ps1 -UnitOnly`
+## 2. Verification
+
+Run the real local CI gate — never a hand-assembled subset of `pytest`/`ruff`/`mypy` on just the
+files you touched, see `.agents/ONBOARDING.md` §1a for why:
+
+```bash
+export PATH="$PWD/.venv/bin:$PATH"
+pwsh ./scripts/ci-local.ps1
+```
 
 ---
 
 ## 3. Mandatory Rules for AI Agents & Automated Tools
 
-1. **Never Attempt Plain PyPI Install for Engine:**
-   - Always install via GitHub repository URL or local editable path as defined above.
-   - Do NOT run plain `pip install sagittarius-engine` or `pip install sagittarius_engine` without the git URL prefix.
-
-2. **Clean Submodule Tree Preservation:**
-   - If using Option 2 (local editable installation), ensure no temporary build artifacts, `.egg-info`, or `__pycache__` leave `Sagittarius-Engine` in a `(dirty)` git state.
-   - In automated agent runs, prefer Option 1 or clean with `git -C Sagittarius-Engine clean -fdx`.
+1. **This repo is the engine, not a consumer of it.** Never add `sagittarius_engine` itself as
+   a dependency in `requirements.txt`/`pyproject.toml`, and never suggest `pip install`-ing it
+   from GitHub as a setup step for working *in* this repo — that instruction is for someone
+   consuming the package, which is a different audience than this file.
+2. **Do not leave the working tree dirty from environment setup.** No stray `.egg-info`,
+   `__pycache__`, or build artifacts left staged or committed — `git status` clean after
+   `pip install -e .`.

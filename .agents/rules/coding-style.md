@@ -61,7 +61,7 @@ trigger: model_decision
 ## 9. Run lint & CI
 
 * refer: [Lint context](../context/lint.md)
-* **Local CI/CD:** Always run `Sagittarius_Elite_Warrior\scripts\ci-local.ps1` to validate code formatting and pass tests before committing changes.
+* **Local CI/CD:** Always run `scripts/ci-local.ps1` to validate code formatting and pass tests before committing changes.
 
 ## 10. Architectural Consistency
 * **Strict Layering:** Respect the 4 Clean Architecture layers. The Core (Domain & Application) must be completely isolated from Adapters (Presentation) and Infrastructure.
