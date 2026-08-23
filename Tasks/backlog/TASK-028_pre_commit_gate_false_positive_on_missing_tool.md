@@ -1,5 +1,31 @@
 # TASK-028: `pre_commit.ps1` reports "all checks passed" when a tool isn't even on `PATH`
 
+> **Status update 2026-08-23 (after `TASK-030`):** `pre_commit.ps1` was replaced wholesale by
+> `scripts/ci-local.ps1` in `TASK-030`, which cites this task in its commit message. **Requirement
+> 1 is done, verified empirically** — the new script sets `$ErrorActionPreference = "Stop"` and
+> wraps every step in `try/catch`, so a command-not-found is now a caught, terminating error
+> instead of a silently-ignored non-terminating one. Re-ran the exact false-positive scenario
+> against the new script on this machine (`PATH` with no `ruff`/`mypy`/`pytest` resolvable):
+> result was `RESULT: FAIL` / `FAILED_STEPS: Ruff Lint,Ruff Format,Mypy`, not a false pass. The
+> gate no longer lies about having run.
+>
+> **Requirement 2 (a regression test for this class of bug) is not done** — no test in `tests/`
+> or elsewhere exercises the missing-tool path; a future PowerShell change to this script could
+> silently reintroduce the same defect with nothing to catch it.
+>
+> **Requirement 3 is partially done.** The script itself now degrades gracefully when no `.venv`
+> exists (`scripts/ci-local.ps1:135,141-143`: checks `Test-Path .venv`, warns, and falls back to
+> whatever is on `PATH`) — verified on this machine, which genuinely has no `.venv` (tools live
+> under `AppData\Local\Python\pythoncore-3.14-64\Scripts` instead). But `ONBOARDING.md` §1a's own
+> documented invocation still reads `export PATH="$PWD/.venv/bin:$PATH"`, unchanged by `TASK-030`
+> — still assumes a `.venv` this machine doesn't have. Not re-verified against whatever
+> environment produced `TASK-030`'s "verified with a real run" claim, so this may be
+> environment-specific rather than universally wrong; either way it wasn't re-checked.
+>
+> Scope narrowed to requirements 2 and 3 going forward; left in `backlog/` rather than closed,
+> per `rules/design-discipline.md` — "prefer leaving something undone and named over done and
+> wrong."
+
 ## Description
 
 `pre_commit.ps1` gates every step on `$LASTEXITCODE`:
@@ -66,9 +92,10 @@ that lie" category, and the `--show`/`offscreen` precedent it documents.
 
 ## Priority
 
-**P1** — this is the mechanism every other task in this repo relies on to certify "done." A gate
-that can report success while doing nothing undermines every prior and future completion claim
-that trusted it without independently re-verifying, as `TASK-026` had to.
+~~**P1**~~ **P3** (downgraded 2026-08-23) — the P1-severity concern (the gate silently lying)
+is the part now fixed and verified. What remains is closing the gap so it can't regress
+unnoticed (requirement 2) and a small doc-accuracy check (requirement 3) — real, but no longer
+urgent.
 
 ## Category
 
