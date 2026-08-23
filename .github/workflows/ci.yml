@@ -82,7 +82,6 @@ jobs:
       - name: Run tests with coverage
         run: |
           pytest tests/ \
-            --ignore=tests/benchmark_runtime.py \
             --cov=sagittarius_engine \
             --cov-report=xml \
             --cov-report=term-missing \
@@ -155,6 +154,12 @@ jobs:
     name: Performance Benchmark
     needs: test
     runs-on: ubuntu-latest
+    # Kept deliberately (TASK-020 req. 4): shared GitHub Actions runners have
+    # variable performance, so a timing-based benchmark failing the build
+    # would produce false-positive breaks unrelated to code correctness. This
+    # is *not* what let the job silently rot for months, though — nobody was
+    # reading its output either way, which the corrected path below and the
+    # job's own visible name/label are meant to make less likely.
     continue-on-error: true
 
     steps:
@@ -173,7 +178,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run benchmarks
-        run: PYTHONPATH=. python tests/benchmark_runtime.py
+        run: PYTHONPATH=. python tests/runtime/benchmark_runtime.py
 
   # ──────────────────────────────────────────────────────────────
   # Job 6: Security Audit (Bandit & Pip-Audit)
