@@ -60,9 +60,21 @@ def test_roster_screen_emits_no_qml_runtime_warnings(qtbot, tmp_path):
         view.show()
         for _ in range(15):
             qtbot.wait(1)
+
+        # Close the window, then stop the app, WHILE STILL CAPTURING --
+        # gui.py's real teardown order (qt_app.exec() returns once the user
+        # closes the window, then app.stop() runs). Uninstalling the handler
+        # before this point (the bug this reordering fixes, found 2026-08-23
+        # by actually running the app) means teardown-time QML errors were
+        # invisible to this test no matter how thorough the rest of it was.
+        view.close()
+        for _ in range(15):
+            qtbot.wait(1)
+        app.stop()
+        for _ in range(15):
+            qtbot.wait(1)
     finally:
         qInstallMessageHandler(previous)
-        app.stop()
 
     assert messages == [], "QML runtime warnings:\n" + "\n".join(messages)
     assert presenter.view_model is not None

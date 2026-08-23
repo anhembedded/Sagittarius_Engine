@@ -98,8 +98,16 @@ Rectangle {
             TimeRangeCard {
                 id: filterCard
                 compact: viewModel.compactMode
-                Layout.preferredWidth: compact ? compactSize : 300
-                Layout.preferredHeight: compact ? compactSize : 96
+                // Unlike statsCard above, TimeRangeCard declares its own
+                // full-size implicitWidth/implicitHeight (title + toggle +
+                // two DateTimePicker rows need far more than statsCard's
+                // fixed 96px) -- BaseCard never clips overflowing content,
+                // so hardcoding 96 here (found 2026-08-23, from a screenshot
+                // showing the card's real content painted over the table/log
+                // row below it) let the card's actual content overflow its
+                // allocated box instead of erroring or resizing.
+                Layout.preferredWidth: compact ? compactSize : implicitWidth
+                Layout.preferredHeight: compact ? compactSize : implicitHeight
 
                 useCustomTime: viewModel.useCustomTime
                 fromDateTime: viewModel.fromDateTime
@@ -127,6 +135,13 @@ Rectangle {
             }
 
             ColumnLayout {
+                // Explicit fillWidth: false, not just a preferredWidth --
+                // being the LAST item in this RowLayout, Qt Quick Layouts
+                // defaults it to fillWidth: true otherwise (found
+                // 2026-08-23 from a screenshot: this column claimed nearly
+                // the whole row and AppDataTable next to it collapsed to a
+                // few px), which silently wins over a plain preferredWidth.
+                Layout.fillWidth: false
                 Layout.preferredWidth: 320
                 Layout.fillHeight: true
                 spacing: Theme.spaceXs

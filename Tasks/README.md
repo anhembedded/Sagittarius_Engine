@@ -48,6 +48,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
 | **TASK-034** | `extensions/__init__.py` is a barrel that eagerly imports all six extensions together | Architecture / Package Boundaries | P3 | [TASK-034_extensions_barrel_eager_imports_everything.md](backlog/TASK-034_extensions_barrel_eager_imports_everything.md) |
+| **TASK-035** | `AppDataTable`'s columns render with no horizontal gap — a right-aligned column touches the next one | UI / Widget Kit (`pyside_mvc`) | P3 | [TASK-035_appdatatable_columns_have_no_horizontal_gap.md](backlog/TASK-035_appdatatable_columns_have_no_horizontal_gap.md) |
 
 ---
 
