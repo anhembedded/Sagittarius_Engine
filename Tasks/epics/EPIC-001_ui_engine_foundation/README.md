@@ -79,7 +79,7 @@ condition this epic exists to end.
 | :--- | :--- | :---: | :---: |
 | **[EPIC-001A](completed/EPIC-001A_architecture_rule_rewrite.md)** | Architecture Rule Rewrite & Ownership Boundary | 🟢 | ✅ Done (22/08) — no code, governance only |
 | **[EPIC-001B](completed/EPIC-001B_design_token_layer.md)** | Design Token Layer — fixed colour vocabulary, bootstrap validation, anti-literal-colour test | 🟢 | ✅ Done (22/08) — 19 new tests, 481 passed total, 0 new mypy errors |
-| **[EPIC-001C](completed/EPIC-001C_widget_kit_expansion.md)** | Widget Kit Expansion — data table first, gallery, anti-raw-primitive test | 🟢 | ✅ Done (23/08) — table+gallery+both guards+AppModal delivered |
+| **[EPIC-001C](completed/EPIC-001C_widget_kit_expansion.md)** | Widget Kit Expansion — data table first, gallery, anti-raw-primitive test | 🟢 | ✅ Done (23/08) — table, AppModal, compact mode, 3 kit guards, showcase runner (see §5 for the same-day increment) |
 | **[EPIC-001D](incomplete/EPIC-001D_runtime_slot_registry.md)** | Runtime, Regions & Slot Registry — shell, contribution model, lifecycle conformance suite | 🟡 | 🟡 Unblocked (`B`+`C` done) — not started; open design question found 23/08 (does the UI Engine become a real `IExtension`?) must be settled first |
 
 **Dependency order:** strictly `A → B → C → D`. `A` is governance-only and unblocks

@@ -66,16 +66,29 @@ these, it almost certainly doesn't — re-read `ui-architecture.md` first.
 ## 4. Current state (check this is still accurate before trusting it)
 
 As of 2026-08-23: **`EPIC-001A`/`EPIC-001B`/`EPIC-001C` are all done.** `EPIC-001C` (Widget
-Kit Expansion) shipped `AppDataTable`, `Gallery`, the anti-literal-colour guard, the
-anti-raw-primitive guard, `AppModal`, and — closing the one gap it was still missing as of
-2026-08-22 — a `Rectangle`-as-styled-card detection guard
-(`kit/rectangle_card_guard.py`, block-scoped brace-depth parsing rather than a per-line
-regex, since the violation is a combination of properties that must all belong to the same
-Rectangle's own direct scope). Two small items remain deliberately deferred inside `C`'s own
-file (not blocking): `DateTimePicker.qml`'s calendar popup was not retrofitted onto
-`AppModal`, and no icon-only button variant exists yet. `EPIC-001D` (Runtime/Registry) is
-now unblocked (`B`+`C` both done) but has not been started. Verify this is still true rather
-than trusting this document indefinitely:
+Kit Expansion) shipped `AppDataTable`, `AppModal`, `Gallery`, card **compact mode** +
+`CardModel`, a `scripts/show-gallery.ps1` runner (real window or headless PNG), and **four**
+static guards: anti-literal-colour, anti-raw-primitive, `Rectangle`-as-styled-card, and
+gallery coverage. `C`'s own §5 documents the same-day increment and — more usefully — two
+mistakes worth not repeating: an attempt to embed a `CardModel` QObject in every card's QML
+tree that hit three QML init-order hazards **without failing a single test**, and a
+`--show` mode that could never open a window because offscreen was forced at module import.
+Both are why `test_gallery_emits_no_qml_runtime_warnings` now captures Qt's message stream
+instead of trusting `QQuickWidget.errors()`, which sees parse errors only.
+
+Two small items remain deliberately deferred inside `C`'s own file (not blocking):
+`DateTimePicker.qml`'s calendar popup was not retrofitted onto `AppModal`, and no icon-only
+button variant exists yet. One known defect is recorded but unfixed: `LogPanel` throws in its
+`ListView` delegate when a second instance exists, regardless of model contents.
+
+**`EPIC-001D` (Runtime/Registry) is unblocked but not started — and has an open design
+question that must be settled first** (its objective 5): does the UI Engine become a real
+`IExtension`/`IModule` of Sagittarius Engine, or stay deliberately outside it? Today it is
+outside — `configure_app_qml()` is a bare function call after `app_engine.boot()` has already
+finished — which means `app_engine.shutdown()` has no path to the `Theme` singleton or
+`OverlayHost`. Decide before building the shell's lifecycle contract, not after.
+
+Verify this is still true rather than trusting this document indefinitely:
 
 ```bash
 ls Tasks/epics/EPIC-001_ui_engine_foundation/completed/

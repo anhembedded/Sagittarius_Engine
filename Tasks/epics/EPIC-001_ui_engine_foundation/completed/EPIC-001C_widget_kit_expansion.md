@@ -2,9 +2,11 @@
 
 **Epic:** [EPIC-001 — UI Engine Foundation](../README.md)
 **Status:** ✅ **Done (2026-08-23)** — data table, gallery, anti-raw-primitive test, AppModal
-(2026-08-22) and the Rectangle-as-styled-card detection guard (2026-08-23) all delivered. Three
-smaller items remain deliberately deferred, not blocking closure — see §4's "Deferred, not
-blocking" list.
+(2026-08-22) and the Rectangle-as-styled-card detection guard (2026-08-23) all delivered.
+**A further increment landed the same day after this line was first written** — card compact
+mode, `CardModel`, the gallery-coverage guard and the showcase runner; see §5. Two smaller
+items remain deliberately deferred, not blocking closure — see §4's "Deferred, not blocking"
+list (the third, hover/pressed states, was resolved by §5.2's window mode).
 **Category:** UI Engine / Component Library
 **Priority:** P1
 **Depends on:** EPIC-001B ✅ (the kit renders tokens; the vocabulary must exist first)
@@ -208,3 +210,83 @@ not concept.
 - The gallery does not yet demonstrate hover/pressed states (no synthetic pointer input is
   driven in the offscreen snapshot) — only structurally distinct states (`isActive`,
   `enabled: false`, and now an opened `AppModal`) are visible in the rendered image.
+  **Resolved 2026-08-23** by `scripts/show-gallery.ps1`'s window mode — see §5.
+
+---
+
+## 5. Delivered after closure (2026-08-23, same day)
+
+Recorded here rather than in a new task file: all of it is squarely this subtask's scope
+(Widget Kit), it just landed after the status line above was written. Keeping it in one place
+beats splitting one coherent body of work across two files for a bookkeeping technicality.
+
+### 5.1 Card compact mode (`ae31249`)
+
+App-wide full-size/compact display on `BaseCard`, so every descendant gets it: compact renders
+a square badge showing the icon, else the title's first letter, else `?`. `title`/`icon`/card
+chrome (`bgCard` fill, border, radius) pulled up into `BaseCard` — `title` had been redeclared
+independently in `LogPanel` and `TimeRangeCard`, and the chrome repeated verbatim in all three.
+
+`kit/card_model.py` (`CardModel`) is the Python implementation of the badge derivation,
+17 tests, none requiring a `QApplication` or any rendering.
+
+**A design attempt was made, failed, and was reverted — the failure is the useful part.**
+Embedding a `CardModel` QObject inside every card's own QML object tree (the user's explicit
+first choice) hit three separate QML initialisation hazards, each isolated with a minimal
+repro: an inline `readonly property CardModel x: CardModel {}` resolving to null; a
+`default property alias` swallowing the base's own internal children into the container being
+declared; and, once a card was subclassed, sibling bindings evaluating before the model
+existed and then never re-evaluating. **None of the three failed a test** — QML binding
+errors are runtime warnings and `QQuickWidget.errors()` reports parse errors only, so four
+tests stayed green while every compact badge silently rendered blank. Reverted to driving the
+same Python logic from a screen-level ViewModel, the mechanism already proven by
+`controlsEnabled` (one property, 7 Backtest buttons, zero such problems). The principle
+"derivation belongs in Python" held; the delivery mechanism was the mistake.
+
+`test_gallery_emits_no_qml_runtime_warnings` closes the gap that hid all three: it installs a
+Qt message handler instead of trusting `errors()`. Mutation-verified by reintroducing the bug
+and confirming the test goes red.
+
+Also fixed while here: the test icon loader returned a bare `QIcon()`, so Qt logged "Failed to
+get image from provider" for every icon on screen — noise that would have buried the genuine
+binding errors the new test exists to surface.
+
+**Known gap, deliberately not patched under this change:** `LogPanel` throws in its `ListView`
+delegate when a *second* instance exists — with an unset model, an empty `ListModel {}`, and a
+populated one alike. Isolated by bisecting it out of the gallery. That is a `LogPanel`
+robustness defect, not a compact-mode one; fixing it means changing its delegate contract and
+deserves its own change. `LogPanel` is therefore absent from the compact demo row, with the
+reason recorded inline in `Gallery.qml`.
+
+### 5.2 Gallery-coverage guard + showcase runner (`3ae2c2a`, `d36c5a8`)
+
+`kit/gallery_coverage_guard.py` makes §6.2's "every kit component must appear in the gallery"
+checkable rather than merely stated. It reads `qmldir` (the kit's declared public type list)
+rather than listing directories, so internal sub-components and the four placeholder candidate
+directories from `TASK-018` are correctly ignored without needing exemptions.
+
+**It found a real gap on its first run:** `DateTimePicker` had been registered in `qmldir`
+since before the gallery existed and had never been shown. Added standalone (`TimeRangeCard`
+embeds two, but its own calendar-toggle chrome was never visible). Precisely the decay the
+guard exists to stop. `BaseCard` is the sole default exemption — no standalone appearance,
+shown through every card deriving from it — pinned by a test so growing that set is a visible
+decision.
+
+`scripts/show-gallery.ps1` runs the gallery: a real interactive window by default,
+`-Snapshot` for a headless PNG. `Join-Path` kept to two arguments throughout — the three-plus
+form is PowerShell 7+ only and is exactly what broke the consuming app's build script in
+`BUG-029`.
+
+**Shipped broken, then fixed (`d36c5a8`):** `render_gallery_snapshot.py` forced
+`QT_QPA_PLATFORM=offscreen` at module import, before argv was read, so `--show` built a real
+window and entered `app.exec()` against the offscreen platform. Every signal said success —
+process alive, `isVisible()` true, valid window handle and geometry — and nothing appeared.
+Found only because the user ran it and reported no window. Diagnosed by probing
+`app.platformName()` from inside the running process (`offscreen`, while `DISPLAY` and
+`WAYLAND_DISPLAY` were both set); snap-confined `pwsh` was ruled out first rather than
+assumed. Now offscreen applies to snapshot mode only, and an inherited `offscreen` is actively
+cleared when a window is requested.
+
+**Cumulative after §5:** 543 passed, 7 skipped. All four QML guards at baseline —
+literal-colour 0, raw-primitive 6, rectangle-as-card 2, gallery-gap 0. `mypy` unchanged at its
+26 pre-existing errors.
