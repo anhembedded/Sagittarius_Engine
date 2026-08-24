@@ -2,6 +2,15 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
+from sagittarius_engine.infrastructure.event_bus.bus_logger import (
+    resolve_bus_logger,
+)
+from sagittarius_engine.infrastructure.event_bus.dispatch_trace import (
+    log_event_emitted,
+)
+from sagittarius_engine.infrastructure.event_bus.handler_reporting import (
+    report_handler_failure,
+)
 from sagittarius_engine.interfaces import IEventBus, ILogger
 
 
@@ -32,11 +41,14 @@ class MemoryEventBus(IEventBus):
     def __init__(self, logger: ILogger | None = None) -> None:
         """
         @brief Constructor.
-        @param logger Optional logger instance.
+        @param logger Optional. Omitting it does NOT make this bus silent —
+        handler failures still get reported (see `handler_reporting`); it only
+        means they go to the standard `logging` module rather than to the
+        application's own `ILogger`.
         """
         self._handlers: dict[str, tuple[Callable, ...]] = {}
         self._lock = threading.Lock()
-        self.logger = logger
+        self.logger = resolve_bus_logger(logger)
 
     def _get_event_key(self, event_name_or_type: str | type | Any) -> str:
         if isinstance(event_name_or_type, str):
@@ -62,18 +74,16 @@ class MemoryEventBus(IEventBus):
             event_name = self._get_event_key(event_name_or_obj)
             payload = data if data is not None else event_name_or_obj
 
-        if self.logger:
-            self.logger.info(f"Emitting event: {event_name} with data: {payload}")
-
         # ⚡ Bolt: Lock-free read using Copy-On-Write pattern to reduce contention
         handlers_snapshot = self._handlers.get(event_name, ())
+
+        log_event_emitted(self.logger, event_name, len(handlers_snapshot))
 
         for handler in handlers_snapshot:
             try:
                 handler(payload)
             except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error in handler {handler}: {e}")
+                report_handler_failure(self.logger, event_name, handler, e)
 
     def on(self, event_name_or_type: str | type | Any, handler: Callable) -> None:
         """

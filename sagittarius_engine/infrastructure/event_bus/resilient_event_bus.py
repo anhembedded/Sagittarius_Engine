@@ -2,6 +2,12 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
+from sagittarius_engine.infrastructure.event_bus.bus_logger import (
+    resolve_bus_logger,
+)
+from sagittarius_engine.infrastructure.event_bus.handler_reporting import (
+    report_handler_failure,
+)
 from sagittarius_engine.interfaces import IEventBus, ILogger
 
 
@@ -43,7 +49,7 @@ class ResilientEventBus(IEventBus):
         self.inner_bus = inner_bus
         self.max_retries = max_retries
         self._dlq: list[tuple[str, Any, Callable, Exception]] = []
-        self.logger = logger
+        self.logger = resolve_bus_logger(logger)
 
         self._wrapper_map: dict[tuple[str, Callable], Callable] = {}
         self._lock = threading.Lock()
@@ -54,26 +60,14 @@ class ResilientEventBus(IEventBus):
 
         @param event_name_or_obj The name of the event or BaseEvent object.
         @param data The data payload.
+
+        @details Deliberately does not log the dispatch itself — the inner bus
+        does that, with the handler count for *this* event. This decorator
+        used to re-derive the event name here purely to write its own log
+        line, which meant every emit resolved the key twice and produced two
+        records for one dispatch. Its job is retry and the dead-letter queue;
+        tracing belongs to whichever bus actually holds the handlers.
         """
-        if isinstance(event_name_or_obj, str):
-            event_name = event_name_or_obj
-            payload = data
-        else:
-            event_name = (
-                getattr(
-                    event_name_or_obj,
-                    "event_name",
-                    type(event_name_or_obj).__qualname__,
-                )
-                or type(event_name_or_obj).__qualname__
-            )
-            payload = data if data is not None else event_name_or_obj
-
-        if self.logger:
-            self.logger.info(
-                f"Emitting resilient event: {event_name} with data: {payload}"
-            )
-
         self.inner_bus.emit(event_name_or_obj, data)
 
     def on(self, event_name_or_type: str | Any, handler: Callable[..., Any]) -> None:
@@ -101,6 +95,14 @@ class ResilientEventBus(IEventBus):
                         break
                     except Exception as e:
                         if attempt == self.max_retries:
+                            #: Reported before the DLQ append, not instead of
+                            #: it. The DLQ is a recovery mechanism — something
+                            #: has to call `reprocess()` for it to matter — and
+                            #: before this, a handler that exhausted its
+                            #: retries left no log line at all, so a failure
+                            #: parked in the DLQ was invisible until someone
+                            #: thought to call `get_dlq()`.
+                            report_handler_failure(self.logger, event_name, handler, e)
                             with self._lock:
                                 self._dlq.append((event_name, data, handler, e))
 
@@ -150,5 +152,6 @@ class ResilientEventBus(IEventBus):
                     break
                 except Exception as e:
                     if attempt == self.max_retries:
+                        report_handler_failure(self.logger, event_name, handler, e)
                         with self._lock:
                             self._dlq.append((event_name, data, handler, e))

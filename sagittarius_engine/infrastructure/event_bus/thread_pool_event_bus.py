@@ -2,6 +2,15 @@ import concurrent.futures
 from collections.abc import Callable
 from typing import Any
 
+from sagittarius_engine.infrastructure.event_bus.bus_logger import (
+    resolve_bus_logger,
+)
+from sagittarius_engine.infrastructure.event_bus.dispatch_trace import (
+    log_event_emitted,
+)
+from sagittarius_engine.infrastructure.event_bus.handler_reporting import (
+    report_handler_failure,
+)
 from sagittarius_engine.infrastructure.event_bus.memory_event_bus import MemoryEventBus
 from sagittarius_engine.interfaces import IEventBus, ILogger
 
@@ -20,11 +29,13 @@ class ThreadPoolEventBus(IEventBus):
         @param max_workers Maximum number of threads in the pool.
         @param logger Optional logger instance.
         """
-        self._inner_bus = MemoryEventBus(
-            logger=None
-        )  # We will manage logging locally for the pool
+        #: The inner bus only stores the handler registry here — this class
+        #: reads that registry and dispatches to the pool itself, never calling
+        #: `inner.emit()`, so the inner bus never logs and there is no
+        #: double-reporting.
+        self._inner_bus = MemoryEventBus(logger=None)
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
-        self.logger = logger
+        self.logger = resolve_bus_logger(logger)
 
     def emit(self, event_name_or_obj: str | Any, data: Any = None) -> None:
         """
@@ -46,11 +57,6 @@ class ThreadPoolEventBus(IEventBus):
                 or type(event_name_or_obj).__qualname__
             )
             payload = data if data is not None else event_name_or_obj
-        if self.logger:
-            self.logger.info(
-                f"Emitting event: {event_name} to ThreadPoolEventBus with data: {payload}"
-            )
-
         # Public handler access without inspecting private state
         if hasattr(self._inner_bus, "get_handlers"):
             handlers_snapshot = self._inner_bus.get_handlers(
@@ -63,22 +69,25 @@ class ThreadPoolEventBus(IEventBus):
                 event_name, ()
             )
 
-        futures = []
+        log_event_emitted(self.logger, event_name, len(handlers_snapshot))
+
         for handler in handlers_snapshot:
-            futures.append(self._executor.submit(handler, payload))
+            future = self._executor.submit(handler, payload)
 
-        for future in futures:
-
-            def _log_error(f, event=event_name):
+            def _report(f, event=event_name, h=handler):
                 try:
                     f.result()
                 except Exception as exc:
-                    if self.logger:
-                        self.logger.error(
-                            f"Error executing handler for event {event}: {exc}"
-                        )
+                    #: Re-raised inside this `except` so that
+                    #: `report_handler_failure`'s `traceback.format_exc()` has
+                    #: a live exception context to read. `Future.result()`
+                    #: re-raises the original exception with its original
+                    #: traceback attached, so the report still points at where
+                    #: the handler actually failed on the worker thread, not
+                    #: at this callback.
+                    report_handler_failure(self.logger, event, h, exc)
 
-            future.add_done_callback(_log_error)
+            future.add_done_callback(_report)
 
     def on(self, event_name_or_type: str | Any, handler: Callable[..., Any]) -> None:
         """

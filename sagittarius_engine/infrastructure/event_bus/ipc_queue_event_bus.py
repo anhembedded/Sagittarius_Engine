@@ -5,6 +5,12 @@ from collections.abc import Callable
 from multiprocessing.queues import Queue
 from typing import Any
 
+from sagittarius_engine.infrastructure.event_bus.bus_logger import (
+    resolve_bus_logger,
+)
+from sagittarius_engine.infrastructure.event_bus.handler_reporting import (
+    report_handler_failure,
+)
 from sagittarius_engine.interfaces.i_event_bus import IEventBus
 from sagittarius_engine.interfaces.i_logger import ILogger
 
@@ -144,12 +150,20 @@ class IPCQueueEventBus(IEventBus):
                     self._logger.error(f"IPCQueueEventBus listener error: {e}")
 
     def _dispatch(self, event_name: str, data: Any) -> None:
-        """Calls all local handlers registered for the event."""
+        """Calls all local handlers registered for the event.
+
+        @details Handler failures are reported through the shared
+        `handler_reporting` path rather than this class's own
+        `if self._logger:` idiom. Everywhere else in this file that guard has
+        an explicit `else:` branch falling back to the standard `logging`
+        module — this one method did not, so a handler exception here was the
+        single place in the class that could disappear without a trace when no
+        `ILogger` was injected."""
         # ⚡ Bolt: Lock-free read using Copy-On-Write pattern to reduce contention
         handlers = self._handlers.get(event_name, ())
+        logger = resolve_bus_logger(self._logger)
         for handler in handlers:
             try:
                 handler(data)
             except Exception as e:
-                if self._logger:
-                    self._logger.error(f"Error in IPC handler for '{event_name}': {e}")
+                report_handler_failure(logger, event_name, handler, e)
