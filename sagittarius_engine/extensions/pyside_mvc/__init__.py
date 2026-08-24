@@ -20,7 +20,14 @@ except ImportError:
     # We don't raise an error here because simply scanning the extensions folder shouldn't crash the engine.
 else:
     from .kit import RawPrimitiveFinding, find_raw_primitives
-    from .mvc import BasePresenter, BaseView, IView, PresenterManager
+    from .mvc import (
+        BasePresenter,
+        BaseView,
+        EventDelivery,
+        IView,
+        PresenterManager,
+        QtEventBridge,
+    )
     from .runtime import (
         ICON_PROVIDER_ID,
         AppQmlConfig,
@@ -97,6 +104,7 @@ else:
         "AppQmlConfig",
         "BareQtBaseFinding",
         "BasePresenter",
+        "EventDelivery",
         "BaseQmlViewModel",
         "BaseView",
         "Card",
@@ -113,6 +121,7 @@ else:
         "OverlayHost",
         "Panel",
         "PresenterManager",
+        "QtEventBridge",
         "QmlHostView",
         "RawPrimitiveFinding",
         "SelectableCard",

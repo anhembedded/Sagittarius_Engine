@@ -8,6 +8,9 @@ from sagittarius_engine.extensions.pyside_mvc.mvc.base_view import (
     DEV_MODE_CONFIG_KEY,
     BaseView,
 )
+from sagittarius_engine.extensions.pyside_mvc.mvc.qt_event_bridge import (
+    QtEventBridge,
+)
 from sagittarius_engine.extensions.pyside_mvc.safety.thread_affinity import (
     set_thread_affinity_dev_mode,
 )
@@ -26,10 +29,26 @@ class BasePresenter(QObject):
 
     @details
     This class enforces strict lifecycle management and architectural contracts:
-    - Multiple Inheritance safety (QObject first, ABC second).
-    - Prevents the 'Template Method Trap' by NOT calling abstract methods in __init__.
-      Child classes MUST manually call `self._connect_ui_signals()` and `self._connect_engine_events()`
-      at the very end of their own `__init__` after all local attributes are initialized.
+
+    - **Single inheritance from `QObject`.** This docstring previously claimed
+      "Multiple Inheritance safety (QObject first, ABC second)"; there is no
+      second base and never was. Corrected 2026-08-25 (`EPIC-008D`) rather
+      than left to mislead the next reader — and multiple inheritance is
+      forbidden in this codebase anyway (`code-rule.md`).
+    - **Avoids the 'Template Method Trap'** by NOT calling overridable methods
+      in `__init__`. Child classes call `self._connect_ui_signals()` and
+      `self._connect_engine_events()` themselves, at the very end of their own
+      `__init__`, once their attributes exist.
+    - **Subscribes through `QtEventBridge`** (`self.subscribe`), so a handler
+      always runs on the Qt main thread and is always unsubscribed on
+      `dispose()`. A subclass never has to remember either.
+
+    @par Teardown: override `shutdown()`, never `dispose()`
+    `dispose()` is framework-owned and final in practice: it unsubscribes
+    everything this presenter registered and *then* calls `shutdown()`, the
+    author hook. Overriding `dispose()` instead would skip the unsubscribe
+    silently — the same override-vs-call trap the engine's extension
+    lifecycle documents.
     """
 
     # Class-level definition for the initial state of the FSM.
@@ -57,6 +76,12 @@ class BasePresenter(QObject):
         self.logger = container.resolve(ILogger)
         self.dispatcher = container.resolve(IDispatcher)
         self.config = container.resolve(IConfig)
+
+        #: Owns this presenter's subscriptions and the hop onto the main
+        #: thread. One bridge per presenter, so `dispose()` removes exactly
+        #: this presenter's handlers and never a sibling screen's.
+        self._events = QtEventBridge(self.event_bus, logger=self.logger, parent=self)
+        self._disposed = False
 
         # Auto-activate dev-mode View instrumentation (e.g. click logging)
         # for any View that opts in by subclassing BaseView — a no-op for
@@ -131,14 +156,65 @@ class BasePresenter(QObject):
 
     def _connect_ui_signals(self) -> None:
         """
-        @brief Connect view signals to presenter slots.
-        @details MUST be implemented and explicitly called at the end of the child's __init__.
+        @brief Connect view signals to presenter slots. Override and call
+        explicitly at the end of the child's `__init__`.
+
+        @details A no-op by default, not `raise NotImplementedError`. A screen
+        with no view signals to wire is a valid screen, not a programming
+        error, and raising from an inherited method breaks Liskov
+        substitutability — `code-rule.md` forbids it explicitly. The cost was
+        real: a Settings presenter with nothing to subscribe to had to
+        override this with an empty body purely to avoid an exception.
         """
-        raise NotImplementedError
 
     def _connect_engine_events(self) -> None:
         """
-        @brief Subscribe to Engine EventBus events.
-        @details MUST be implemented and explicitly called at the end of the child's __init__.
+        @brief Subscribe to Engine EventBus events via `self.subscribe`.
+        Override and call explicitly at the end of the child's `__init__`.
+        @details A no-op by default — see `_connect_ui_signals`.
         """
-        raise NotImplementedError
+
+    def subscribe(self, event_name_or_type, handler) -> None:
+        """
+        @brief Subscribes to an engine event for the lifetime of this
+        presenter.
+
+        @details Prefer this over `self.event_bus.on(...)`. Two things come
+        with it that a direct subscription does not have: the handler is
+        delivered on the Qt main thread (`QtEventBridge`), and it is
+        unsubscribed automatically in `dispose()`. Subscribing directly on the
+        bus opts out of both, and the second one is silent — nothing fails,
+        the handler simply keeps running after the screen is gone.
+        """
+        self._events.on(event_name_or_type, handler)
+
+    def unsubscribe(self, event_name_or_type, handler) -> None:
+        """@brief Removes one subscription made via `subscribe()`. Rarely
+        needed — `dispose()` removes all of them."""
+        self._events.off(event_name_or_type, handler)
+
+    def dispose(self) -> None:
+        """
+        @brief Framework-owned teardown: drops every subscription this
+        presenter made, then calls the author hook `shutdown()`.
+
+        @details Idempotent, because `PresenterManager.shutdown()` may be
+        reached more than once on an abnormal exit and a second teardown must
+        not re-run a subclass's cleanup.
+
+        Do not override this. Override `shutdown()` — see the class docstring.
+        """
+        if self._disposed:
+            return
+        self._disposed = True
+        self._events.off_all()
+        self.shutdown()
+
+    def shutdown(self) -> None:
+        """
+        @brief Author hook for presenter-specific cleanup — cancelling
+        in-flight work, closing resources. Called by `dispose()` after the
+        event subscriptions are already gone.
+        @details A no-op by default; a presenter with nothing of its own to
+        clean up does not need to implement it.
+        """

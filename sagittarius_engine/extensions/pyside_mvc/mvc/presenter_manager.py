@@ -102,18 +102,31 @@ class PresenterManager(QObject):
         return self._registry[self._current_screen_name]["presenter_instance"]
 
     def shutdown(self) -> None:
-        """Requests cooperative shutdown from every instantiated presenter."""
+        """
+        @brief Requests cooperative teardown from every instantiated presenter.
+
+        @details Prefers `dispose()` over `shutdown()`. `BasePresenter.dispose()`
+        drops the presenter's event subscriptions and *then* calls its
+        `shutdown()` hook, so calling `shutdown()` directly here would tear the
+        presenter down while leaving its handlers registered on the bus —
+        exactly the leak `EPIC-008D` closes. `shutdown()` remains the fallback
+        for a presenter that does not derive from `BasePresenter`; this router
+        deliberately does not require that base (see `register`'s duck-typed
+        `presenter_class`).
+        """
         if self._is_shutdown:
             return
         self._is_shutdown = True
         for config in reversed(tuple(self._registry.values())):
             presenter = config["presenter_instance"]
-            shutdown = getattr(presenter, "shutdown", None)
-            if callable(shutdown):
+            teardown = getattr(presenter, "dispose", None) or getattr(
+                presenter, "shutdown", None
+            )
+            if callable(teardown):
                 try:
-                    shutdown()
+                    teardown()
                 except Exception:
                     self.logger.exception(
-                        "[PresenterManager] Presenter shutdown failed: %s",
+                        "[PresenterManager] Presenter teardown failed: %s",
                         type(presenter).__name__,
                     )
