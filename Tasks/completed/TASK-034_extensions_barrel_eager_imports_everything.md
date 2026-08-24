@@ -1,5 +1,8 @@
 # TASK-034: `extensions/__init__.py` is a barrel that eagerly imports every extension
 
+- **Status**: ✅ Completed
+- **Completed Date**: 2026-08-24
+
 ## Description
 
 `sagittarius_engine/extensions/__init__.py` unconditionally imports every extension's public
@@ -81,5 +84,68 @@ Architecture / Package Boundaries
 
 ## Related
 
-- [TASK-031](../completed/TASK-031_top_level_package_eagerly_imports_persistence.md) — the
+- [TASK-031](TASK-031_top_level_package_eagerly_imports_persistence.md) — the
   narrower fix (package root) that surfaced this broader question.
+
+## Implementation
+
+1. **`extensions/__init__.py` is now lazy** — PEP 562 `__getattr__`/`__dir__`, resolving each
+   name in `__all__` against a `_LAZY_ATTRS: dict[str, str]` map (name → owning submodule) and
+   importing only that submodule on first access, caching the result in `globals()`. `__all__`
+   itself is unchanged (still the exhaustive public surface); only how each name gets populated
+   changed. Chose lazy over "keep as-is" (requirement 1): `grep` across both this repo's own
+   source/tests/examples/tools and `Sagittarius_Elite_Warrior` confirmed zero real usage of the
+   barrel import path (`from sagittarius_engine.extensions import X`) anywhere — every real
+   caller already imports the deep submodule path directly, unaffected by this change — so the
+   eager barrel had a real cost (importing all six extensions' modules, guarded-persistence
+   included, for anyone touching any one of them) and no offsetting benefit.
+2. **`health_check_query.py`** (requirement 3) now imports `ISession` from the leaf module
+   `sagittarius_engine.extensions.persistence.i_session` instead of the `persistence` package
+   `__init__`, which itself eagerly imports `database_module.py` and
+   `sqlalchemy_session_adapter.py` — unnecessary for a health check that only needs the pure
+   interface for DI resolution/typing. `transaction_middleware.py` has the same package-level
+   import but was left as-is: it already lives inside `extensions/persistence/`, so it pays that
+   cost anyway as a side effect of being a sibling submodule — the leaf import only saves
+   anything for a caller outside the package, which `health_check_query.py` is and
+   `transaction_middleware.py` is not.
+3. **Four new tests** in `tests/test_architecture.py` (requirement 2), next to `TASK-031`'s own
+   guard: `test_extensions_barrel_imports_only_the_requested_submodule` (subprocess-isolated —
+   deep-importing `.cqrs` alone must not pull in `.audit`/`.health`/`.logger`/`.persistence`/
+   `.thread_manager`), `test_extensions_getattr_lazy_resolves_only_the_owning_submodule`
+   (same shape, via the barrel-attribute path `__getattr__` itself exists for),
+   `test_extensions_lazy_attrs_cover_all_public_names_and_resolve` (`_LAZY_ATTRS` and `__all__`
+   can't drift apart, and every entry actually resolves), and
+   `test_extensions_getattr_unknown_name_raises_attribute_error` (PEP 562's contract — a name
+   this module doesn't own must raise `AttributeError`, not return `None`).
+4. **Doc-code-sync**: `sagittarius_engine/__init__.py`'s own comment (from `TASK-031`) described
+   the barrel as eager in the present tense — updated to past tense plus a pointer at this task,
+   since that claim would otherwise go stale the moment this file shipped. `test_architecture.py`'s
+   `test_bare_import_does_not_pull_in_any_extension` docstring updated the same way.
+
+## Verification
+
+Full `pwsh ./scripts/ci-local.ps1` run (after installing this repo's own declared
+`PySide6-Fluent-Widgets` dependency — see Surprising Findings below): ruff lint ✅, ruff format
+✅, mypy (371 files) ✅, Architecture Tests (8/8, including the four new ones) ✅. Pytest full
+suite: 888 passed, 10 skipped, 1 failed, 88.22% coverage (gate is 80%). The one failure
+(`test_gallery_emits_no_qml_runtime_warnings`, a missing-system-font Qt warning) was verified
+via `git stash` to occur identically with none of this task's changes applied — pre-existing,
+unrelated, not fixed here (see Surprising Findings).
+
+## Surprising Findings (`surprising-findings.md`)
+
+- **The full test suite could not run at all on this machine before this session**, for a
+  reason unrelated to this task: `requirements.txt` declares `PySide6-Fluent-Widgets`
+  (`qfluentwidgets`, added in `TASK-037` for `examples/student_management`'s Fluent-styled
+  QtWidgets backend) but this checkout has no `.venv` and the system Python it fell back to
+  never had that package installed — collection failed on the two `qfluentwidgets`-based
+  example test files with no summary line at all. Installed it (`pip install
+  PySide6-Fluent-Widgets`, no version bump to the already-installed `PySide6==6.11.1`) to get a
+  real gate run; not a code fix, just completing this session's own environment setup per
+  `install-rule.md` §1.
+- **One pre-existing, unrelated test failure remains**: `test_gallery_emits_no_qml_runtime_warnings`
+  fails on `main` with or without this task's changes (confirmed via `git stash`) — Qt reports
+  `QFontDatabase: Cannot find font directory .../PySide6/lib/fonts` because "Qt no longer ships
+  fonts." Not filed as a bug anywhere in `Tasks/`; flagged separately rather than fixed here,
+  since it's an environment/deployment question (which fonts, deployed how) outside this task's
+  scope.
