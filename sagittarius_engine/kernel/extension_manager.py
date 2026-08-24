@@ -162,7 +162,9 @@ class ExtensionManager:
 
                 if deps_satisfied:
                     self.context.logger.info(f"Initializing extension '{name}'...")
-                    self._emit("extension.initializing", ExtensionInitializing(name))
+                    self._emit(
+                        ExtensionInitializing.event_name, ExtensionInitializing(name)
+                    )
                     ext.initialize(self.context)
                     self.initialized_extensions.append(ext)
                     initialized_names.add(name)
@@ -240,7 +242,9 @@ class ExtensionManager:
             if ext not in self.initialized_extensions:
                 name = ext.descriptor.name
                 self.context.logger.info(f"Initializing extension '{name}'...")
-                self._emit("extension.initializing", ExtensionInitializing(name))
+                self._emit(
+                    ExtensionInitializing.event_name, ExtensionInitializing(name)
+                )
                 try:
                     ext.initialize(self.context)
                     self.initialized_extensions.append(ext)
@@ -256,7 +260,7 @@ class ExtensionManager:
             name = ext.descriptor.name
             self.context.logger.info(f"Starting extension '{name}'...")
             ext.start(self.context)
-            self._emit("extension.started", ExtensionStarted(name))
+            self._emit(ExtensionStarted.event_name, ExtensionStarted(name))
             # 3. Schedule async boot hook if AsyncRuntime is available
             self._schedule_boot_async(ext)
 
@@ -312,7 +316,7 @@ class ExtensionManager:
             self.context.logger.info(f"Disposing extension '{name}' due to rollback...")
             try:
                 ext.dispose(self.context)
-                self._emit("extension.disposed", ExtensionDisposed(name))
+                self._emit(ExtensionDisposed.event_name, ExtensionDisposed(name))
             except (RuntimeError, ValueError, TypeError) as e:
                 self.context.logger.error(
                     f"Error during rollback disposal of '{name}': {e}"
@@ -331,14 +335,14 @@ class ExtensionManager:
             self.context.logger.info(f"Stopping extension '{name}'...")
             try:
                 ext.stop(self.context)
-                self._emit("extension.stopped", ExtensionStopped(name))
+                self._emit(ExtensionStopped.event_name, ExtensionStopped(name))
             except (RuntimeError, ValueError, TypeError) as e:
                 self.context.logger.error(f"Error stopping extension '{name}': {e}")
 
             self.context.logger.info(f"Disposing extension '{name}'...")
             try:
                 ext.dispose(self.context)
-                self._emit("extension.disposed", ExtensionDisposed(name))
+                self._emit(ExtensionDisposed.event_name, ExtensionDisposed(name))
             except (RuntimeError, ValueError, TypeError) as e:
                 self.context.logger.error(f"Error disposing extension '{name}': {e}")
 

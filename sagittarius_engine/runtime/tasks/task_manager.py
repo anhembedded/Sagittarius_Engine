@@ -91,7 +91,7 @@ class TaskManager(ITaskManager):
                 res = fn()
                 bg_task.status = TaskState.COMPLETED
                 self._emit(
-                    "runtime.tasks.completed",
+                    TaskCompleted.event_name,
                     TaskCompleted(bg_task.id, bg_task.name),
                 )
                 return res
@@ -100,7 +100,7 @@ class TaskManager(ITaskManager):
                 bg_task.error = e
                 self._logger.error(f"Task '{bg_task.name}' failed: {e}")
                 self._emit(
-                    "runtime.tasks.failed",
+                    TaskFailed.event_name,
                     TaskFailed(bg_task.id, bg_task.name, e),
                 )
                 raise e
@@ -116,14 +116,14 @@ class TaskManager(ITaskManager):
             res = await coro
             bg_task.status = TaskState.COMPLETED
             self._emit(
-                "runtime.tasks.completed", TaskCompleted(bg_task.id, bg_task.name)
+                TaskCompleted.event_name, TaskCompleted(bg_task.id, bg_task.name)
             )
             return res
         except Exception as e:
             bg_task.status = TaskState.FAILED
             bg_task.error = e
             self._logger.error(f"Async task '{bg_task.name}' failed: {e}")
-            self._emit("runtime.tasks.failed", TaskFailed(bg_task.id, bg_task.name, e))
+            self._emit(TaskFailed.event_name, TaskFailed(bg_task.id, bg_task.name, e))
             raise e
         finally:
             with self._lock:
@@ -153,7 +153,8 @@ class TaskManager(ITaskManager):
 
         def _on_progress(val: float, msg: str):
             self._emit(
-                "runtime.tasks.progress", TaskProgressUpdated(bg_task.id, val, msg)
+                TaskProgressUpdated.event_name,
+                TaskProgressUpdated(bg_task.id, val, msg),
             )
 
         bg_task = BackgroundTask(
@@ -163,7 +164,7 @@ class TaskManager(ITaskManager):
         with self._lock:
             self.tasks[bg_task.id] = bg_task
 
-        self._emit("runtime.tasks.started", TaskStarted(bg_task.id, task_name))
+        self._emit(TaskStarted.event_name, TaskStarted(bg_task.id, task_name))
 
         # Check if it's an async callable or a coroutine object
         if inspect.iscoroutinefunction(callable_or_coro) or inspect.iscoroutine(
@@ -184,7 +185,7 @@ class TaskManager(ITaskManager):
             except Exception as e:
                 bg_task.status = TaskState.FAILED
                 bg_task.error = e
-                self._emit("runtime.tasks.failed", TaskFailed(bg_task.id, task_name, e))
+                self._emit(TaskFailed.event_name, TaskFailed(bg_task.id, task_name, e))
                 with self._lock:
                     self._finished_task_ids.append(bg_task.id)
                 self._cleanup_old_tasks()
@@ -211,7 +212,7 @@ class TaskManager(ITaskManager):
             except Exception as e:
                 bg_task.status = TaskState.FAILED
                 bg_task.error = e
-                self._emit("runtime.tasks.failed", TaskFailed(bg_task.id, task_name, e))
+                self._emit(TaskFailed.event_name, TaskFailed(bg_task.id, task_name, e))
                 with self._lock:
                     self._finished_task_ids.append(bg_task.id)
                 self._cleanup_old_tasks()

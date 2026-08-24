@@ -1,8 +1,21 @@
 from typing import TYPE_CHECKING
 
+from sagittarius_engine.domain.event_registry import EventRegistry
+
 if TYPE_CHECKING:
     from sagittarius_engine.kernel.i_kernel_context import IKernelContext
 from sagittarius_engine.interfaces import ILogger
+
+#: No dedicated event class exists for this one — the payload is the `App`
+#: instance itself, not a purpose-built event shape. Named as a constant
+#: (rather than inlined at the `emit()` call site below) for the same reason
+#: every other lifecycle event in `kernel/events.py`/`runtime/*/events.py`
+#: reads its name off a class attribute: one place to change on a rename.
+APP_BOOTED_EVENT_NAME = "app.booted"
+
+EventRegistry.register_named(
+    APP_BOOTED_EVENT_NAME, None, module="sagittarius_engine.kernel.bootstrap"
+)
 
 
 class Bootstrap:
@@ -76,4 +89,4 @@ class Bootstrap:
             f"App booted successfully with {len(self.context.modules)} modules."
         )
 
-        self.context.event_bus.emit("app.booted", self.context.app)
+        self.context.event_bus.emit(APP_BOOTED_EVENT_NAME, self.context.app)

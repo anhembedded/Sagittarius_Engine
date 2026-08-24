@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from sagittarius_engine.domain.event_registry import EventRegistry
+
 
 @dataclass
 class TaskStarted:
@@ -37,3 +39,11 @@ class TaskFailed:
     task_id: str
     task_name: str
     error: Exception
+
+
+EventRegistry.register_named(TaskStarted.event_name, TaskStarted, module=__name__)
+EventRegistry.register_named(TaskCompleted.event_name, TaskCompleted, module=__name__)
+EventRegistry.register_named(
+    TaskProgressUpdated.event_name, TaskProgressUpdated, module=__name__
+)
+EventRegistry.register_named(TaskFailed.event_name, TaskFailed, module=__name__)

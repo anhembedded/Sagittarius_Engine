@@ -44,7 +44,7 @@ class HostedServiceManager:
             try:
                 service.start(self.context)
                 self.started_services.append(service)
-                self._emit("runtime.hosted.started", HostedServiceStarted(name))
+                self._emit(HostedServiceStarted.event_name, HostedServiceStarted(name))
             except Exception as e:
                 self._logger.error(
                     f"Failed to start Hosted Service '{name}': {e}. Rolling back..."
@@ -61,7 +61,7 @@ class HostedServiceManager:
             self._logger.info(f"Stopping Hosted Service '{name}' due to rollback...")
             try:
                 service.stop(self.context)
-                self._emit("runtime.hosted.stopped", HostedServiceStopped(name))
+                self._emit(HostedServiceStopped.event_name, HostedServiceStopped(name))
             except Exception as stop_error:
                 self._logger.error(
                     f"Error stopping Hosted Service '{name}' during rollback: {stop_error}"
@@ -78,7 +78,7 @@ class HostedServiceManager:
             self._logger.info(f"Stopping Hosted Service '{name}'...")
             try:
                 service.stop(self.context)
-                self._emit("runtime.hosted.stopped", HostedServiceStopped(name))
+                self._emit(HostedServiceStopped.event_name, HostedServiceStopped(name))
             except Exception as e:
                 self._logger.error(f"Error stopping Hosted Service '{name}': {e}")
                 errors.append(e)

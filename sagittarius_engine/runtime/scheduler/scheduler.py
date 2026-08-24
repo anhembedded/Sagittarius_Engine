@@ -89,7 +89,7 @@ class Scheduler:
         )
         self._thread.start()
         self._logger.info("Scheduler started.")
-        self._emit("runtime.scheduler.started", SchedulerStarted())
+        self._emit(SchedulerStarted.event_name, SchedulerStarted())
 
     def stop(self) -> None:
         """
@@ -105,7 +105,7 @@ class Scheduler:
             self._thread.join(timeout=5.0)
             self._thread = None
         self._logger.info("Scheduler stopped.")
-        self._emit("runtime.scheduler.stopped", SchedulerStopped())
+        self._emit(SchedulerStopped.event_name, SchedulerStopped())
 
     def add_job(self, job: ScheduledJob) -> None:
         """
