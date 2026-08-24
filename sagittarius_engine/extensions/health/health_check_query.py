@@ -2,7 +2,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from sagittarius_engine.extensions.cqrs import IQuery
-from sagittarius_engine.extensions.persistence import ISession
+
+# Leaf import (TASK-034 req. 3), not `from ...extensions.persistence import
+# ISession`: this module needs only the pure-interface `ISession` for DI
+# resolution/typing, but importing the `persistence` package itself also
+# runs `database_module.py` and `sqlalchemy_session_adapter.py` (each
+# guards its own `sqlalchemy` import, so nothing crashes — it is simply
+# unnecessary work `health` has no reason to pay for a database check that
+# may not even be configured).
+from sagittarius_engine.extensions.persistence.i_session import ISession
 from sagittarius_engine.interfaces import IContainer, IEventBus
 
 

@@ -40,6 +40,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-033** | `audit_dashboard.py` renamed to `audit_dashboard_cli.py`; the documented app is reachable under its own name again | Tooling / Package Boundaries | 2026-08-23 | [TASK-033_tools_mypy_errors.md](completed/TASK-033_tools_mypy_errors.md) |
 | **TASK-037** | `IView` dual QML/QWidget rendering backend — enroll-form prototype validated, then rolled out to the full roster screen (`WidgetRosterView`, `run.ps1 -QtWidget`) | Architecture / Presentation Layer | 2026-08-23 | [TASK-037_iview_dual_backend_prototype_validated.md](completed/TASK-037_iview_dual_backend_prototype_validated.md) |
 | **TASK-038** | `pyside_mvc.widgets` — QtWidgets base classes (`Surface`/`Card`/`Panel`/`Overlay`/`Styled*`) replacing the QML kit, built for Elite's `EPIC-006` (drop QML project-wide) | Architecture / Presentation Layer | 2026-08-24 | [TASK-038_qtwidgets_base_classes_surface_overlay_controls.md](completed/TASK-038_qtwidgets_base_classes_surface_overlay_controls.md) |
+| **TASK-034** | `extensions/__init__.py` barrel made lazy (PEP 562 `__getattr__`) — deep-importing one extension no longer pulls in its five siblings | Architecture / Package Boundaries | 2026-08-24 | [TASK-034_extensions_barrel_eager_imports_everything.md](completed/TASK-034_extensions_barrel_eager_imports_everything.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
@@ -49,7 +50,6 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
-| **TASK-034** | `extensions/__init__.py` is a barrel that eagerly imports all six extensions together | Architecture / Package Boundaries | P3 | [TASK-034_extensions_barrel_eager_imports_everything.md](backlog/TASK-034_extensions_barrel_eager_imports_everything.md) |
 | **TASK-035** | `AppDataTable`'s columns render with no horizontal gap — a right-aligned column touches the next one | UI / Widget Kit (`pyside_mvc`) | P3 | [TASK-035_appdatatable_columns_have_no_horizontal_gap.md](backlog/TASK-035_appdatatable_columns_have_no_horizontal_gap.md) |
 | **TASK-036** | Audit every widget-kit card for missing Windows-Explorer-style utility actions (survey done, decisions/implementation pending) | UI / Widget Kit (`pyside_mvc`) | P2 | [TASK-036_audit_widget_kit_for_missing_windows_style_actions.md](backlog/TASK-036_audit_widget_kit_for_missing_windows_style_actions.md) |
 
