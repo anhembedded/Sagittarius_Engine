@@ -35,7 +35,7 @@ from .guards import (
 )
 from .overlay import Overlay
 from .style import StyleRole, WidgetState, apply_role
-from .surface import Card, Panel, Surface
+from .surface import Card, Panel, SelectableCard, Surface
 
 __all__ = [
     "BareQtBaseFinding",
@@ -44,6 +44,7 @@ __all__ = [
     "InlineStylesheetFinding",
     "Overlay",
     "Panel",
+    "SelectableCard",
     "StyleRole",
     "StyledButton",
     "StyledCheckBox",

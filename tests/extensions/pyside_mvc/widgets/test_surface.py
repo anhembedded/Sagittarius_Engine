@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 from PySide6.QtWidgets import QFrame, QLabel
 
-from sagittarius_engine.extensions.pyside_mvc.widgets import Card, Panel, Surface
+from sagittarius_engine.extensions.pyside_mvc.widgets import (
+    Card,
+    Panel,
+    SelectableCard,
+    Surface,
+)
 
 
 def test_surface_itself_is_abstract(qtbot):
@@ -90,3 +95,73 @@ def test_on_enabled_changed_hook_fires_on_setenabled(qtbot):
     panel.setEnabled(True)
 
     assert calls == [False, True]
+
+
+def test_selectable_card_is_a_bare_panel(qtbot):
+    card = SelectableCard()
+    qtbot.addWidget(card)
+
+    assert isinstance(card, Panel)
+    assert isinstance(card, QFrame)
+    assert card.styleSheet() != ""
+
+
+def test_selectable_card_starts_unselected(qtbot):
+    card = SelectableCard()
+    qtbot.addWidget(card)
+
+    assert card.selected is False
+
+
+def test_selectable_card_selected_setter_changes_its_stylesheet(qtbot):
+    card = SelectableCard()
+    qtbot.addWidget(card)
+    unselected_qss = card.styleSheet()
+
+    card.selected = True
+
+    assert card.selected is True
+    assert card.styleSheet() != unselected_qss
+
+
+def test_selectable_card_click_emits_clicked_only_when_press_and_release_are_both_inside(
+    qtbot,
+):
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+
+    card = SelectableCard()
+    qtbot.addWidget(card)
+    card.resize(100, 40)
+
+    clicks: list[None] = []
+    card.clicked.connect(lambda: clicks.append(None))
+
+    inside = QPointF(50, 20)
+    outside = QPointF(500, 500)
+
+    def _press(pos: QPointF) -> QMouseEvent:
+        return QMouseEvent(
+            QMouseEvent.Type.MouseButtonPress,
+            pos,
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+
+    def _release(pos: QPointF) -> QMouseEvent:
+        return QMouseEvent(
+            QMouseEvent.Type.MouseButtonRelease,
+            pos,
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+
+    card.mousePressEvent(_press(inside))
+    card.mouseReleaseEvent(_release(inside))
+    assert clicks == [None]
+
+    card.mousePressEvent(_press(inside))
+    card.mouseReleaseEvent(_release(outside))
+    assert clicks == [None]  # unchanged — release landed outside

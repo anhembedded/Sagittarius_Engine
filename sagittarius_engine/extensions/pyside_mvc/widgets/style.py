@@ -46,6 +46,11 @@ class StyleRole(Enum):
     """
 
     SURFACE = auto()
+    #: A `Surface` that is also clickable and can be the user's current
+    #: choice among siblings (`SelectableCard`) — e.g. one row of a picker
+    #: list. Distinct from `SURFACE` because it needs a `WidgetState.SELECTED`
+    #: rendering `SURFACE` has no reason to define.
+    SELECTABLE_CARD = auto()
     PRIMARY_BUTTON = auto()
     SECONDARY_BUTTON = auto()
     DANGER_BUTTON = auto()
@@ -61,6 +66,11 @@ class WidgetState(Enum):
 
     NORMAL = auto()
     DISABLED = auto()
+    #: Rendered only by `StyleRole.SELECTABLE_CARD` — "this is the user's
+    #: current choice among its siblings," an accent border/background, not
+    #: to be confused with keyboard/mouse `:hover` (Qt's own pseudo-state,
+    #: still expressed via a `:hover` selector in that role's QSS block).
+    SELECTED = auto()
 
 
 def apply_role(
@@ -121,6 +131,19 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"border: 1px solid {_token('border')};"
             f"border-radius: {_px('radiusMd')};"
             f"color: {_token('textPrimary')};"
+        )
+
+    if role is StyleRole.SELECTABLE_CARD:
+        selected = state is WidgetState.SELECTED
+        border_color = _token("accent") if selected else _token("border")
+        background = _token("stateActiveTint") if selected else "transparent"
+        return (
+            f"QFrame {{"
+            f"background-color: {background};"
+            f"border: 1px solid {border_color};"
+            f"border-radius: {_px('radiusMd')};"
+            f"}}"
+            f"QFrame:hover {{background-color: {_token('stateHoverBg')};}}"
         )
 
     if role is StyleRole.CHECKBOX:
