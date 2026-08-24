@@ -1,0 +1,58 @@
+"""
+@brief The UI Engine's QtWidgets widget base classes — the replacement for
+`Sagittarius/UI/`'s QML kit (EPIC-006, `Sagittarius_Elite_Warrior`'s
+project-wide move off QML). See
+`Sagittarius_Elite_Warrior/Tasks/epics/EPIC-006_drop_qml/
+DECISION_2026-08-24_widget_architecture.md` for the full architecture
+rationale.
+
+@details
+Same ownership boundary as the QML kit before it (`ui-architecture.md` §1):
+this package knows no consuming application, screen, or domain concept —
+only shapes (`Surface`/`Card`/`Panel`, `Overlay`, `Styled*` controls). A
+consuming app names things (`ChartCard`, `GapInspectorOverlay`) by
+subclassing from here; it never authors a bare `QFrame`/`QDialog`, and
+never builds a stylesheet string outside its own call to `apply_role()`
+(see `style.py`, `guards.py`).
+
+Four independent single-inheritance chains, deliberately not one shared
+base — PySide6/Shiboken forbids a class inheriting two QObject-derived
+bases, which rules out a mixin shared across `QFrame`/`QDialog`/
+`QPushButton`/`QCheckBox`/`QLineEdit`/`QDateTimeEdit` lineages. Shared
+styling behaviour lives in `apply_role()` (composition), not inheritance.
+"""
+
+from __future__ import annotations
+
+from .controls import DateTimeField, StyledButton, StyledCheckBox, StyledField
+from .guards import (
+    BareQtBaseFinding,
+    InlineStylesheetFinding,
+    find_bare_qt_base_widgets,
+    find_inline_stylesheets,
+    format_bare_qt_base_findings,
+    format_inline_stylesheet_findings,
+)
+from .overlay import Overlay
+from .style import StyleRole, WidgetState, apply_role
+from .surface import Card, Panel, Surface
+
+__all__ = [
+    "BareQtBaseFinding",
+    "Card",
+    "DateTimeField",
+    "InlineStylesheetFinding",
+    "Overlay",
+    "Panel",
+    "StyleRole",
+    "StyledButton",
+    "StyledCheckBox",
+    "StyledField",
+    "Surface",
+    "WidgetState",
+    "apply_role",
+    "find_bare_qt_base_widgets",
+    "find_inline_stylesheets",
+    "format_bare_qt_base_findings",
+    "format_inline_stylesheet_findings",
+]
