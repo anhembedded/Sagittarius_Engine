@@ -69,6 +69,20 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         "getattr",
         "dataclasses",
         "TypeError",  # Python builtin, quoted in lint.md's UP045 corruption story.
+        # Python builtins and stdlib names quoted in context/events.md while
+        # explaining what a mechanism raises or is built on — none is defined
+        # in this repo.
+        "AttributeError",
+        "NotImplementedError",
+        "Enum",
+        # `dataclasses.field()` keyword arguments, named in context/events.md's
+        # explanation of why BaseEvent's metadata fields are keyword-only. They
+        # appear only inside call expressions, never as a definition.
+        "kw_only",
+        "default_factory",
+        # Qt's Qt.ConnectionType member, named in context/events.md §5 — PySide6
+        # API, not a repo symbol.
+        "AutoConnection",
         # Builtin/typing type names quoted in lint.md's description of the UP006
         # and UP035 rules (`typing.Dict`/`List` -> `dict`/`list`) — they name
         # Python's own types, not anything resolvable in this repo's tree.
@@ -80,6 +94,10 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         "Generics",
         # This repo's own name, quoted for emphasis — not a class.
         "Sagittarius_Engine",
+        # The consuming application's repo name. Real, but it is a *separate*
+        # repository (ONBOARDING.md §8) — nothing in this tree resolves it, and
+        # nothing here should try to.
+        "Sagittarius_Elite_Warrior",
         # Informal shorthand for the messaging interface, used throughout
         # context/ prose — the real names are IEventBus/MemoryEventBus/etc.
         "EventBus",
@@ -284,7 +302,38 @@ def _looks_like_bare_package_name(token: str) -> bool:
 
 
 def _package_name_resolves(token: str) -> bool:
-    return token in _REAL_DIRECTORY_NAMES or token.lower() in _DECLARED_DEPENDENCY_NAMES
+    """A bare lowercase name is real if it names a package directory, a
+    declared dependency, or a function/attribute actually defined in the tree.
+
+    The third case was added 2026-08-25 (`EPIC-008`): this checker previously
+    resolved only directories and dependencies, so `context/` prose naming a
+    real, greppable function — `report_handler_failure`, `resolve_bus_logger`,
+    a property like `occurred_on` — was reported as a dangling reference. The
+    fix is to teach the checker the category it was missing, **not** to park
+    real symbols in `IGNORE_TOKENS`: that list is for names this repo genuinely
+    does not own, and burying real ones in it would hide the next actually-stale
+    claim.
+    """
+    if token in _REAL_DIRECTORY_NAMES or token.lower() in _DECLARED_DEPENDENCY_NAMES:
+        return True
+    return _defined_somewhere_in_tree(token)
+
+
+def _defined_somewhere_in_tree(token: str) -> bool:
+    """Greps for a `def <token>` or a module/class-level `<token>: ...` /
+    `<token> = ...` binding. A real grep for the same reason
+    `_class_name_resolves` uses one: the value of this check is that it
+    reflects the tree as it exists right now, not a cached index."""
+    escaped = re.escape(token)
+    pattern = rf"(^[[:space:]]*def {escaped}[(]|^[[:space:]]*{escaped}[[:space:]]*[:=])"
+    result = subprocess.run(
+        ["grep", "-rlE", pattern, "sagittarius_engine", "examples", "tools", "scripts"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,  # grep exits 1 on "no match", which is a valid answer here
+    )
+    return bool(result.stdout.strip())
 
 
 def _class_name_resolves(token: str) -> bool:
