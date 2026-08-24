@@ -139,6 +139,7 @@ Always load: `project.md`, `repository.md`.
 | Build | `build.md`, `lint.md` |
 | Adding/upgrading a dependency | `dependencies.md` |
 | Writing a new example, or learning the engine by reading one | `examples.md` |
+| Anything touching events, an event bus, or a presenter's subscriptions | `events.md` |
 | Unfamiliar term in a rule or task file | `glossary.md` |
 
 Documentation and Deployment have no `context/` entry — both were pure duplicates of
@@ -240,32 +241,101 @@ preference throughout this repo's history, reinforced by the exact failure this 
 rewrite responds to: a doc that was confidently wrong for three weeks because nothing forced
 anyone to check it.
 
-## 10. Where things stand (2026-08-23, commit `df51202`)
+## 10. Picking up work in progress — read this before you start
 
-For a fresh session picking this up: EPIC-002 is fully complete (4/4). The engine audit that
-followed it found real bugs, not just doc drift — a full account is in each commit message
-(`git log --oneline -8`), summarized here so it doesn't need re-deriving:
+### 10.1 First three commands, every time
 
-- Fixed: a missing import (`ITaskHandle`) that made `app.boot()` raise on Python ≤3.13 while
-  staying invisible on 3.14's deferred annotations; a dead unimportable package
-  (`infrastructure/persistence/`); the scaffolding feature (`tools/scaffold.py`,
-  `sagittarius_engine/sdk/`) removed entirely — unused, and broken in both its documented
-  forms; the `ruff.toml`/`pyproject.toml` config shadow (§1a's gate now actually lints).
-- Added two permanent guards: `tests/test_agents_docs_resolve.py` (`.agents/context/` claims
-  must resolve against the real tree) and `tests/test_all_modules_importable.py` (every module
-  must import, and public interface annotations must resolve — this is what would have caught
-  `ITaskHandle` on day one).
-- A run of tasks closed the same day, each verified against the real tree rather than executed
-  from its checklist blindly — several turned out partially or fully already fixed, or built on
-  a stale premise, and said so rather than re-doing settled work: `TASK-017`, `TASK-021`,
-  `TASK-022`, `TASK-026`, `TASK-027`, `TASK-032`. Released as `2.1.0` and `2.2.0` — check
-  `CHANGELOG.md` before assuming something still-listed elsewhere is still open.
-- **Everything genuinely still open** is on the two boards — read them directly, don't trust a
-  snapshot list here or anywhere else in `.agents/`. This exact paragraph has already gone stale
-  once (an earlier version showed two closed tasks as open); it is not special, it is not
-  exempt, and neither is any other list of task/bug IDs you find in this tree. If you're about to
-  copy one, stop and read the board instead:
-  - [`Tasks/README.md`](../Tasks/README.md)'s backlog table.
-  - [`Tasks/bug_report/README.md`](../Tasks/bug_report/README.md)'s Overview table.
-- Two tasks filed on the *other* repo (`Sagittarius_Elite_Warrior/Tasks/backlog/BOT-118`,
-  `BOT-119`) from cross-checking its engine usage — see §8, do not action them from here.
+```bash
+git -C . status                                   # this repo
+git -C ../Sagittarius_Elite_Warrior status        # the consuming app, if it is on this disk
+cat ../Sagittarius_Elite_Warrior/Tasks/epics/README.md
+```
+
+**Work here is routinely left uncommitted between sessions** — as of 2026-08-25 both repos had
+substantial finished, verified, *uncommitted* work in the tree, because this project's standing
+rule is that the agent does not commit unless the user asks (`code-rule.md` §9, and Elite's
+`commit-rule.md`). So `git status` is not a formality: an empty-looking board plus a dirty tree
+means the work exists and simply is not recorded yet. Read the diff before assuming a task is
+untouched.
+
+### 10.2 The authoritative lists — and why there is no snapshot of them here
+
+Everything genuinely open lives on the boards. Read them directly:
+
+- [`Tasks/README.md`](../Tasks/README.md) — this repo's backlog and epics.
+- [`Tasks/bug_report/README.md`](../Tasks/bug_report/README.md) — this repo's open bugs.
+- `../Sagittarius_Elite_Warrior/Tasks/epics/README.md` — the app's epics, which is where most
+  cross-repo programs are driven from.
+
+This section used to carry a list of task IDs and went stale twice (it once showed two closed
+tasks as open). It is not exempt from that just because it is in the onboarding file. **If you
+are about to copy an ID out of a document into your plan, stop and open the board instead.**
+
+### 10.3 Two cross-repo programs are in flight, driven from the app repo
+
+Both are planned and specified in `Sagittarius_Elite_Warrior/Tasks/epics/`, and both contain
+sub-tasks that are implemented **in this repo**. That is normal and intentional: the app's epic
+owns the *why* and the sequencing; the engine change is committed here, separately
+(§8 — two repos, two commits, no sync step).
+
+| Epic (in the app repo) | What it is | Engine's part |
+| :--- | :--- | :--- |
+| `EPIC-007_chuan_hoa_card_dung_chung` | Standardising the app's duplicated card widgets onto `pyside_mvc.widgets` | `007A`–`007C`: extend the widget guards to `QWidget`, add the `ConfirmOverlay`/`PickerOverlay` that `BUG-004` reports as missing, add six shared surface shapes and three leaf controls |
+| `EPIC-008_chuan_hoa_luong_event` | Standardising the event flow | `008A`–`008E` are engine work; `008F`–`008H` are app work |
+
+**Read the epic's `README.md` and its `DECISION_*.md` ADR before doing any of its sub-tasks.**
+The ADR carries decisions already argued out with the user — including several that reverse an
+earlier plan — and re-deriving them wastes a session and usually lands somewhere different.
+
+### 10.4 Mechanisms added recently that you are expected to use, not re-invent
+
+Each of these exists because the same thing had been hand-rolled in several places. Using
+something else re-creates the defect they closed.
+
+| Need | Use | Documented in |
+| :--- | :--- | :--- |
+| Define an event | subclass `BaseEvent` | [`context/events.md`](context/events.md) §1 |
+| List/catalog events | `EventRegistry` + `scripts/generate_event_catalog.py` | `context/events.md` §3 |
+| Report a handler that raised | `report_handler_failure` | `context/events.md` §4 |
+| A logger when none was injected | `resolve_bus_logger` / `resolve_logger` — **not** `NullLogger` | `context/events.md` §4 |
+| Subscribe from a presenter | `BasePresenter.subscribe()` (routes through `QtEventBridge`) | `context/events.md` §5 |
+| Presenter cleanup | override `shutdown()`, never `dispose()` | `context/events.md` §6 |
+
+### 10.5 Standing user preferences that outrank convenience
+
+These have been stated directly by the user and apply to every task here, not just the epic that
+prompted them:
+
+1. **Fix the mechanism, not the symptom. No hotfixes.** If the same defect exists in four
+   places, fixing the one it was reported against is not acceptable — that is the situation
+   `EPIC-008C` was in, and the fix was a shared module every bus calls. A change that makes a
+   symptom vanish without explaining *why* is not a fix (`rules/design-discipline.md`).
+2. **One abstraction per file, and as many files as that produces.** Putting things that are
+   not the same abstraction into one module is treated as an anti-pattern. The counterweight is
+   `code-rule.md`'s Single-Scope Cohesion: definitions describing *one lifecycle* stay together
+   (an FSM's enums plus its transition matrix; a style-role enum plus the function that renders
+   it). Same abstraction across several symbols → one file; different abstractions → separate
+   files.
+3. **Show a design before implementing a restructure.** For anything beyond a contained change,
+   produce PlantUML class + component diagrams (as-is and to-be, marking what is shared versus
+   what is screen-specific) and get them reviewed before writing task files or code.
+4. **Do not commit or push unless asked.**
+
+### 10.6 One trap that will waste your time if nobody warns you
+
+The full gate can report failures that have nothing to do with your change:
+
+- **`BUG-006`** — two "no QML runtime warnings" tests assert on Qt's *entire* message stream, so
+  a once-per-process platform warning (`QFontDatabase: Cannot find font directory ...`) lands on
+  whichever one collection order reaches first. **Adding an unrelated test file changes which
+  test fails, and can change the failure count.** It is reproducible in both directions, not
+  random.
+- `tests/test_agents_docs_resolve.py` fails intermittently **only** when the suite is launched
+  through `scripts/ci-local.ps1` under PowerShell: that test shells out to `grep`, which is not
+  on `PATH` in that context. Same class of problem as `TASK-028`.
+
+**Before attributing any failure to your change, A/B it**: `git stash push -u`, run, `git stash
+pop`, run. That takes two minutes and is the difference between a real regression and an hour
+chasing the environment. Running `pytest` directly with the gate's own arguments (see
+`scripts/ci-local.ps1`'s pytest invocation) is more stable than the PowerShell wrapper and is a
+reasonable cross-check — but the gate is still what decides "done" (§1a).

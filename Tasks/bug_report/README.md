@@ -37,11 +37,16 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 0 |
-| ✅ **Fixed** | 3 |
-| 📈 **Total** | **3** |
+| 🔴 **Open** | 3 |
+| ✅ **Fixed** | 4 |
+| 📈 **Total** | **7** |
 
-All three were found on 2026-08-23 during the engine audit that followed `EPIC-002`. Defects
+`BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
+`Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
+they are tracked, fixed and committed here — the app repo's epics only reference them
+(`.agents/ONBOARDING.md` §8). `BUG-005` closed 2026-08-25; `BUG-004` still open.
+
+The three fixed ones were found on 2026-08-23 during the engine audit that followed `EPIC-002`. Defects
 found in the *same* audit that already had a fix applied were tracked as tasks instead, because
 they were closed in the same session — see `TASK-024`, `TASK-025`, and the `ITaskHandle` import
 bug fixed in commit `568d3bb`. Future defects should come here first.
@@ -50,7 +55,11 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 
 ## 🔴 Open
 
-*(none — all three defects filed since this board's creation are fixed)*
+| ID | Title | Severity | Reported | Note |
+| :--- | :--- | :---: | :---: | :--- |
+| **[BUG-007](incomplete/BUG-007_resilient_bus_drops_a_subscription_on_name_collision.md)** | `ResilientEventBus.on()` silently drops a subscription when two event classes share a `__name__` | Medium | 2026-08-25 | Keys `_wrapper_map` by `__name__` while the rest of the package keys by `event_name`/`__qualname__`; the colliding second `on()` early-returns and the handler never fires. Reproduced. Found while fixing `EPIC-008C`, filed separately rather than fixed inline. |
+| **[BUG-006](incomplete/BUG-006_qml_warning_tests_are_order_dependent.md)** | The two "no QML runtime warnings" tests assert on the whole Qt message stream, so a once-per-process platform warning makes them order-dependent | Medium | 2026-08-25 | gallery-first → gallery fails; roster-first → both pass. Same code, opposite results. The message is a `QFontDatabase` platform warning, not a QML binding error. |
+| **[BUG-004](incomplete/BUG-004_overlay_names_nonexistent_subclasses.md)** | `Overlay`'s docstring and `TypeError` message name `ConfirmOverlay`/`PickerOverlay`, which exist nowhere | Medium | 2026-08-24 | Same class of defect as `BUG-001` (a doc naming a class that does not exist), but here it is in a runtime error message a consumer will actually read. 9 real consumers waiting in the app repo. |
 
 ---
 
@@ -58,6 +67,7 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-005](completed/BUG-005_baseevent_inheritance_is_inert_for_dataclasses.md)** | Inheriting `BaseEvent` gave a `@dataclass` subclass nothing — `event_id`, `occurred_on`, `to_dict()` all raised `AttributeError` | High | 2026-08-24 | Fixed 2026-08-25: `BaseEvent` is now a `@dataclass` with `kw_only` metadata fields backed by concrete properties (a public dataclass field with the same name as the inherited abstract property re-triggers `abc.update_abstractmethods()` and breaks instantiation — avoided). `event_name` defaults via `__init_subclass__`. 8 new regression tests, all 3 existing engine consumers unaffected. |
 | **[BUG-003](completed/BUG-003_get_logger_annotation_contradicts_iengincontext_contract.md)** | `_get_logger()` declared `ILogger \| None` against a contract that guarantees non-None | Low | 2026-08-23 | Fixed 2026-08-23: 4 mypy errors resolved (27→23). Also removed 6 dead `if logger:` guards in `bootstrap.py`, by explicit user decision. 757 passed, 0 failed. |
 | **[BUG-001](completed/BUG-001_phantom_apprunner_in_iengincontext_docstring.md)** | `IEngineContext` docstring names a nonexistent `AppRunner` class | Low | 2026-08-23 | Fixed 2026-08-23: mention dropped (not renamed) — `ApplicationRunner` takes no context at all, per its real constructor. `doc-code-sync.md:63`'s row marked closed in place. |
 | **[BUG-002](completed/BUG-002_mkdocs_config_points_at_deleted_docs_tree.md)** | `mkdocs.yml` builds from a `docs/` tree deleted in `a338d42` | Medium | 2026-08-23 | Fixed 2026-08-23: Option A chosen — `mkdocs.yml`, `requirements-docs.txt`, `scripts/docs.{sh,bat}` deleted rather than rebuilt. `.agents/context/` remains the sole documentation. |
