@@ -8,10 +8,11 @@ behaviour lives here, per-family, not in one widget-wide mixin.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent
+from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from .style import StyleRole, apply_role
+from .style import StyleRole, WidgetState, apply_role
 
 
 class Surface(QFrame):
@@ -94,3 +95,57 @@ class Card(Surface):
     @title.setter
     def title(self, value: str) -> None:
         self._title_label.setText(value)
+
+
+class SelectableCard(Panel):
+    """
+    @brief A bare `Panel` that is also clickable and can be the user's
+    current choice among siblings — one row of a picker list (a strategy,
+    a timeframe, a timezone, ...).
+
+    @details Not a `QAbstractButton` subclass — `Panel`/`Surface`'s own
+    `QFrame` lineage already carries the token styling this needs, and a
+    second Qt base is forbidden (see `widgets.style`'s module docstring).
+    `clicked` is emitted from `mouseReleaseEvent` only when the matching
+    `mousePressEvent` also landed inside this widget's bounds (the same
+    press-then-release-inside contract `QAbstractButton` itself uses),
+    so a drag that starts here and releases elsewhere does not fire it.
+    """
+
+    clicked = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._selected = False
+        self._pressed_inside = False
+        apply_role(self, StyleRole.SELECTABLE_CARD)
+
+    @property
+    def selected(self) -> bool:
+        return self._selected
+
+    @selected.setter
+    def selected(self, value: bool) -> None:
+        self._selected = bool(value)
+        apply_role(
+            self,
+            StyleRole.SELECTABLE_CARD,
+            state=WidgetState.SELECTED if self._selected else WidgetState.NORMAL,
+        )
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressed_inside = True
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        was_pressed_inside = self._pressed_inside
+        self._pressed_inside = False
+        if (
+            was_pressed_inside
+            and event.button() == Qt.MouseButton.LeftButton
+            and self.rect().contains(event.position().toPoint())
+        ):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)

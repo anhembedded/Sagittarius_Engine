@@ -68,6 +68,31 @@ def test_disabled_button_uses_the_live_muted_token(qtbot):
     assert live_muted in widget.styleSheet()
 
 
+def test_selectable_card_selected_state_uses_the_live_accent_token(qtbot):
+    widget = QFrame()
+    qtbot.addWidget(widget)
+
+    apply_role(widget, StyleRole.SELECTABLE_CARD, state=WidgetState.SELECTED)
+
+    live_accent = str(get_theme_bridge().value("accent"))
+    assert live_accent in widget.styleSheet()
+
+
+def test_selectable_card_normal_vs_selected_produce_different_qss(
+    qtbot, fake_theme_bridge
+):
+    widget = QFrame()
+    qtbot.addWidget(widget)
+
+    apply_role(widget, StyleRole.SELECTABLE_CARD, state=WidgetState.NORMAL)
+    normal_qss = widget.styleSheet()
+
+    apply_role(widget, StyleRole.SELECTABLE_CARD, state=WidgetState.SELECTED)
+    selected_qss = widget.styleSheet()
+
+    assert normal_qss != selected_qss
+
+
 def test_checkbox_and_field_roles_ignore_disabled_state():
     """These two roles' QSS blocks have no disabled-state branch (see
     style._build_qss) — asserting that explicitly, so a future change
