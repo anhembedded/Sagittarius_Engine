@@ -9,6 +9,11 @@ class MockContext:
     def __init__(self):
         self.event_bus = Mock()
         self.async_runtime = Mock()
+        # EPIC-005B added `recorder` to the engine context, and the task
+        # manager reads it to decide whether to open a task-run span. `None`
+        # here is what "tracing off" means -- the same value a real context
+        # carries by default.
+        self.recorder = None
 
 
 def test_task_manager_error_logging():

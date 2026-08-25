@@ -1,6 +1,6 @@
 # EPIC-005: Audit Telemetry — Teardown, and Rebuild as a Trace *Recorder*
 
-- **Status**: ⏸️ **On hold — spec complete and approved in principle; deferred behind `EPIC-006`**
+- **Status**: 🟡 **In Progress** — `EPIC-005B` ✅ done; `EPIC-005A` partially done (contracts + ring buffer shipped and measured; teardown outstanding); `C`/`D` remain
 - **Created**: 2026-08-25 · **Revised**: 2026-08-25 (scope cut §5; then deferred §0.1)
 - **Priority**: P2 — *behind `EPIC-006`, which answers the more urgent question*
 - **Category**: Observability / Diagnostics

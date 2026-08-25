@@ -45,7 +45,9 @@ import time
 from collections import deque
 from typing import Any
 
-from .contracts import Hello, Lane, RecordKind, TraceRecord
+from sagittarius_engine.interfaces.i_trace_recorder import ITraceRecorder, Lane
+
+from .contracts import Hello, RecordKind, TraceRecord
 
 #: Retained-mode default. 100k 8-tuples is a few tens of MB at worst and covers
 #: minutes of a busy application — long enough that "attach when it goes wrong"
@@ -53,7 +55,7 @@ from .contracts import Hello, Lane, RecordKind, TraceRecord
 DEFAULT_CAPACITY = 100_000
 
 
-class TraceRecorder:
+class TraceRecorder(ITraceRecorder):
     """
     @brief Captures records into a bounded ring buffer.
 

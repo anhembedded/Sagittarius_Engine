@@ -8,6 +8,7 @@ from typing import Any
 
 from sagittarius_engine.interfaces.i_config import IConfig
 from sagittarius_engine.interfaces.i_task_manager import ITaskHandle, ITaskManager
+from sagittarius_engine.interfaces.i_trace_recorder import Lane as TraceLane
 from sagittarius_engine.runtime.tasks.background_task import BackgroundTask, TaskState
 from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
 from sagittarius_engine.runtime.tasks.events import (
@@ -87,6 +88,28 @@ class TaskManager(ITaskManager):
         self, bg_task: BackgroundTask, fn: Callable[[], Any]
     ) -> Callable[[], Any]:
         def wrapper():
+            # EPIC-005B requirement 2: a task-run span must reconstruct to the
+            # same duration the task manager itself reports. It is opened and
+            # closed around *exactly* the wrapped callable, so the span measures
+            # the same work the status transitions bracket -- if the two ever
+            # disagreed, the trace would be wrong and nothing built on it could
+            # be trusted.
+            recorder = self.context.recorder
+            started = (
+                recorder.span_begin(
+                    TraceLane.TASK,
+                    bg_task.name,
+                    cat="run",
+                    # The task id is a UUID *string*; `cid` is an int. It goes
+                    # in `args` instead, which costs a dict per task run --
+                    # affordable here in a way it would not be on the dispatch
+                    # path, because a task run is already a heavyweight
+                    # operation and two of these bracket the whole of it.
+                    args={"task_id": bg_task.id},
+                )
+                if recorder is not None
+                else 0
+            )
             try:
                 res = fn()
                 bg_task.status = TaskState.COMPLETED
@@ -105,6 +128,14 @@ class TaskManager(ITaskManager):
                 )
                 raise e
             finally:
+                if recorder is not None:
+                    recorder.span_end(
+                        TraceLane.TASK,
+                        bg_task.name,
+                        started,
+                        cat="run",
+                        args={"task_id": bg_task.id},
+                    )
                 with self._lock:
                     self._finished_task_ids.append(bg_task.id)
                 self._cleanup_old_tasks()

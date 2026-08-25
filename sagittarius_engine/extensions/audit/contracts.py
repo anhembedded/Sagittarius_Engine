@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from sagittarius_engine.interfaces.i_trace_recorder import Lane
+
 #: Bumped on any **incompatible** change to the shapes below. The consumer
 #: refuses a mismatch loudly at connect rather than degrading into a blank
 #: panel — that degradation is `D1`, and a version handshake is its direct fix.
@@ -59,27 +61,25 @@ class RecordKind(StrEnum):
     SPAN = "s"
 
 
-class Lane(StrEnum):
-    """
-    @brief Which subsystem a record came from.
-
-    @details A closed set, not a free string: the lane table goes over the wire
-    in `hello` so a consumer can build its rows before the first batch arrives,
-    and an unknown lane appearing mid-stream would mean rebuilding the view.
-    Applications do not add lanes — their records go in `USER`, which is
-    SystemView's user-marker model and the reason the framework needs to know
-    nothing about application events (`D8`).
-    """
-
-    KERNEL = "kernel"
-    EXTENSION = "extension"
-    EVENT_BUS = "event_bus"
-    DISPATCH = "dispatch"
-    MIDDLEWARE = "middleware"
-    TASK = "task"
-    SCHEDULER = "scheduler"
-    HOSTED = "hosted"
-    USER = "user"
+#: Re-exported, not redefined. `Lane` moved to `interfaces/i_trace_recorder.py`
+#: in `EPIC-005B`, because `tests/test_architecture.py` forbids `kernel/` from
+#: importing `extensions/` and the kernel's instrumentation sites have to name a
+#: lane. Defining it in both places would be `D3`/`D4` a third time — this
+#: module exists to argue that two hand-maintained copies of a schema drift, so
+#: it does not get to keep a second copy of its own vocabulary.
+__all__ = [
+    "PROTOCOL_VERSION",
+    "Envelope",
+    "Hello",
+    "Lane",
+    "MessageType",
+    "ProtocolMismatch",
+    "RecordKind",
+    "TraceRecord",
+    "check_protocol",
+    "error_message",
+    "trace_batch",
+]
 
 
 @dataclass(frozen=True, slots=True)
