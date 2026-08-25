@@ -96,6 +96,24 @@ class StyleRole(Enum):
     TABLE_HEADER = auto()
     PROGRESS = auto()
 
+    # --- EPIC-007F ----------------------------------------------------- #
+    # Both added from measured consumers in the reference app, not from a
+    # guess at what a text kit "should" have — the count is recorded beside
+    # each so a later reader can tell a real shape from a speculative one.
+
+    #: Ordinary body text at full contrast — a form field's label, a
+    #: checkbox's caption. Distinct from `CAPTION`, which is deliberately
+    #: quieter (muted, one size down) so it recedes behind a heading; this
+    #: one is the text a user actually reads to operate the screen, so it
+    #: must not recede. 4 real consumers, across 3 screens.
+    BODY_LABEL = auto()
+    #: An accent-coloured bold heading naming a panel or dialog — larger and
+    #: louder than `SECTION_LABEL`, which is a muted, letter-spaced label
+    #: over a *group inside* a panel. 3 real consumers, which between them
+    #: used two near-identical sizes (13px and 14px); collapsing that pair
+    #: onto one token is exactly what this epic exists to do.
+    HEADING = auto()
+
 
 class WidgetState(Enum):
     """Structural state `apply_role()` renders differently. Not every role
@@ -355,6 +373,21 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"background-color: transparent;"
             f"color: {_token('muted')};"
             f"font-size: {_px('fontSizeSm')};"
+        )
+
+    if role is StyleRole.BODY_LABEL:
+        return (
+            f"background-color: transparent;"
+            f"color: {_token('textPrimary')};"
+            f"font-size: {_px('fontSizeMd')};"
+        )
+
+    if role is StyleRole.HEADING:
+        return (
+            f"background-color: transparent;"
+            f"color: {_token('accent')};"
+            f"font-size: {_px('fontSizeMd')};"
+            f"font-weight: bold;"
         )
 
     if role is StyleRole.TABLE_HEADER:
