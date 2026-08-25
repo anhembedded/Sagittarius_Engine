@@ -149,7 +149,7 @@ def test_tone_reaches_the_rendered_qss(qtbot, fake_theme_bridge, tone, token):
 
     badge.set_tone(tone)
 
-    assert badge.styleSheet().rstrip().endswith(f"{token};")
+    assert f"color: {token};" in badge.styleSheet()
 
 
 def test_tone_and_emphasis_are_mutually_exclusive(qtbot, fake_theme_bridge):

@@ -37,8 +37,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 3 |
-| ✅ **Fixed** | 5 |
+| 🔴 **Open** | 2 |
+| ✅ **Fixed** | 6 |
 | 📈 **Total** | **8** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
@@ -57,7 +57,6 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
-| **[BUG-008](incomplete/BUG-008_apply_role_qss_cascades_into_every_child.md)** | `apply_role()` writes unscoped QSS for `SURFACE`/`SECTION_LABEL`/`CAPTION`/`TABLE_HEADER`/`CHECKBOX`/`FIELD`, so a `Card`/`Panel` restyles every child widget that has no stylesheet of its own | High | 2026-08-25 | First real consumer of `Card` (`EPIC-007E`, `ChartCard`) hit it immediately: a toolbar with unstyled buttons lost its chrome the moment it sat inside a `Card`. Fix: scope with a type selector (`Card {{ ... }}`), same as `MetricCardWidget` already does by hand in the app repo. |
 | **[BUG-007](incomplete/BUG-007_resilient_bus_drops_a_subscription_on_name_collision.md)** | `ResilientEventBus.on()` silently drops a subscription when two event classes share a `__name__` | Medium | 2026-08-25 | Keys `_wrapper_map` by `__name__` while the rest of the package keys by `event_name`/`__qualname__`; the colliding second `on()` early-returns and the handler never fires. Reproduced. Found while fixing `EPIC-008C`, filed separately rather than fixed inline. |
 | **[BUG-006](incomplete/BUG-006_qml_warning_tests_are_order_dependent.md)** | The two "no QML runtime warnings" tests assert on the whole Qt message stream, so a once-per-process platform warning makes them order-dependent | Medium | 2026-08-25 | gallery-first → gallery fails; roster-first → both pass. Same code, opposite results. On Windows the contaminant is a `QFontDatabase` platform warning; **on Linux it is 32 `RosterScreen.qml` teardown `TypeError`s** that normally land after pytest's summary line and move inside the test when unrelated test files shift timing (found 2026-08-25 during `EPIC-007A`). Neither is a QML binding error the test was written to catch. **Đo 2026-08-25: không chỉ phụ thuộc thứ tự mà còn KHÔNG TẤT ĐỊNH** — cùng commit, cùng lệnh, 3 lần chạy cho 1 đỏ / 2 xanh. Suite xanh không còn là bằng chứng cho test này. |
 
@@ -67,6 +66,7 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-008](completed/BUG-008_apply_role_qss_cascades_into_every_child.md)** | `apply_role()` wrote unscoped QSS for `SURFACE`/`SECTION_LABEL`/`CAPTION`/`TABLE_HEADER`/`CHECKBOX`/`FIELD`, so a `Card`/`Panel` restyled every child widget that had no stylesheet of its own | High | 2026-08-25 | Fixed 2026-08-25: `apply_role()` now wraps unscoped role QSS in a type selector built from the widget's own runtime class before `setStyleSheet()`; already-scoped roles pass through unchanged. Also fixed a second defect it exposed — `Badge.set_tone()` string-concatenated a bare property that would have dangled after the new scoped block. 2 new regression tests in `test_surface.py`, 1 existing assertion in `test_labels.py` rewritten. Full suite: 1262 passed, 0 failed. |
 | **[BUG-004](completed/BUG-004_overlay_names_nonexistent_subclasses.md)** | `Overlay`'s docstring and `TypeError` message name `ConfirmOverlay`/`PickerOverlay`, which exist nowhere | Medium | 2026-08-24 | Fixed 2026-08-25: both written, one file per class under `widgets/overlays/`, exported from `__all__`. Closed by writing them rather than by dropping the mention — 9 real consumers were waiting in the app repo. The regression test resolves the names *out of the message itself*, so rewording cannot reintroduce a phantom. 1004 passed, coverage 89.46%. |
 | **[BUG-005](completed/BUG-005_baseevent_inheritance_is_inert_for_dataclasses.md)** | Inheriting `BaseEvent` gave a `@dataclass` subclass nothing — `event_id`, `occurred_on`, `to_dict()` all raised `AttributeError` | High | 2026-08-24 | Fixed 2026-08-25: `BaseEvent` is now a `@dataclass` with `kw_only` metadata fields backed by concrete properties (a public dataclass field with the same name as the inherited abstract property re-triggers `abc.update_abstractmethods()` and breaks instantiation — avoided). `event_name` defaults via `__init_subclass__`. 8 new regression tests, all 3 existing engine consumers unaffected. |
 | **[BUG-003](completed/BUG-003_get_logger_annotation_contradicts_iengincontext_contract.md)** | `_get_logger()` declared `ILogger \| None` against a contract that guarantees non-None | Low | 2026-08-23 | Fixed 2026-08-23: 4 mypy errors resolved (27→23). Also removed 6 dead `if logger:` guards in `bootstrap.py`, by explicit user decision. 757 passed, 0 failed. |

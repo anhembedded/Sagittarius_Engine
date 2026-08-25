@@ -89,11 +89,17 @@ class Badge(StyledLabel):
         both."""
         self._tone = tone
         self.set_state(WidgetState.NORMAL)
-        # Appended after the role, relying on last-declaration-wins, the
-        # same way `StatCard`'s badge tone does. `BADGE` renders a flat
-        # property list with no selector; a test pins that the tone
-        # actually reaches the rendered QSS.
-        self.setStyleSheet(f"{self.styleSheet()}color: {tone_colour(tone)};")
+        # Appended after the role's own scoped block, relying on
+        # last-declaration-wins, the same way `StatCard`'s badge tone does.
+        # `apply_role()` (BUG-008 fix) now scopes `BADGE`'s QSS to this
+        # widget's own type selector, so the override must use that same
+        # selector rather than a bare property — a bare property here would
+        # dangle after the role block's closing `}` and never apply. A test
+        # pins that the tone actually reaches the rendered QSS.
+        selector = type(self).__name__
+        self.setStyleSheet(
+            f"{self.styleSheet()}{selector} {{ color: {tone_colour(tone)}; }}"
+        )
 
     def setText(self, text: str) -> None:
         """@brief Sets the text and hides the pill when it is empty.

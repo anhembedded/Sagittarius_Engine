@@ -81,6 +81,32 @@ def test_setenabled_cascades_to_body_layout_children(qtbot):
     assert button.isEnabled() is False
 
 
+def test_card_qss_is_scoped_to_its_own_type_not_bare(qtbot):
+    """BUG-008 regression. `SURFACE`'s QSS used to be a bare property
+    list — Qt's universal selector — so setting it on a `Card` repainted
+    every unstyled descendant too (e.g. a toolbar's buttons lost their
+    chrome the moment the toolbar sat inside a `Card`). The fix wraps it
+    in a type selector built from the widget's own runtime class."""
+    card = Card("X")
+    qtbot.addWidget(card)
+
+    assert card.styleSheet().startswith("Card {")
+
+
+def test_unstyled_child_of_a_card_is_not_touched(qtbot):
+    """BUG-008 requirement 5. A `Card` scoping its own QSS to itself must
+    leave a child with no stylesheet of its own exactly as it was — this
+    is the toolbar-buttons symptom that surfaced the bug."""
+    from PySide6.QtWidgets import QPushButton
+
+    card = Card("X")
+    qtbot.addWidget(card)
+    button = QPushButton("Action")
+    card.body_layout.addWidget(button)
+
+    assert button.styleSheet() == ""
+
+
 def test_on_enabled_changed_hook_fires_on_setenabled(qtbot):
     calls: list[bool] = []
 

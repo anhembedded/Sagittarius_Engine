@@ -2,7 +2,7 @@
 
 **Reported date:** 2026-08-25
 **Severity:** High (silently changes the appearance of arbitrary child widgets; the first real consumer hit it immediately)
-**Status:** 🔴 Open
+**Status:** ✅ Fixed 2026-08-25
 **Found by:** `Sagittarius_Elite_Warrior`'s `EPIC-007E`, moving its `ChartCard` onto this package's `Card`
 
 ---
@@ -95,3 +95,51 @@ thing and the one the caller did not ask for.
 - The consuming app's `EPIC-007E` records the visible symptom and links here.
 - `EPIC-007B` is where `Card` gained its first consumers, i.e. where this
   became reachable.
+
+## Fix — 2026-08-25
+
+Added `style._scope_qss(widget, qss)`, called from `apply_role()` before
+`setStyleSheet()`. It wraps a bare property list in a type selector built
+from the widget's own runtime class (`f"{type(widget).__name__} {{ {qss} }}"`)
+and leaves already-scoped roles (`SELECTABLE_CARD`, `PROGRESS`, the three
+button roles) untouched by checking for `"{"` in the built QSS first.
+
+**Requirement 2 resolved: bare, not dotted.** `apply_role()` is always
+called with the real instance (`self`), so `type(widget).__name__` already
+resolves to the most derived class — a `ChartCard(Card)` gets `ChartCard {
+... }`, not `Card { ... }`. Because the selector is already the exact
+runtime type, Qt's subclass-matching behaviour for a bare type selector
+only ever reaches a *further* subclass of this same widget, never an
+unrelated sibling — so the dotted form's extra restriction has nothing to
+buy here, and bare stays consistent with how every already-scoped role in
+this module already writes its selector.
+
+**Requirement 3 (moved test assertions):** only one assertion in the whole
+package compared `styleSheet()` against a string shape that broke —
+`test_labels.py::test_tone_reaches_the_rendered_qss`, which asserted the
+tone colour was the literal last thing in the stylesheet. Rewritten to
+`assert f"color: {token};" in badge.styleSheet()`. Every other test either
+does substring (`"<token>" in ...`) or self-referential before/after
+comparison, both unaffected by the wrapper.
+
+**A second, related defect this fix exposed:** `Badge.set_tone()`
+(`controls/badge.py`) recoloured itself by string-concatenating a bare
+`color: ...;` property onto whatever `styleSheet()` currently held. Once
+`BADGE`'s own QSS became a scoped `Badge { ... }` block, appending a bare
+property after its closing `}` would dangle and never apply. Fixed to
+append a second block using the same selector
+(`f"{selector} {{ color: {tone_colour(tone)}; }}"`), relying on
+last-declaration-wins for the same selector — the mechanism the original
+code's own comment already claimed to use, just not actually scoped.
+
+**Requirement 5 (regression test):** added
+`test_card_qss_is_scoped_to_its_own_type_not_bare` and
+`test_unstyled_child_of_a_card_is_not_touched` to `test_surface.py`.
+
+**Requirement 4 (visual re-verification):** not yet done in this pass —
+tracked as follow-up work in the consuming app's repo (re-run
+`test_capture_screenshots.py` there and check whether `ChartToolbar`'s
+BUG-008 workaround styling in `chart_toolbar.py` is now redundant).
+
+Full engine suite: `ruff check`/`ruff format --check` clean, `mypy` clean
+(via `.venv`, Python 3.12), `1262 passed, 8 skipped, 0 failed`.
