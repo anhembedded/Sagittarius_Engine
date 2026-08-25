@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from sagittarius_engine.extensions.pyside_mvc.widgets import Panel, Tab, TabBar
+from sagittarius_engine.extensions.pyside_mvc.widgets import Panel, Surface, Tab, TabBar
 
 
-def test_is_a_panel_and_selects_the_first_tab(qtbot):
+def test_is_not_a_surface_and_selects_the_first_tab(qtbot):
+    """It used to be a `Panel`, which gave every tab row a card background,
+    a border and a radius of its own.
+
+    That contradicted the reasoning already written one level down, where
+    `_TabButton` carries `base-exempt: a tab is a button, not a surface` — a
+    row of those buttons is not a surface either. An app wanting the row
+    framed puts it inside a `Panel`; an app that does not cannot un-frame
+    one."""
     bar = TabBar([Tab("trades", "DANH SÁCH LỆNH"), Tab("logs", "NHẬT KÝ")])
     qtbot.addWidget(bar)
 
-    assert isinstance(bar, Panel)
+    assert not isinstance(bar, Surface)
+    assert not isinstance(bar, Panel)
+    assert bar.styleSheet() == "", "a tab row must not paint chrome of its own"
     assert bar.current_id == "trades"
     assert bar.current_index == 0
 
