@@ -24,12 +24,22 @@ class StatCard(Card):
     empty rather than split into two classes over what is one card with
     slots.
 
-    Two behaviours of the metric card are **not** reproduced, both because
-    they have one call site rather than two: its always-drawn, unconfigurable
-    `info` icon (no tooltip, no click — decorative), and its value font
-    shrinking 18px→16px past ten characters. The second is a real usability
-    fix and is recorded in `EPIC-007B` as a candidate; it needs a font-size
-    token before it can be expressed here without a literal.
+    The reference metric card's **hover lift** is reproduced (`STAT_CARD`),
+    as QSS `:hover` rather than the consumer's `enterEvent`/`leaveEvent`
+    pair — one declaration instead of two handlers that must be kept in
+    sync, and it cannot get stuck in the hovered look if a leave event is
+    missed.
+
+    Two of its behaviours are still **not** reproduced:
+
+    - Its always-drawn `info` icon. It has no tooltip and no click handler,
+      so it carries no information — a decorative glyph. Reproducing it
+      would mean every `StatCard` in every app grows an icon that does
+      nothing.
+    - Its value font shrinking past ten characters. A real usability fix,
+      recorded in `EPIC-007B` as a candidate; it needs a rule about *when*
+      to shrink, which is a layout decision this class has no basis to make
+      for one caller.
     """
 
     def __init__(
@@ -42,6 +52,23 @@ class StatCard(Card):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(title, parent)
+        # Re-applied over `Surface`'s own `SURFACE`: same chrome plus a
+        # hover response. Done here rather than by `Surface` accepting a
+        # role parameter, so the hover stays specific to this shape.
+        apply_role(self, StyleRole.STAT_CARD)
+        # The card's own title reads as a small muted heading over the
+        # figure, which is exactly `SECTION_LABEL` — `Card` leaves its title
+        # unstyled because a generic card has no opinion, but a stat card
+        # does.
+        #
+        # Styling only: the text is left exactly as given. `SectionLabel`
+        # uppercases itself and documents why, but doing that here would
+        # make the inherited `Card.title` lossy — a caller could no longer
+        # read back what it set. A label may redefine its own text; a
+        # subclass quietly changing an inherited property's round-trip is a
+        # different and worse surprise. A caller wanting uppercase passes
+        # uppercase.
+        apply_role(self._title_label, StyleRole.SECTION_LABEL)
 
         value_row = QHBoxLayout()
         self._value_label = QLabel(value)
@@ -80,7 +107,16 @@ class StatCard(Card):
     def set_value(self, value: str, *, tone: Tone = Tone.NEUTRAL) -> None:
         """@brief Sets the headline figure and how it should read."""
         self._value_label.setText(value)
-        self._value_label.setStyleSheet(f"color: {tone_colour(tone)};")
+        # Size and weight come from the role; only the colour is decided per
+        # card. Appended as its own scoped rule rather than a bare property,
+        # which `BUG-009` established is silently discarded by Qt once the
+        # role's QSS carries a selector.
+        apply_role(self._value_label, StyleRole.STAT_VALUE)
+        selector = type(self._value_label).__name__
+        self._value_label.setStyleSheet(
+            f"{self._value_label.styleSheet()}"
+            f"{selector} {{ color: {tone_colour(tone)}; }}"
+        )
 
     def set_suffix(self, suffix: str) -> None:
         self._suffix_label.setText(suffix)

@@ -119,6 +119,23 @@ class StyleRole(Enum):
     #: headings when both resolve through one token. A heading is the large
     #: tier by definition; that is the tier it must name.
     HEADING = auto()
+    #: A `StatCard`'s headline figure — the one number the card exists to
+    #: show. Carries size and weight only; its **colour** is per-instance
+    #: (`set_value(tone=...)`), which is the case `semantic_colour()`'s
+    #: docstring describes and `apply_role()` cannot express.
+    #:
+    #: The card shipped without this: the value had no font rule at all, so
+    #: the "headline" rendered at the widget default while the caption
+    #: beside it was explicitly sized. Nobody chose that — the scale simply
+    #: had no display tier to name.
+    STAT_VALUE = auto()
+    #: A `Surface` that lifts under the pointer. Separate from `SURFACE`
+    #: because most surfaces in a screen are not hoverable and giving them
+    #: all a hover response would be a visible change to every card in the
+    #: app; separate from `SELECTABLE_CARD` because that role also carries a
+    #: `SELECTED` state, and a stat card is never "the user's current
+    #: choice" — it just acknowledges the pointer.
+    STAT_CARD = auto()
 
 
 class WidgetState(Enum):
@@ -394,6 +411,30 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"color: {_token('accent')};"
             f"font-size: {_px('fontSizeLg')};"
             f"font-weight: bold;"
+        )
+
+    if role is StyleRole.STAT_VALUE:
+        # No `color` on purpose — the figure's colour is decided per card at
+        # runtime by `StatCard.set_value(tone=...)`. Naming a colour here
+        # would be a default every caller then has to override.
+        return (
+            f"background-color: transparent;"
+            f"font-size: {_px('fontSizeXl')};"
+            f"font-weight: bold;"
+        )
+
+    if role is StyleRole.STAT_CARD:
+        return (
+            f"QFrame {{"
+            f"background-color: {_token('bgCard')};"
+            f"border: 1px solid {_token('border')};"
+            f"border-radius: {_px('radiusMd')};"
+            f"color: {_token('textPrimary')};"
+            f"}}"
+            f"QFrame:hover {{"
+            f"background-color: {_token('stateHoverBg')};"
+            f"border: 1px solid {_token('stateNavBorder')};"
+            f"}}"
         )
 
     if role is StyleRole.TABLE_HEADER:
