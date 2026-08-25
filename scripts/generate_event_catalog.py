@@ -23,10 +23,23 @@ import pkgutil
 import sys
 from pathlib import Path
 
-import sagittarius_engine
-from sagittarius_engine.domain import EventRegistry
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
-_DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "EVENT_CATALOG.md"
+# Running this as a file (`python scripts/generate_event_catalog.py`) puts
+# `scripts/` on `sys.path[0]`, not the repository root — so the import below
+# fails with `ModuleNotFoundError` on a bare checkout where the package is not
+# pip-installed. That is exactly how `tests/domain/
+# test_event_catalog_matches_registry.py` invokes this script, so without this
+# bootstrap the catalog test fails on any machine whose virtualenv does not
+# happen to have `sagittarius-engine` installed. Prepending the root keeps the
+# script runnable straight from a clone, with no install step.
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+import sagittarius_engine  # noqa: E402
+from sagittarius_engine.domain import EventRegistry  # noqa: E402
+
+_DEFAULT_OUTPUT = _REPO_ROOT / "EVENT_CATALOG.md"
 
 _HEADER = """\
 # Event Catalog
