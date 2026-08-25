@@ -38,8 +38,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 | Status | Count |
 | :--- | :---: |
 | 🔴 **Open** | 2 |
-| ✅ **Fixed** | 6 |
-| 📈 **Total** | **8** |
+| ✅ **Fixed** | 7 |
+| 📈 **Total** | **9** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -66,6 +66,7 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-009](completed/BUG-009_statcard_badge_tone_stopped_rendering_after_bug008.md)** | `StatCard.set_badge()`'s tone stopped rendering once `BUG-008` scoped the role QSS | Medium | 2026-08-25 | Fixed 2026-08-25: the append produced a bare property after a closing brace, which Qt discards (it even logs "Could not parse stylesheet"). Delegates to `Badge.set_tone()` now. **The existing test passed the whole time** — it asserted the stylesheet string *ended* in the tone token, and the broken output still did. Rewritten to assert structure (nothing may dangle after the last `}`), confirmed red before / green after, and verified by rendering pixels, not just the string. |
 | **[BUG-008](completed/BUG-008_apply_role_qss_cascades_into_every_child.md)** | `apply_role()` wrote unscoped QSS for `SURFACE`/`SECTION_LABEL`/`CAPTION`/`TABLE_HEADER`/`CHECKBOX`/`FIELD`, so a `Card`/`Panel` restyled every child widget that had no stylesheet of its own | High | 2026-08-25 | Fixed 2026-08-25: `apply_role()` now wraps unscoped role QSS in a type selector built from the widget's own runtime class before `setStyleSheet()`; already-scoped roles pass through unchanged. Also fixed a second defect it exposed — `Badge.set_tone()` string-concatenated a bare property that would have dangled after the new scoped block. 2 new regression tests in `test_surface.py`, 1 existing assertion in `test_labels.py` rewritten. Full suite: 1262 passed, 0 failed. |
 | **[BUG-004](completed/BUG-004_overlay_names_nonexistent_subclasses.md)** | `Overlay`'s docstring and `TypeError` message name `ConfirmOverlay`/`PickerOverlay`, which exist nowhere | Medium | 2026-08-24 | Fixed 2026-08-25: both written, one file per class under `widgets/overlays/`, exported from `__all__`. Closed by writing them rather than by dropping the mention — 9 real consumers were waiting in the app repo. The regression test resolves the names *out of the message itself*, so rewording cannot reintroduce a phantom. 1004 passed, coverage 89.46%. |
 | **[BUG-005](completed/BUG-005_baseevent_inheritance_is_inert_for_dataclasses.md)** | Inheriting `BaseEvent` gave a `@dataclass` subclass nothing — `event_id`, `occurred_on`, `to_dict()` all raised `AttributeError` | High | 2026-08-24 | Fixed 2026-08-25: `BaseEvent` is now a `@dataclass` with `kw_only` metadata fields backed by concrete properties (a public dataclass field with the same name as the inherited abstract property re-triggers `abc.update_abstractmethods()` and breaks instantiation — avoided). `event_name` defaults via `__init_subclass__`. 8 new regression tests, all 3 existing engine consumers unaffected. |

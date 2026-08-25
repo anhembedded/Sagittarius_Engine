@@ -61,16 +61,30 @@ def test_tone_reaches_the_rendered_value_qss(qtbot, fake_theme_bridge):
 
 
 def test_badge_tone_survives_the_role_being_reapplied(qtbot, fake_theme_bridge):
-    """`set_badge` appends `color:` after `apply_role(BADGE)` and relies on
-    last-declaration-wins. If `BADGE` ever grows a selector block, the
-    append stops overriding and this fails — which is the point."""
+    """The tone override must land in a block Qt will actually apply.
+
+    This test used to assert the stylesheet *string* ended in the tone
+    token, and that is exactly how it missed a real break: once `BUG-008`
+    gave `BADGE` a selector block, `set_badge` was appending a bare
+    `color:` after a closing brace. Qt discards such a property, so the
+    tone stopped rendering — while the string still ended in the right
+    token and the assertion still passed.
+
+    So assert on structure, not on the tail: the token must sit inside a
+    braced rule, and nothing may dangle after the last `}`.
+    """
     card = StatCard("Drawdown")
     qtbot.addWidget(card)
 
     card.set_badge("Rủi ro", tone=Tone.NEGATIVE)
 
     qss = card._badge_label.styleSheet()
-    assert qss.rstrip().endswith("<danger>;")
+    assert "<danger>" in qss
+    assert qss.rstrip().endswith("}"), (
+        f"tone override is dangling outside a rule block, Qt will ignore it: {qss!r}"
+    )
+    _, _, after_last_block = qss.rpartition("}")
+    assert after_last_block.strip() == ""
 
 
 def test_tone_resolves_through_the_palette_not_a_baked_colour(qtbot):

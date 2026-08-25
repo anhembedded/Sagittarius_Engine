@@ -98,11 +98,11 @@ class StatCard(Card):
         self._badge_label.setVisible(bool(text))
         if not text:
             return
-        # Appended, not rebuilt: `BADGE` renders a flat property list with no
-        # selector, so a later `color:` overrides the role's own by ordinary
-        # CSS last-declaration-wins. This would silently stop working if
-        # `BADGE` ever grew a `QLabel { ... }` selector — a test pins the
-        # tone actually reaching the rendered QSS.
-        self._badge_label.setStyleSheet(
-            f"{self._badge_label.styleSheet()}color: {tone_colour(tone)};"
-        )
+        # Delegated to the badge rather than appending a `color:` here.
+        # This method used to hand-roll that append, with a comment saying
+        # it would break if `BADGE` ever grew a selector block. `BUG-008`
+        # then gave every role a selector, and it did break: Qt discards a
+        # bare property sitting after a closing brace, so the tone silently
+        # stopped rendering while the string still ended in the right token.
+        # `Badge.set_tone()` already emits a correctly scoped override.
+        self._badge_label.set_tone(tone)
