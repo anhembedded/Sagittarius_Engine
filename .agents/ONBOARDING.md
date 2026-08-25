@@ -17,10 +17,15 @@ the other (found and fixed 2026-08-23: six rule files here told an AI session to
 `Sagittarius_Elite_Warrior\scripts\ci-local.ps1` — the *other* repo's script, which does not
 exist in this one).
 
-Python floor is **3.14** (`requires-python = ">=3.14"` in `pyproject.toml`, raised from `>=3.12`
-on 2026-08-23 to match what CI actually tests — see
-`Tasks/backlog/TASK-023_ci_matrix_hides_312_313_breakage.md` for why a declared-but-untested
-floor is exactly the kind of claim this repo no longer makes). Do not
+Python floor is **3.12** (`requires-python = ">=3.12"` in `pyproject.toml`, lowered back from
+`>=3.14` on 2026-08-25). It was raised to `>=3.14` on 2026-08-23 because CI's matrix only ever
+tested `3.14-dev` — see `Tasks/completed/TASK-023_ci_matrix_hides_312_313_breakage.md` for why a
+declared-but-untested floor is exactly the kind of claim this repo does not make. Lowering it
+back to 3.12 moved the CI matrix (`test` and `import-guard` jobs in `.github/workflows/ci.yml`)
+to `3.12` in the same change, per `.agents/rules/release.md` §3, and the suite — including
+`tests/test_all_modules_importable.py::test_annotations_resolve_on_public_interfaces`, the guard
+against the `ITaskHandle`-shaped eager-annotation bug that motivated the 3.14 floor in the first
+place — was verified green on a real Python 3.12 interpreter before the floor moved. Do not
 write code that needs to run on an older Python; there is no fallback path.
 
 ## 1a. The completion gate — run this before calling anything done

@@ -32,7 +32,7 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
 
 ## Requirements
 
-- Python **3.14** or higher
+- Python **3.12** or higher
 - Zero mandatory external dependencies (built on the Python Standard Library)
 
 ---
