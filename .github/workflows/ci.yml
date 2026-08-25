@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Every runner here is headless. Qt refuses to start without a platform plugin,
+# and `offscreen` is the one that needs no display server; it is a real plugin
+# on Windows too, so this is set once for the whole workflow rather than per job.
+env:
+  QT_QPA_PLATFORM: offscreen
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -84,6 +90,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
+      - uses: ./.github/actions/qt-system-libs
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -128,6 +136,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - uses: ./.github/actions/qt-system-libs
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -154,6 +164,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - uses: ./.github/actions/qt-system-libs
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -171,7 +183,7 @@ jobs:
       - name: Wiring inspection (sagittarius-doctor)
         run: |
           pip install -e .
-          QT_QPA_PLATFORM=offscreen sagittarius-doctor \
+          sagittarius-doctor \
             examples.student_management.doctor_target:build \
             --handler-package examples.student_management \
             --strict
@@ -199,6 +211,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+
+      - uses: ./.github/actions/qt-system-libs
 
       - name: Install dependencies
         run: |
@@ -296,20 +310,11 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      # PySide6 links against the system EGL/GL stack, and a bare GitHub runner
-      # has none of it -- so importing `pyside_mvc.mvc.base_view` from the
-      # installed wheel died on `libEGL.so.1: cannot open shared object file`
-      # and this guard has been red since it was added.
-      #
-      # Installing the libraries rather than exempting the modules, deliberately:
-      # this script's own docstring says an exemption list "should be a
-      # deliberate, argued change rather than a quiet append", and exempting Qt
-      # would blind the guard to precisely the largest package in the wheel.
-      - name: Install the system libraries PySide6 links against
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libglib2.0-0 libxkbcommon0 libdbus-1-3
+      # Installing the libraries rather than exempting the Qt modules,
+      # deliberately: this script's own docstring says an exemption list "should
+      # be a deliberate, argued change rather than a quiet append", and exempting
+      # Qt would blind the guard to the largest package in the wheel.
+      - uses: ./.github/actions/qt-system-libs
 
       - name: Install build tooling
         run: |

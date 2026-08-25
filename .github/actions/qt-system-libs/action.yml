@@ -1,0 +1,22 @@
+name: Qt system libraries
+description: >-
+  Install the system libraries PySide6 links against. A bare GitHub Linux runner
+  has none of them, and without them merely *importing* PySide6.QtGui raises
+  `ImportError: libEGL.so.1: cannot open shared object file` — which takes down
+  a whole pytest session, since pytest-qt imports Qt during `pytest_configure`,
+  before any test runs.
+
+  Extracted rather than repeated: five jobs need this, and the reason is worth
+  stating once instead of drifting across five copies. Linux only — the Windows
+  PySide6 wheels bundle what they need.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Qt system libraries
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          libegl1 libgl1 libglib2.0-0 libxkbcommon0 libdbus-1-3
