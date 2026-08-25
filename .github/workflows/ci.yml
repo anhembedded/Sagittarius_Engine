@@ -238,6 +238,20 @@ jobs:
       - name: Run benchmarks
         run: PYTHONPATH=. python tests/runtime/benchmark_runtime.py
 
+      # EPIC-005A's overhead budget is an acceptance criterion, not a note in a
+      # document -- but it is a *timing* measurement, and the `test` job runs
+      # `pytest --cov`, whose per-line trace hook takes a 157 ns trace point to
+      # 2407 ns. Under coverage those two tests skip themselves, so without this
+      # step they would run nowhere and the criterion would go unchecked.
+      #
+      # Deliberately NOT `continue-on-error` like the benchmark above it: that
+      # one is timing-based and shared runners are variable, so it must not
+      # break a build. This is a 12x-headroom budget check that catches a
+      # `str()` or a dataclass construction landing on the capture path -- a
+      # correctness regression measured in microseconds, not runner noise.
+      - name: Trace recorder overhead budget (EPIC-005A)
+        run: pytest tests/extensions/audit/test_trace_recorder.py -q
+
   # ──────────────────────────────────────────────────────────────
   # Job 6: Security Audit (Bandit & Pip-Audit)
   # ──────────────────────────────────────────────────────────────

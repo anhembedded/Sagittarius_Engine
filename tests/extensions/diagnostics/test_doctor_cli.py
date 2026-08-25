@@ -281,3 +281,66 @@ def test_target_error_is_a_usage_error():
     catching `UsageError`, while the message can still distinguish a mistyped
     argument from an application that crashed."""
     assert issubclass(cli.TargetError, cli.UsageError)
+
+
+# ------------------------- guards against a green run that checked nothing
+
+
+def factory_returning_the_wrong_type():
+    return {"not": "an app"}
+
+
+def unbooted_app():
+    """An `App` that the factory forgot to boot. Easy to do, and the reason
+    this needs a guard: before boot there are no subscriptions, no initialised
+    extensions and an empty container, so *every check passes*."""
+    app = App(StdLibContainer(), MemoryEventBus())
+    _apps.append(app)
+    return app
+
+
+def test_a_factory_returning_a_non_app_is_a_usage_error(capsys):
+    """Previously an `AttributeError` on `app.context` escaped as a bare
+    traceback under `EXIT_FINDINGS` — the same defect class as a raising
+    factory, one line further down."""
+    assert cli.main([f"{__name__}:factory_returning_the_wrong_type"]) == cli.EXIT_USAGE
+    err = capsys.readouterr().err
+    assert "dict" in err
+    assert ".context" in err
+
+
+def test_an_unbooted_app_is_refused_rather_than_reported_clean(capsys):
+    """The dangerous case: it used to exit `0` with an empty report, which
+    reads as "your wiring is fine" for an application whose wiring does not
+    exist yet."""
+    assert cli.main([f"{__name__}:unbooted_app"]) == cli.EXIT_USAGE
+
+    captured = capsys.readouterr()
+    assert "has not been booted" in captured.err
+    assert captured.out == ""
+
+
+def test_a_handler_package_matching_nothing_is_a_usage_error(capsys):
+    """A mistyped `--handler-package` ran no handler checks and still exited
+    `0`. A green build for a check that never ran is worse than no check, because
+    it is believed."""
+    assert (
+        cli.main([f"{__name__}:clean_app", "--handler-package", "no.such.package"])
+        == cli.EXIT_USAGE
+    )
+    assert "matched no loaded module" in capsys.readouterr().err
+
+
+def test_a_real_handler_package_is_not_refused(capsys):
+    """The guard must fire on a *missing* prefix, not on a real one.
+
+    Asserted as "not `EXIT_USAGE`" rather than "`EXIT_OK`": searching a real
+    package finds real handlers, and whether those have findings is this
+    package's other tests' business, not this one's. Pinning an exact code here
+    would make the test fail for a reason it is not about.
+    """
+    code = cli.main(
+        [f"{__name__}:clean_app", "--handler-package", "sagittarius_engine"]
+    )
+    assert code != cli.EXIT_USAGE
+    assert "matched no loaded module" not in capsys.readouterr().err

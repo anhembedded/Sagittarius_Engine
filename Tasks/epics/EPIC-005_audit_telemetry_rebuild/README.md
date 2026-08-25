@@ -205,9 +205,47 @@ Two modes, both from SystemView:
   Attach late today and you see only "now". This is the single most valuable property in the
   design, and it is the one thing `py-spy`/`viztracer` (§5) cannot give you either.
 
-**Overhead budget, enforced as an acceptance criterion:** < 2µs per record enabled, and
-**exactly zero** when disabled — the recorder resolves to a no-op object at boot, so a disabled
-build pays one attribute lookup, not a branch per event.
+**Overhead budget, enforced as an acceptance criterion:** < 2µs per record enabled, and as
+close to zero as CPython allows when disabled.
+
+> #### Corrected 2026-08-25, before any teardown — measured, and the original was backwards
+>
+> This paragraph read: *"**exactly zero** when disabled — the recorder resolves to a no-op
+> object at boot, so a disabled build pays one attribute lookup, not a branch per event."*
+> Both halves were wrong, and `EPIC-005A`'s own "Risk to watch" is why this was measured
+> first: a budget that cannot be met must surface at Milestone A, not after `EPIC-005B`'s
+> instrumentation is already written against it.
+>
+> **"Exactly zero" is not achievable.** A no-op object still costs an attribute lookup and a
+> method call. Measured against a floor of 21.5 ns (the empty call site itself), 1M
+> iterations, best of five:
+>
+> | Disabled call site | ns | above floor |
+> | :--- | ---: | ---: |
+> | no instrumentation at all (floor) | 21.5 | — |
+> | **no-op object** (as specified) | 48.8 | **+27.3** |
+> | **guard on `None`** | 24.5 | **+3.0** |
+>
+> **And the branch this paragraph rejected is nine times cheaper than the object it preferred.**
+> `if self._trace is not None:` costs a load and a compare; `self._trace.instant(...)` on a
+> null object costs a full call frame. The revised rule is therefore the opposite of the
+> original: **guard at the call site, and let `_trace` be `None` when disabled.**
+>
+> This is the second time this codebase has measured that result — `EPIC-006F` found the same
+> thing about its observer hook, where an unconditional call cost 65 ns against 27 ns for
+> reading the tuple first. Treat "a no-op object is free" as false here by default.
+>
+> **The enabled budget passes comfortably**, which is the finding that lets the rest of the
+> epic proceed:
+>
+> | Enabled call site | ns | budget |
+> | :--- | ---: | ---: |
+> | guard + `deque.append` of an 8-tuple + `perf_counter_ns()` | **157** | 2000 |
+>
+> Component costs, for anyone re-deriving this: `perf_counter_ns()` 53.8 ns,
+> `deque.append` of a constant 8-tuple 32.7 ns, an empty call 19.0 ns. For scale, a
+> `MemoryEventBus` emit is ~490 ns — an enabled trace point costs about a third of one emit,
+> and a disabled one about 0.6% of it.
 
 ### 4.3 What gets instrumented
 

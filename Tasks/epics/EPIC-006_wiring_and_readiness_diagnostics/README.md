@@ -1,6 +1,6 @@
 # EPIC-006: Wiring & Readiness Diagnostics
 
-- **Status**: 🟡 **In Progress — 5/6 subtasks done** (`EPIC-006A`–`E` ✅ 2026-08-25; only `F` remains, deferred)
+- **Status**: ✅ **Complete — 6/6 subtasks done** (`EPIC-006A`–`F` ✅ 2026-08-25)
 - **Created**: 2026-08-25
 - **Priority**: P1
 - **Category**: Diagnostics / Runtime Correctness
@@ -258,7 +258,7 @@ Four consumers of one diagnostic result, in increasing order of intrusiveness:
 | **[EPIC-006C](completed/EPIC-006C_readiness_state_machine.md)** | Readiness state machine + `app.ready` (§E), checks run at that milestone | ✅ **Done 2026-08-25** — `CREATED`/`READY` added, guarded transitions, `app.ready` once, `when_ready()` for late arrivals, `DiagnosticsExtension` attached at the milestone. The stranded-extension gate was removed after measuring that boot cannot reach that state — `BUG-008` |
 | **[EPIC-006D](completed/EPIC-006D_dispatch_resolvability_preflight.md)** | Check B — `IDispatchable` discovery and resolvability pre-flight | ✅ **Done 2026-08-25** — structural discovery, not `__init_subclass__`: measured, a subclass registry would have found 0 of the demo app's 7 handlers, because `IDispatchable` is a duck-typed marker and no handler inherits it |
 | **[EPIC-006E](completed/EPIC-006E_doctor_cli_and_docs.md)** | `sagittarius-doctor` CLI + generated wiring document + docs | ✅ **Done 2026-08-25** — `sagittarius-doctor`, three exit codes, runs in CI against the sample app with `--strict`. The committed wiring document was dropped: measured deterministic, but it would have documented the demo app and needed regenerating on every engine event |
-| **[EPIC-006F](incomplete/EPIC-006F_runtime_anomaly_detection.md)** | Runtime anomaly detection (§F) | *Deferred — specify after C lands and "settled" is well-defined* |
+| **[EPIC-006F](completed/EPIC-006F_runtime_anomaly_detection.md)** | Runtime anomaly detection (§F) | ✅ **Done 2026-08-25** — R1 (emitted with nobody listening) and R2 (a handler raised), observing the two dispatch funnels `EPIC-008C` already created. Nothing measurable added for applications that do not opt in (0.4877 vs 0.4905 µs/emit); 98 ns/emit for those that do. R3 (duration) resolved into `EPIC-005` rather than built twice |
 
 Order: **A → B → C → D → E.** A is groundwork and small; B delivers the flagship value on its
 own and is independently shippable.

@@ -5,6 +5,11 @@ reports the difference — at boot, deterministically, rather than on a user's f
 
 ---
 
+> **Adopting it in your own application?** Start with
+> [`diagnostics_usage.md`](diagnostics_usage.md) — writing the factory, the first
+> run, CI, and every way it refuses to run. This file is the reference: what each
+> check means and why.
+
 ## 1. What it is for
 
 A DI container and an event bus are a deliberate trade: flexibility bought by giving up static
@@ -89,6 +94,40 @@ not exist yet; later means the application has been serving while mis-wired.
 | D2 | warning | Hosted service registered but never started |
 | D3 | warning | Scheduled job with no next run — it will never fire |
 
+### Runtime checks (`EPIC-006F`)
+
+Everything above inspects **structure** — it holds still while you look at it, and one pass at
+readiness sees all of it. These two watch **behaviour**, so they run for the life of the
+process and are opt-in: `DiagnosticsExtension(watch_runtime=True)`.
+
+| Check | Severity | Finds |
+| :--- | :--- | :--- |
+| **R1** | warning | An event was emitted at runtime and **nothing was listening** |
+| **R2** | **error** | A handler **raised**, with a count and every exception type seen |
+
+**R1 is not A1.** A1 is static: *this event is declared and nobody subscribes*, which is true of
+most of the engine's own events in most applications and is usually fine. R1 fires only when
+something actually **published into the void** — a real emit that reached nobody, with the line
+it was emitted from. A1 asks "is anyone listening?"; R1 says "you just spoke and nobody heard
+you".
+
+**R1 ignores the engine's own events by default.** Measured: a trivial boot-and-stop produced
+six R1 warnings, five of them engine lifecycle events (`app.ready`, `extension.started`,
+`runtime.scheduler.*`) no application has reason to handle — the same flood A1 is advisory to
+avoid. The distinction is exact, not a guess from the name: every registration records its
+declaring module. `include_engine_events=True` reveals them without re-running.
+
+**R2 does not change the bus's isolation.** A handler that raises is still caught, and the other
+subscribers are still notified — that is deliberate (`handler_reporting.py`). What R2 adds is
+that the failure is *counted and surfaced* rather than living in one log line among thousands.
+
+**Cost.** An application that does not opt in pays nothing measurable (0.4877 vs 0.4905
+µs/emit — within noise). One that does pays ~98 ns per emit. See
+`EPIC-006F`'s outcome section for the full measurements and why the guard is inlined at the call
+site.
+
+---
+
 **A1 is advisory on purpose.** `EventRegistry` is process-wide and holds every event the engine
 can emit, most of which any given application has no reason to handle. Warning on those every
 boot would train the reader to skip the report, which costs more than the check finds. Silence
@@ -139,6 +178,8 @@ handler nothing can dispatch.
 | `extensions/diagnostics/handlers.py` | Structural handler discovery |
 | `extensions/diagnostics/extension.py` | `DiagnosticsExtension` — attaches to readiness |
 | `extensions/diagnostics/cli.py` | `sagittarius-doctor` |
+| `extensions/diagnostics/runtime.py` | `RuntimeMonitor` — R1/R2 |
+| `infrastructure/event_bus/bus_observers.py` | `IBusObserver` and the registry it observes through |
 | `interfaces/i_event_bus.py` | `subscriptions()` — the enumeration the checks needed |
 | `interfaces/i_container.py` | `registrations()`, `Registration` |
 | `kernel/lifecycle.py` | `EngineState`, `app.ready`, `when_ready()` |

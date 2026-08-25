@@ -24,7 +24,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .handlers import discover_handlers
+from .handlers import discover_handlers, unmatched_prefixes
 from .inspector import WiringInspector
 from .report import WiringReport
 
@@ -242,8 +242,51 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return EXIT_USAGE
 
-    context = app.context
-    handlers = discover_handlers(*args.handler_package) if args.handler_package else ()
+    # Everything from here to the report is still "could the doctor run?", not
+    # "is the wiring right?". Each guard below was found by writing the usage
+    # guide and running what it told the reader to do -- each one previously
+    # produced a **green or misleading** result for an application that had not
+    # been inspected, which is the worst failure this tool can have.
+    context = getattr(app, "context", None)
+    if context is None:
+        print(
+            f"{args.factory} returned {type(app).__name__}, which has no "
+            "`.context`. The factory must return an App — see --help.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    # An App that was never booted has no subscriptions, no initialised
+    # extensions and an empty container, so every check passes and the command
+    # exits 0 having verified nothing. Forgetting `app.boot()` in the factory is
+    # an easy mistake precisely because the result looks like success.
+    lifecycle = getattr(context, "lifecycle", None)
+    if lifecycle is not None and getattr(lifecycle, "is_created", False):
+        print(
+            f"{args.factory} returned an App that has not been booted. "
+            "Wiring does not exist until boot, so there would be nothing to "
+            "inspect — call app.boot() in the factory before returning it.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    handlers: tuple[type, ...] = ()
+    if args.handler_package:
+        # A mistyped --handler-package silently checked no handlers and still
+        # exited 0. Reported rather than ignored: a green build for a check that
+        # never ran is worse than no check at all, because it is believed.
+        missing = unmatched_prefixes(*args.handler_package)
+        if missing:
+            print(
+                "--handler-package matched no loaded module: "
+                + ", ".join(repr(m) for m in missing)
+                + "\nHandlers are searched among modules the application has "
+                "already imported, so check the spelling — and that this "
+                "package is reachable from your factory.",
+                file=sys.stderr,
+            )
+            return EXIT_USAGE
+        handlers = discover_handlers(*args.handler_package)
 
     report = WiringInspector().inspect(
         bus=context.event_bus,

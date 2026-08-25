@@ -135,6 +135,15 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         # Python builtins, quoted in api.md's "not a bool/True" correction.
         "bool",
         "True",
+        # Same category. `False` was missing while `True` was present — a gap,
+        # not a decision; diagnostics_usage.md quotes it as DiagnosticsExtension's
+        # default for `fail_fast`.
+        "False",
+        # The process's standard streams, named in diagnostics_usage.md §8 while
+        # explaining that boot output goes to stderr so `--json` stays parseable.
+        # Stream names, not repo symbols.
+        "stdout",
+        "stderr",
         # Names a doc explicitly quotes *because* they're wrong — each is
         # part of a "corrected 2026-08-23, previous version said `X`"
         # sentence documenting a real bug this same audit found and fixed.

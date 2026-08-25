@@ -23,6 +23,7 @@ import traceback
 from collections.abc import Callable
 from typing import Any
 
+from sagittarius_engine.infrastructure.event_bus import bus_observers
 from sagittarius_engine.infrastructure.event_bus.diagnostic_labels import (
     describe_handler,
 )
@@ -44,6 +45,11 @@ def report_handler_failure(
     while the failure is *visible*, which is what this function guarantees.
     """
     described = describe_handler(handler)
+    # EPIC-006F. After the log, never instead of it: the report above is the
+    # guarantee this module exists to make, and an observer must not be able to
+    # take it away by being registered.
+    if bus_observers._observers:
+        bus_observers.notify_handler_failed(event_name, described, exc)
     logger.error(
         f"Handler {described} raised {type(exc).__name__} "
         f"while handling event '{event_name}': {exc}",
