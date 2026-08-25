@@ -24,11 +24,16 @@ this module deliberately does not. It lives in
 `tools.widget_showcase.showcased_types()`, and fails when a type in
 `widgets.__all__` is never built by the showcase.
 
-Both guards here scan text, so neither needs Qt — which is also why neither
-is wired to any real source tree today. They are exercised only through
-`tmp_path` fixtures. Pointing them at `sagittarius_engine/` and at a
-consuming app's `presentation/ui` is still outstanding; a guard nobody runs
-protects nothing.
+Both guards here scan text, so neither needs Qt. Within *this* repo they are
+still exercised only through `tmp_path` fixtures — pointing them at
+`sagittarius_engine/` itself remains outstanding.
+
+The consuming app wired them up in EPIC-007D/E
+(`tests/unit/presentation/ui/test_widget_guards_hold.py`): colour literals
+locked at zero, bare Qt bases held under a ratchet that may only fall. That
+is what `colour_source_names` exists for — an app's palette module is its
+`style.py`, and until it could be named, the guard reported that file for
+containing the very tokens it defines, which put zero out of reach.
 """
 
 from __future__ import annotations

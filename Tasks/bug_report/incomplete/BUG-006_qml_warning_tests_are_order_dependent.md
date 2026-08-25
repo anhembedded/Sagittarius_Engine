@@ -91,6 +91,42 @@ Worth checking separately whether the 32 teardown `TypeError`s are themselves a 
 `RosterScreen.qml`'s bindings (a `null` root context guard) rather than only noise — that is
 not this bug, but nobody has looked.
 
+## Worse than order-dependent: it is non-deterministic — measured 2026-08-25
+
+The title says "order-dependent", which implies a fixed order gives a fixed
+answer. It does not. Three consecutive full-suite runs, **same commit, same
+command, same collection order, nothing else running**:
+
+```text
+run 1:  1 failed, 1141 passed, 8 skipped   in 17.60s
+run 2:  1142 passed,           8 skipped   in 17.49s
+run 3:  1142 passed,           8 skipped   in 17.74s
+```
+
+The failing run was `test_roster_screen_emits_no_qml_runtime_warnings`,
+carrying the same `RosterScreen.qml` teardown `TypeError`s described above.
+In isolation it passes every time.
+
+This was found while trying to attribute a failure to a commit that changed
+**only a docstring** — 15 lines of comment in `widgets/guards.py`, which
+cannot reach QML at all. The suite happened to be green on the parent commit
+and red on the child, which reads exactly like a regression and is not one.
+
+Consequences that make this worth more than its Medium severity suggests:
+
+1. **A green suite is not evidence for this test.** It passes ~2 runs in 3,
+   so any change can be "verified" against it by luck.
+2. **A red suite invites a false attribution.** The natural next step —
+   bisect, blame the diff — costs a session and finds nothing, because the
+   diff is innocent. That happened here; only re-running the same commit
+   three times settled it.
+3. **CI reports on one run.** With ~1-in-3 failure it will go red on
+   unrelated pull requests, and the cheapest response for whoever hits it is
+   to re-run until green, which trains everyone to ignore this test.
+
+Whatever fix is chosen from Requirements below, it should be judged by
+running the full suite **several times on the same commit**, not once.
+
 ## Why this matters beyond the noise
 
 The tests were written for a good reason, documented in their own docstrings:
