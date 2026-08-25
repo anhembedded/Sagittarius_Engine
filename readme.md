@@ -176,6 +176,25 @@ app.boot()   # report is logged; a wiring error aborts here
 `fail_fast` defaults to `False` — an engine that refuses to start over a diagnostic is a worse
 default than one that says loudly what is wrong.
 
+### Watching a running application
+
+Everything above inspects structure, in one pass at readiness. Two further checks watch
+behaviour for the life of the process, and are opt-in for that reason:
+
+```python
+app.use(DiagnosticsExtension(watch_runtime=True))
+```
+
+- **R1** — an event was emitted and **nothing was listening**, with the line it came from. Not
+  the same as the static check: this one fires only when something really published into the
+  void.
+- **R2** — a handler **raised**, how many times, and every exception type. The bus still
+  isolates the failure so the other subscribers are notified; R2 makes it countable instead of
+  one log line among thousands.
+
+An application that leaves it off pays nothing measurable per emit; one that turns it on pays
+about 98 ns.
+
 Step-by-step for adopting it in your own project — writing the factory, the first run,
 CI, and every way it refuses to run:
 [`.agents/context/diagnostics_usage.md`](.agents/context/diagnostics_usage.md).

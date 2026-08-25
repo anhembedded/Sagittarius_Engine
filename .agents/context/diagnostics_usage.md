@@ -165,6 +165,56 @@ the findings directly instead of parsing them back out of a log line.
 
 ---
 
+## 6b. Catching what only happens while it runs
+
+Steps 1–6 all inspect **structure** — one pass, at readiness. Two more checks watch
+**behaviour**, for the life of the process:
+
+```python
+app.use(DiagnosticsExtension(
+    watch_runtime=True,
+    expected_unheard=("order.archived",),
+    handler_packages=("myapp",),
+))
+```
+
+| Check | | Finds |
+| :--- | :--- | :--- |
+| **R1** | warning | An event was emitted and **nothing was listening** — with the line it came from |
+| **R2** | **error** | A handler **raised**, how many times, and every exception type |
+
+Anomalies are logged at shutdown, and readable at any point:
+
+```python
+report = diagnostics_extension.runtime_report()
+```
+
+```text
+Wiring report: 1 error(s), 1 warning(s), 0 info.
+  [R2] ERROR: myapp.orders.on_shipped on 'order.shipped' — raised 2x while
+       handling this event (ValueError)
+        → first failure: ValueError: downstream service returned 500
+  [R1] WARNING: order.cancelled — emitted 2x at runtime with no handler
+       subscribed — nothing received it
+        → first emitted from myapp/orders/service.py:19
+```
+
+**R1 is not A1.** A1 is static — *declared, nobody subscribes* — and is usually fine. R1 fires
+only when something really **published into the void**. The engine's own lifecycle events are
+excluded by default; `include_engine_events=True` on `RuntimeMonitor` shows them.
+
+**R2 does not change anything about how your application behaves.** A handler that raises is
+still isolated, and the other subscribers still get the event. R2 only makes the failure
+*countable* instead of one log line among thousands.
+
+**Off by default, because it is the only part that runs continuously.** An application that
+leaves it off pays nothing measurable per emit; one that turns it on pays about 98 ns.
+
+Not available through `sagittarius-doctor`: the command is a one-shot inspection that boots,
+reports, and exits, and there is no runtime to watch.
+
+---
+
 ## 7. When it will not run
 
 Exit `2` always means the same thing: **no report exists, nothing was
