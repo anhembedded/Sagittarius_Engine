@@ -17,6 +17,10 @@ defaults:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   ACTIONS_NODE20_DEPRECATION_WARNING: 'false'
+  # Every runner here is headless. Qt refuses to start without a platform
+  # plugin, and `offscreen` is the one that needs no display server; it is a
+  # real plugin on Windows too, so one declaration covers the whole matrix.
+  QT_QPA_PLATFORM: offscreen
 
 jobs:
   # ──────────────────────────────────────────────────────────────
@@ -35,9 +39,21 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install dev tools
+      # Runtime requirements, not just the dev toolchain. mypy's job is to check
+      # the code as it will actually run, and without PySide6 installed every Qt
+      # type resolves to `Any` -- which is *weaker* checking, not stricter, and
+      # produced a false positive that kept this job red for days:
+      # `thread_affinity.py`'s `cls.__new__(cls)` has no matching overload when
+      # `cls` is `type[Any]`, while the same command with PySide6 present reports
+      # `Success: no issues found in 436 source files`.
+      #
+      # The `test` job has always installed both files. The gap between the two
+      # was the whole defect: a linter checking a different program than the one
+      # the tests run.
+      - name: Install dependencies and dev tools
         run: |
           python -m pip install --upgrade pip
+          pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
       - name: Ruff — lint
@@ -64,13 +80,32 @@ jobs:
         python-version: ["3.12"]
 
     steps:
+      # Full history, not the default shallow (`fetch-depth: 1`) clone.
+      # `tests/test_agents_docs_resolve.py::test_staleness_check_actually_catches_the_original_bug`
+      # runs the staleness checker against the exact pre-fix text of
+      # `.agents/context/repository.md` by reading it out of commit `0bd461b`
+      # (2026-08-02) -- that is the whole point of the test: proving the
+      # mechanism catches a bug that really sat undetected, rather than only
+      # agreeing with a fixture someone wrote to make it pass. A depth-1
+      # checkout does not contain that commit, so the test could only ever
+      # fail here: `git show` exits 128 and the assertion is never reached.
+      #
+      # It went unnoticed because this job has been *skipped*, not run, since
+      # `lint` went red -- the same gating trap TASK-040 exists to close. Only
+      # this job runs the whole `tests/` tree, so only this checkout needs the
+      # history; the others name single files that do not touch git. The cost
+      # is small and measured: 794 commits, 2.77 MiB packed.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
+
+      - uses: ./.github/actions/qt-system-libs
 
       - name: Install dependencies
         run: |
@@ -116,6 +151,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - uses: ./.github/actions/qt-system-libs
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -142,6 +179,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - uses: ./.github/actions/qt-system-libs
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -159,7 +198,7 @@ jobs:
       - name: Wiring inspection (sagittarius-doctor)
         run: |
           pip install -e .
-          QT_QPA_PLATFORM=offscreen sagittarius-doctor \
+          sagittarius-doctor \
             examples.student_management.doctor_target:build \
             --handler-package examples.student_management \
             --strict
@@ -187,6 +226,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+
+      - uses: ./.github/actions/qt-system-libs
 
       - name: Install dependencies
         run: |
@@ -283,6 +324,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+
+      # Installing the libraries rather than exempting the Qt modules,
+      # deliberately: this script's own docstring says an exemption list "should
+      # be a deliberate, argued change rather than a quiet append", and exempting
+      # Qt would blind the guard to the largest package in the wheel.
+      - uses: ./.github/actions/qt-system-libs
 
       - name: Install build tooling
         run: |

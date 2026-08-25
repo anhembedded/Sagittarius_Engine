@@ -169,3 +169,36 @@ reason and only when the suite is launched through `scripts/ci-local.ps1` under 
 that test shells out to `grep`, which is not on `PATH` in that context
 (`FileNotFoundError: [WinError 2]`). Same class of problem as `TASK-028`. Not covered by this
 bug; filed here only so the two are not conflated again.
+
+---
+
+## Further evidence (2026-08-25, `TASK-040`)
+
+Two points the original report could not establish, both measured while getting the `test` job
+running again:
+
+**It is not Windows-only, and not tied to `ci-local.ps1`.** It reproduces on Linux under plain
+`pytest`, in this container, with `QT_QPA_PLATFORM=offscreen`.
+
+**It is nondeterministic run-to-run, not merely order-dependent.** The *same* command — CI's
+own `pytest tests/ examples/student_management/tests/ --cov=sagittarius_engine
+--cov-fail-under=80 -q` — run twice in a row, unchanged tree, gave:
+
+| Run | Result |
+|---|---|
+| 1 | `1258 passed, 8 skipped` |
+| 2 | `1 failed, 1257 passed, 8 skipped` — `test_roster_screen_emits_no_qml_runtime_warnings` |
+
+Run in isolation the same file is `7 passed`. So the trigger is not collection order alone,
+which is stable between identical invocations; something run-to-run variable (hash seed,
+font-database initialisation timing) decides which test's handler is installed when the
+once-per-process platform warning is emitted.
+
+This strengthens requirement 3: an ordering-only regression test — running the two commands in
+both orders — would **not** have caught this, because both orders can pass. The fix needs to
+remove the dependency on *when* the warning is emitted (requirement 2's second or third
+option), not just pin the order.
+
+**Not observed in GitHub Actions CI yet.** The run that finally exercised this job
+(`5dbdccd`) reported only the `0bd461b` shallow-clone failure; both QML warning tests passed
+there. That is luck, not immunity — the same coin-flip applies on the runner.
