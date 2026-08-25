@@ -181,3 +181,50 @@ summary, and they fail nothing — the same lines appear on a fully green local 
 noise that buries the one line that matters, which is why this failure looked like a QML
 problem for as long as it did. `BUG-006` already covers the QML warning tests; this is not
 that, and nothing here was changed for it.
+
+---
+
+## Outcome in CI
+
+Run `5fab915` on `claude/dazzling-clarke-knjtv4`:
+
+| Job | Before this task | After |
+|---|---|---|
+| `Lint & Type Check` | ❌ | ✅ |
+| `Package Import Guard` | ❌ | ✅ |
+| `Test (3.12, ubuntu-latest)` | ⏭️ skipped | ✅ |
+| `Test (3.12, windows-latest)` | ⏭️ skipped | ❌ — 2 pre-existing, both filed |
+| `Architecture Guard` / `Reference Applications` / `Performance Benchmark` / `Build & Distribute Check` | ⏭️ skipped | ⏭️ still gated on Windows |
+| `Security Audit` | ❌ | ❌ — out of scope, see above |
+
+Ubuntu is green: **1259 passed, 7 skipped**, coverage 90.72%.
+
+### The Windows failures are pre-existing, and that is measured, not asserted
+
+The same job across the two commits, which is what makes the claim checkable:
+
+| Test | `5dbdccd` | `5fab915` |
+|---|---|---|
+| `test_gallery_emits_no_qml_runtime_warnings` | FAILED | FAILED — `BUG-006` |
+| `test_staleness_check_actually_catches_the_original_bug` | FAILED | **fixed here** |
+| `test_gate_reports_failure_when_a_required_tool_is_missing` | FAILED | FAILED — `BUG-009` |
+| `test_roster_screen_emits_no_qml_runtime_warnings` | FAILED | passed — `BUG-006`'s coin-flip |
+| | `4 failed, 1257 passed` | `2 failed, 1259 passed` |
+
+Neither remaining failure is reachable from this task's change, and neither is fixed here:
+
+- **`BUG-006`** — the Windows runner has no fonts, so Qt emits
+  `QFontDatabase: Cannot find font directory`, and these two tests assert the Qt message stream
+  is *entirely* empty. Already open, and the bug report quotes this exact warning. Fixing it
+  means choosing among the three options its requirement 2 lists — a judgement call about what
+  the guard is for, not an environment fix.
+- **`BUG-009`** — filed by this task. `subprocess.run(capture_output=True, text=True)` returns
+  `stdout=None` on Windows for the `pwsh` invocation, so the test dies before its assertions.
+  Not reproducible in this Linux container (no `pwsh`, so it skips), and the obvious one-line
+  patch would turn a crash into a guard that can pass without reading the output it checks — the
+  same false-positive shape `TASK-028` exists to prevent. Filed with that analysis rather than
+  patched blind.
+
+So `test` on Windows, and the four jobs gated behind it, stay red until those two are addressed.
+That is a smaller and fully-named remainder than the "five jobs silently skipped" this task
+started from, and every part of it is now visible instead of hidden behind a green-looking skip.
