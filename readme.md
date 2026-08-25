@@ -47,7 +47,18 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
 - **Cooperative cancellation** — cancel long-running background tasks gracefully using `CancellationToken`.
 - **Unified dispatcher** — route commands and queries through a single `app.dispatch()` call.
 - **Multiple Event Bus strategies** — synchronous, thread-pool, and asyncio variants.
-- **Remote Audit Dashboard (TUI)** — inspect live engine telemetry (tasks, extensions, health) from a separate terminal via the built-in HTTP telemetry server.
+A **Remote Audit Dashboard (TUI)** was listed here until 2026-08-25 — "inspect live engine
+telemetry from a separate terminal via the built-in HTTP telemetry server". Every part of that
+sentence was wrong, so the bullet is gone rather than reworded:
+
+- There is no HTTP telemetry server. Telemetry moved to WebSocket in `f0247bd` and the CLI was
+  never updated, so it polls `http://localhost:9999` against a socket that speaks WebSocket and
+  reports a connection error on every refresh.
+- Neither client works at all. The GUI connects but renders `str(payload)` into a text box; the
+  `sagittarius-audit` command has never started for any consumer (`TASK-039`) and is no longer
+  advertised.
+
+`EPIC-005` covers the rebuild. This line comes back when there is something behind it.
 
 ---
 
@@ -148,9 +159,16 @@ Please review our [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on 
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feature/your-feature`.
 3. Commit your changes following the existing code style.
-4. Open a pull request against `develop`.
+4. Open a pull request against `main` — there is no `develop` branch, despite what this line
+   said until 2026-08-25. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Please ensure all tests pass and the documentation builds without errors before submitting.
+Please ensure all tests pass before submitting.
+
+> This asked for "the documentation builds without errors" until 2026-08-25 — contradicting the
+> Documentation section above, which records that the MkDocs site was deleted in `a338d42`.
+> There is no documentation build. `BUG-002` removed `mkdocs.yml`, `requirements-docs.txt` and
+> `scripts/docs.{sh,bat}`, but missed the root `Makefile`, whose three targets all invoked
+> `mkdocs`; `make build` failed with `No module named mkdocs`. That file is deleted too.
 
 ---
 

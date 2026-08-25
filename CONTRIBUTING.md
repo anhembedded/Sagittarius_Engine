@@ -7,10 +7,14 @@ Thank you for your interest in contributing to **Sagittarius Engine**! We welcom
 ## 🚀 How to Contribute
 
 ### 1. Branch Strategy
-- Main branch: `main` (production-ready releases)
-- Development branch: `develop` (active development target)
+- Main branch: `main` — **the integration target.** Open pull requests against it.
 - Feature branches: `feature/short-description`
 - Bugfix branches: `fix/short-description`
+
+> A `develop` branch was listed here as "the active development target" until 2026-08-25.
+> **It does not exist** — `git ls-remote --heads origin develop` returns nothing, and every
+> merged pull request to date targets `main`. A contributor following this file would have
+> opened their PR against a branch that is not there.
 
 ### 2. Development Setup
 ```bash
@@ -18,9 +22,16 @@ Thank you for your interest in contributing to **Sagittarius Engine**! We welcom
 git clone https://github.com/anhembedded/Sagittarius-Engine.git
 cd Sagittarius-Engine
 
-# Install in editable mode with dev dependencies
-pip install -e .[dev]
+# Install in editable mode, plus the dev toolchain
+pip install -e .
+pip install -r requirements-dev.txt
 ```
+
+> This said `pip install -e .[dev]` until 2026-08-25. There is no `dev` extra —
+> `[project.optional-dependencies]` declares only `audit` — so pip printed
+> `WARNING: sagittarius-engine 2.3.0 does not provide the extra 'dev'`, installed nothing
+> extra, and **exited 0**. Anyone following this file got no pytest, no ruff and no mypy, with
+> no error to tell them. The pinned toolchain lives in `requirements-dev.txt`.
 
 ### 3. Code Style & Standards
 - Python **3.12+** syntax.
@@ -55,7 +66,7 @@ If your changes affect public APIs or runtime behaviors:
 ## 📬 Submitting a Pull Request
 
 1. Push your branch to GitHub.
-2. Open a Pull Request targeting `develop`.
+2. Open a Pull Request targeting `main`.
 3. Provide a clear PR description detailing:
    - What changed
    - Why the change is needed

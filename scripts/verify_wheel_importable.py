@@ -34,15 +34,41 @@ What it does
 4. ``compileall`` over the *installed* package. This needs no dependencies and
    catches every syntax error in shipped bytes -- the hermetic half.
 5. Imports every module the wheel ships, via ``pkgutil.walk_packages``.
+6. Resolves every ``console_scripts`` entry point the installed distribution
+   declares, and checks each one is actually callable.
 
 Steps 4 and 5 are deliberately both present: compileall cannot catch an
 import-time failure (a bad top-level call, a circular import), and the import
 sweep cannot run at all if a dependency is missing. Together they cover the
 "shipped package is unusable" class.
 
-The import sweep is strict: any failure fails the build. As of this commit
-every module in the package imports cleanly under the declared requirements,
-so there is no exemption list to maintain -- and adding one should be a
+Step 6 covers a class neither of them can reach, and it is not hypothetical:
+``TASK-002`` shipped ``sagittarius-audit`` as a documented, ✅-completed
+feature while the command could not start at all, and that survived a month.
+Three separate faults were involved, and steps 4 and 5 are blind to every one
+of them:
+
+* The target module imported ``PySide6`` at module scope while the wheel
+  declares no dependencies, so the command died before reaching its own code.
+* Its inner imports were bare (``from application...``), resolving only when
+  the process happened to start in one specific directory.
+* The entry point named ``pkg.module`` where a *function* was required, so
+  the generated launcher called a module object.
+
+Steps 4 and 5 miss all three because the script lived in a package the sweep
+does not walk, and because importing a module is not the same as resolving
+``module:attr`` and confirming the result can be called. An entry point is a
+promise printed into the distribution's metadata; nothing else here checks
+that the promise is kept.
+
+Step 6 resolves but never *invokes* the target. Running it would launch the
+application -- a GUI, a server, a REPL -- which is not something a CI guard
+can do meaningfully. Resolution plus a callability check catches all three
+faults above without starting anything.
+
+Both sweeps are strict: any failure fails the build. As of this commit every
+module in the package imports cleanly under the declared requirements, so
+there is no exemption list to maintain -- and adding one should be a
 deliberate, argued change rather than a quiet append.
 
 Usage::
@@ -73,8 +99,10 @@ PACKAGE = "sagittarius_engine"
 # the installed package -- it executes with cwd set outside the repo.
 _VERIFY = r"""
 import compileall, importlib, pkgutil, sys, traceback
+from importlib.metadata import distribution
 
 package = sys.argv[1]
+dist_name = sys.argv[2]
 
 try:
     pkg = importlib.import_module(package)
@@ -87,14 +115,14 @@ root = pkg.__path__[0]
 print(f"installed at: {root}", flush=True)
 
 # --- 1. syntax gate over the installed files (no dependencies needed) -------
-print("\n[1/2] compileall over the installed package", flush=True)
+print("\n[1/3] compileall over the installed package", flush=True)
 if not compileall.compile_dir(root, quiet=1, force=True):
     print("FAIL: the installed package contains files that do not compile.")
     sys.exit(1)
 print("ok - every shipped module compiles", flush=True)
 
 # --- 2. import every module the wheel ships --------------------------------
-print("\n[2/2] importing every shipped module", flush=True)
+print("\n[2/3] importing every shipped module", flush=True)
 failures = []
 count = 0
 for info in pkgutil.walk_packages(pkg.__path__, package + "."):
@@ -114,7 +142,60 @@ if failures:
     sys.exit(1)
 
 print(f"ok - all {count} shipped modules imported", flush=True)
-print("\nPASS: the built wheel installs and imports in a clean environment.")
+
+# --- 3. resolve every console script the distribution advertises ------------
+# An entry point is a promise written into the metadata: "this command exists
+# and can be run". Steps 1 and 2 cannot check it -- the target may live in a
+# package the sweep does not walk, and importing a module proves nothing about
+# whether `module:attr` resolves to something callable.
+print("\n[3/3] resolving declared console scripts", flush=True)
+scripts = [ep for ep in distribution(dist_name).entry_points
+           if ep.group == "console_scripts"]
+
+if not scripts:
+    print("ok - the distribution declares no console scripts", flush=True)
+else:
+    bad = []
+    for ep in sorted(scripts, key=lambda e: e.name):
+        try:
+            # .load() imports the module and walks to the attribute -- the
+            # same two steps the generated launcher performs. It does not
+            # call it; invoking a console script would start the application.
+            target = ep.load()
+        except BaseException as exc:
+            bad.append((ep.name, f"{ep.value} -> {type(exc).__name__}: {exc}",
+                        traceback.format_exc()))
+            print(f"  FAIL {ep.name} = {ep.value}: "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+            continue
+
+        if not callable(target):
+            kind = type(target).__name__
+            bad.append((ep.name,
+                        f"{ep.value} resolves to a {kind}, which is not callable"
+                        " -- the generated launcher would raise TypeError",
+                        ""))
+            print(f"  FAIL {ep.name} = {ep.value}: resolves to a {kind}, "
+                  f"not a callable", flush=True)
+            continue
+
+        print(f"  ok   {ep.name} = {ep.value}", flush=True)
+
+    if bad:
+        print(f"\nFAIL: {len(bad)} of {len(scripts)} console scripts "
+              f"cannot be run by a consumer.\n")
+        for name, reason, tb in bad:
+            print("=" * 70)
+            print(f"{name}: {reason}")
+            if tb:
+                print(tb)
+        sys.exit(1)
+
+    print(f"ok - all {len(scripts)} console scripts resolve to a callable",
+          flush=True)
+
+print("\nPASS: the built wheel installs, imports, and every advertised "
+      "command resolves.")
 """
 
 
@@ -199,7 +280,16 @@ def main() -> int:
         # cwd is deliberately outside the repository: run from REPO_ROOT and
         # the local sagittarius_engine/ source directory would shadow the
         # installed one, and the guard would verify the wrong bytes.
-        result = subprocess.run([str(py), str(script), PACKAGE], cwd=str(tmp))
+        # The distribution name is not the import name -- "sagittarius-engine"
+        # vs "sagittarius_engine" -- and step 3 looks up metadata, not a
+        # module. Take it from the wheel filename, whose first "-" field is
+        # the distribution name by PEP 427, so the guard reads it off the
+        # artifact rather than assuming it matches PACKAGE.
+        dist_name = wheel.name.split("-")[0]
+
+        result = subprocess.run(
+            [str(py), str(script), PACKAGE, dist_name], cwd=str(tmp)
+        )
         return result.returncode
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

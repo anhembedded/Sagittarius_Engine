@@ -41,6 +41,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-037** | `IView` dual QML/QWidget rendering backend — enroll-form prototype validated, then rolled out to the full roster screen (`WidgetRosterView`, `run.ps1 -QtWidget`) | Architecture / Presentation Layer | 2026-08-23 | [TASK-037_iview_dual_backend_prototype_validated.md](completed/TASK-037_iview_dual_backend_prototype_validated.md) |
 | **TASK-038** | `pyside_mvc.widgets` — QtWidgets base classes (`Surface`/`Card`/`Panel`/`Overlay`/`Styled*`) replacing the QML kit, built for Elite's `EPIC-006` (drop QML project-wide) | Architecture / Presentation Layer | 2026-08-24 | [TASK-038_qtwidgets_base_classes_surface_overlay_controls.md](completed/TASK-038_qtwidgets_base_classes_surface_overlay_controls.md) |
 | **TASK-034** | `extensions/__init__.py` barrel made lazy (PEP 562 `__getattr__`) — deep-importing one extension no longer pulls in its five siblings | Architecture / Package Boundaries | 2026-08-24 | [TASK-034_extensions_barrel_eager_imports_everything.md](completed/TASK-034_extensions_barrel_eager_imports_everything.md) |
+| **TASK-039** | Wheel guard now resolves every advertised console script; caught `sagittarius-audit`, which has never run since `TASK-002` and is removed rather than repaired | Build / Packaging — Release Gate | 2026-08-25 | [TASK-039_wheel_guard_never_checked_console_scripts.md](completed/TASK-039_wheel_guard_never_checked_console_scripts.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 
@@ -82,6 +83,8 @@ link is kept here; content is not duplicated.
 | **[EPIC-002](epics/EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | ✅ Completed 2026-08-23 (4/4 subtasks done) |
 | **[EPIC-003](epics/EPIC-003_database_extension_multi_db/README.md)** | `DatabaseExtension` Multi-Database Support — named/sharded databases via `IDatabaseManager`, supersedes `TASK-019` | ✅ Completed 2026-08-23 (4/4 subtasks done) |
 | **[EPIC-004](epics/EPIC-004_sqlite_shard_manager_and_elite_migration/README.md)** | Sharded-SQLite Manager & Elite Migration — absorb the consuming app's generic sharding layer into the engine, then migrate it onto it | ✅ Completed 2026-08-23 (3/3 subtasks done) |
+| **[EPIC-005](epics/EPIC-005_audit_telemetry_rebuild/README.md)** | Audit Telemetry Teardown & Trace Recorder — both dashboard clients are 100% non-functional; delete them and the server, rebuild the recorder half of SystemView, export to Perfetto/OpenTelemetry rather than building a timeline UI. Supersedes `TASK-002` | ⏸️ On hold — spec complete, deferred behind `EPIC-006` |
+| **[EPIC-006](epics/EPIC-006_wiring_and_readiness_diagnostics/README.md)** | Wiring & Readiness Diagnostics — join `EventRegistry` (declared) against `IEventBus` (subscribed) to catch mis-wiring at boot, plus an explicit `app.ready` milestone. Catches the silent-typo class nothing else can | 📋 Spec awaiting approval (0/6 subtasks) |
 
 ---
 
