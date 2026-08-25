@@ -20,6 +20,12 @@ from ..surface import Card
 _DEFAULT_COPY_TEXT = "Copy"
 _DEFAULT_CLEAR_TEXT = "Clear"
 
+#: How the header badge renders the entry count. A format string rather than
+#: a bare number, because the reference consumer's badge reads "340 EVENTS" —
+#: the count carries a unit the panel has no way to guess. `{count}` is the
+#: only field; anything else in the string is literal.
+_DEFAULT_BADGE_FORMAT = "{count}"
+
 
 class LogModel(Protocol):
     """
@@ -70,14 +76,14 @@ class LogPanel(Card):
         *,
         copy_text: str = _DEFAULT_COPY_TEXT,
         clear_text: str = _DEFAULT_CLEAR_TEXT,
-        empty_badge_text: str = "0",
+        badge_format: str = _DEFAULT_BADGE_FORMAT,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(title, parent)
         self._model: LogModel | None = None
-        self._empty_badge_text = empty_badge_text
+        self._badge_format = badge_format
 
-        self._count_badge = Badge(empty_badge_text)
+        self._count_badge = Badge(self._format_count(0))
         self.header_actions.addWidget(self._count_badge)
 
         self.copy_button = StyledButton(copy_text, role=StyleRole.SECONDARY_BUTTON)
@@ -132,11 +138,12 @@ class LogPanel(Card):
             # holds, so there is nothing to recover from.
             pass
 
+    def _format_count(self, count: int) -> str:
+        return self._badge_format.format(count=count)
+
     def _update_count(self) -> None:
-        if self._model is None:
-            self._count_badge.setText(self._empty_badge_text)
-            return
-        self._count_badge.setText(str(self._model.rowCount(QModelIndex())))
+        count = 0 if self._model is None else self._model.rowCount(QModelIndex())
+        self._count_badge.setText(self._format_count(count))
 
     def _copy_all(self) -> None:
         if self._model is not None:
