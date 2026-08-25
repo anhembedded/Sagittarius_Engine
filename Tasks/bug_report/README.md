@@ -37,9 +37,9 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 2 |
+| 🔴 **Open** | 3 |
 | ✅ **Fixed** | 5 |
-| 📈 **Total** | **7** |
+| 📈 **Total** | **8** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -57,6 +57,7 @@ bug fixed in commit `568d3bb`. Future defects should come here first.
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-008](incomplete/BUG-008_apply_role_qss_cascades_into_every_child.md)** | `apply_role()` writes unscoped QSS for `SURFACE`/`SECTION_LABEL`/`CAPTION`/`TABLE_HEADER`/`CHECKBOX`/`FIELD`, so a `Card`/`Panel` restyles every child widget that has no stylesheet of its own | High | 2026-08-25 | First real consumer of `Card` (`EPIC-007E`, `ChartCard`) hit it immediately: a toolbar with unstyled buttons lost its chrome the moment it sat inside a `Card`. Fix: scope with a type selector (`Card {{ ... }}`), same as `MetricCardWidget` already does by hand in the app repo. |
 | **[BUG-007](incomplete/BUG-007_resilient_bus_drops_a_subscription_on_name_collision.md)** | `ResilientEventBus.on()` silently drops a subscription when two event classes share a `__name__` | Medium | 2026-08-25 | Keys `_wrapper_map` by `__name__` while the rest of the package keys by `event_name`/`__qualname__`; the colliding second `on()` early-returns and the handler never fires. Reproduced. Found while fixing `EPIC-008C`, filed separately rather than fixed inline. |
 | **[BUG-006](incomplete/BUG-006_qml_warning_tests_are_order_dependent.md)** | The two "no QML runtime warnings" tests assert on the whole Qt message stream, so a once-per-process platform warning makes them order-dependent | Medium | 2026-08-25 | gallery-first → gallery fails; roster-first → both pass. Same code, opposite results. On Windows the contaminant is a `QFontDatabase` platform warning; **on Linux it is 32 `RosterScreen.qml` teardown `TypeError`s** that normally land after pytest's summary line and move inside the test when unrelated test files shift timing (found 2026-08-25 during `EPIC-007A`). Neither is a QML binding error the test was written to catch. **Đo 2026-08-25: không chỉ phụ thuộc thứ tự mà còn KHÔNG TẤT ĐỊNH** — cùng commit, cùng lệnh, 3 lần chạy cho 1 đỏ / 2 xanh. Suite xanh không còn là bằng chứng cho test này. |
 
