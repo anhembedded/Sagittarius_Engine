@@ -53,3 +53,12 @@ code written before `IExtension` existed. Declares `register(app)`, `boot(app)`,
 what the adapter reads via `getattr`. **Do not use this for new code** — see
 `docs/module_registration.md` for why the deleted old sample's choice of `IModule` made it a
 worse reference, not a different-but-valid one.
+
+---
+
+## `DiagnosticsExtension`
+
+Attaches the wiring inspection to the readiness milestone: `app.use(DiagnosticsExtension())`,
+optionally with `fail_fast=True` to abort a boot on a wiring error. It reaches the lifecycle
+through `context.lifecycle.when_ready()`, never the other way round — the kernel knows nothing
+about diagnostics. See [`diagnostics.md`](diagnostics.md).

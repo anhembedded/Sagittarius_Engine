@@ -151,6 +151,19 @@ jobs:
       - name: Run example integration tests
         run: PYTHONPATH=. pytest tests/test_examples.py -v
 
+      # EPIC-006E. Runs the wiring inspection against the reference application
+      # the same way a consumer would run it against theirs -- the installed
+      # command, not an import of the library. `--strict` because the sample app
+      # is expected to be exemplary: a warning here is a defect in what this
+      # repository holds up as how to build on the engine.
+      - name: Wiring inspection (sagittarius-doctor)
+        run: |
+          pip install -e .
+          QT_QPA_PLATFORM=offscreen sagittarius-doctor \
+            examples.student_management.doctor_target:build \
+            --handler-package examples.student_management \
+            --strict
+
   # ──────────────────────────────────────────────────────────────
   # Job 5: Benchmark (informational, never blocks)
   # ──────────────────────────────────────────────────────────────
