@@ -42,6 +42,12 @@ DEFAULT_TYPOGRAPHY_TOKENS: dict[str, float] = {
     "fontSizeSm": 11,
     "fontSizeMd": 13,
     "fontSizeLg": 16,
+    #: The display tier — a stat card's headline figure, the one number a
+    #: screen exists to show. Added by `EPIC-007F`: `StatCard` shipped with
+    #: *no* size on its value at all, so the figure it calls a headline
+    #: rendered at the widget default (9pt), because the scale stopped at
+    #: `fontSizeLg` and there was no tier to name.
+    "fontSizeXl": 20,
 }
 
 #: Durations in milliseconds — matches the 150-250ms micro-animation range

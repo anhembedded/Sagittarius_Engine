@@ -106,3 +106,54 @@ def test_tone_resolves_through_the_palette_not_a_baked_colour(qtbot):
 
     live_success = str(get_theme_bridge().value("success"))
     assert live_success in card._value_label.styleSheet()
+
+
+def test_the_headline_figure_is_actually_headline_sized(qtbot, fake_theme_bridge):
+    """The defect that motivated `STAT_VALUE`: this card calls its value a
+    headline figure and shipped with no font rule on it at all, so it
+    rendered at the widget default while the caption beside it was
+    explicitly sized. Size and weight must come from the role."""
+    card = StatCard("Net profit")
+    qtbot.addWidget(card)
+
+    card.set_value("1,284.50", tone=Tone.POSITIVE)
+
+    qss = card._value_label.styleSheet()
+    assert "<fontSizeXl>" in qss
+    assert "font-weight: bold" in qss
+
+
+def test_the_value_tone_lands_in_a_rule_qt_will_apply(qtbot, fake_theme_bridge):
+    """Same structural trap as `BUG-009`: the per-instance colour is
+    appended after the role's block, so it must carry its own selector
+    rather than dangle as a bare property."""
+    card = StatCard("Net profit")
+    qtbot.addWidget(card)
+
+    card.set_value("-42.10", tone=Tone.NEGATIVE)
+
+    qss = card._value_label.styleSheet()
+    assert "<danger>" in qss
+    assert qss.rstrip().endswith("}"), f"tone override dangles, Qt drops it: {qss!r}"
+
+
+def test_the_card_lifts_under_the_pointer(qtbot, fake_theme_bridge):
+    """`STAT_CARD` exists to carry this. Expressed as QSS `:hover`, not an
+    enterEvent/leaveEvent pair, so it cannot get stuck in the hovered look
+    when a leave event is missed."""
+    card = StatCard("Net profit")
+    qtbot.addWidget(card)
+
+    assert "QFrame:hover" in card.styleSheet()
+    assert "<stateHoverBg>" in card.styleSheet()
+
+
+def test_the_title_text_survives_round_trip(qtbot, fake_theme_bridge):
+    """The title is styled, never rewritten. Uppercasing it here would make
+    the inherited `Card.title` lossy — a caller could not read back what it
+    set."""
+    card = StatCard("Net Profit")
+    qtbot.addWidget(card)
+
+    assert card.title == "Net Profit"
+    assert "<muted>" in card._title_label.styleSheet()
