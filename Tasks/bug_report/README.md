@@ -37,9 +37,9 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 2 |
+| 🔴 **Open** | 4 |
 | ✅ **Fixed** | 7 |
-| 📈 **Total** | **9** |
+| 📈 **Total** | **11** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -51,12 +51,34 @@ found in the *same* audit that already had a fix applied were tracked as tasks i
 they were closed in the same session — see `TASK-024`, `TASK-025`, and the `ITaskHandle` import
 bug fixed in commit `568d3bb`. Future defects should come here first.
 
+### ⚠️ Numbering is not automatic — two sessions collided here
+
+On 2026-08-25 two sessions each took "the next number" at the same time and
+**both `BUG-008` and `BUG-009` were used twice**, for four different defects.
+Worse, both `BUG-008`s were cited from source: `style.py` meant the QSS
+cascade, `bootstrap.py` meant the post-boot stranding.
+
+Resolved by renumbering the two that were still **open** (they had to be added
+to this board anyway) to `BUG-010`/`BUG-011`, and updating every reference —
+`bootstrap.py`, `EPIC-006C`, that epic's README, and `TASK-040`. The two fixed
+ones keep `BUG-008`/`BUG-009`, which are already cited from regression-test
+docstrings and the app repo.
+
+`tests/test_bug_board_is_consistent.py` now blocks a repeat: no number may be
+used twice, every file must have a row here, and every row must point at a file
+that exists.
+
+Elite's own `BUG-008`/`BUG-009` are unrelated and fine — the two boards are
+deliberately independent (see the top of this file).
+
 ---
 
 ## 🔴 Open
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-011](incomplete/BUG-011_ci_local_gate_test_crashes_on_windows_stdout_none.md)** | `test_ci_local_gate_missing_tool` crashes on Windows: `result.stdout` is `None` despite `capture_output=True` | Medium | 2026-08-25 | A `TASK-028` regression guard that cannot report on the one platform it guards. Filed by `TASK-040`, once the `test` job actually started running again. **Renumbered from `BUG-009` on 2026-08-25** — see the numbering note below. |
+| **[BUG-010](incomplete/BUG-010_post_boot_registration_strands_an_extension_silently.md)** | Registering an extension after boot strands it silently, and the engine still reports `ready` | Medium | 2026-08-25 | `ExtensionManager.register()` defers an extension whose dependencies are unmet and never raises, so a plugin added to a running engine sits uninitialised while lifecycle still reads `ready`. Found by `EPIC-006C`. **Renumbered from `BUG-008` on 2026-08-25** — see the numbering note below. |
 | **[BUG-007](incomplete/BUG-007_resilient_bus_drops_a_subscription_on_name_collision.md)** | `ResilientEventBus.on()` silently drops a subscription when two event classes share a `__name__` | Medium | 2026-08-25 | Keys `_wrapper_map` by `__name__` while the rest of the package keys by `event_name`/`__qualname__`; the colliding second `on()` early-returns and the handler never fires. Reproduced. Found while fixing `EPIC-008C`, filed separately rather than fixed inline. |
 | **[BUG-006](incomplete/BUG-006_qml_warning_tests_are_order_dependent.md)** | The two "no QML runtime warnings" tests assert on the whole Qt message stream, so a once-per-process platform warning makes them order-dependent | Medium | 2026-08-25 | gallery-first → gallery fails; roster-first → both pass. Same code, opposite results. On Windows the contaminant is a `QFontDatabase` platform warning; **on Linux it is 32 `RosterScreen.qml` teardown `TypeError`s** that normally land after pytest's summary line and move inside the test when unrelated test files shift timing (found 2026-08-25 during `EPIC-007A`). Neither is a QML binding error the test was written to catch. **Đo 2026-08-25: không chỉ phụ thuộc thứ tự mà còn KHÔNG TẤT ĐỊNH** — cùng commit, cùng lệnh, 3 lần chạy cho 1 đỏ / 2 xanh. Suite xanh không còn là bằng chứng cho test này. |
 

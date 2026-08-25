@@ -109,7 +109,7 @@ exist.
 
 Stranding is real, but only **after** boot — `register()` defers and never raises, so a plugin
 added to a running engine sits uninitialised while the state still reads `ready`. A one-shot gate
-at boot could not have caught that either. Filed as **`BUG-008`**; `EPIC-006B`'s check D1 already
+at boot could not have caught that either. Filed as **`BUG-010`**; `EPIC-006B`'s check D1 already
 reports it at any point in the engine's life, which is what that case actually needs.
 
 This is the second time in this epic that building the check first and measuring second would
@@ -122,7 +122,7 @@ have shipped something that looked right and did nothing.
   `test_subscribing_to_the_event_after_it_fired_still_misses_it`, which asserts the *limitation*
   rather than treating it as a defect.
 - **Extension registered after readiness?** Readiness is a latch; it does not reopen. The
-  post-boot stranding that motivated the question is `BUG-008`, not a state-model change.
+  post-boot stranding that motivated the question is `BUG-010`, not a state-model change.
 - **Scheduler with zero jobs?** Ready. Nothing about an empty schedule is unfinished.
 
 ### Verification

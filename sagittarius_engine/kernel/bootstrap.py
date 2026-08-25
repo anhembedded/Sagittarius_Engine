@@ -106,6 +106,6 @@ class Bootstrap:
         # extension with unmet dependencies and never raises, so a plugin added
         # to a running engine can sit uninitialised while the state still reads
         # `ready`. A one-shot gate here could not have caught that either. It is
-        # `BUG-008`, and `EPIC-006B`'s check D1 already reports it at any point
+        # `BUG-010`, and `EPIC-006B`'s check D1 already reports it at any point
         # in the engine's life, which is what that case needs.
         self.context.lifecycle.set_ready()
