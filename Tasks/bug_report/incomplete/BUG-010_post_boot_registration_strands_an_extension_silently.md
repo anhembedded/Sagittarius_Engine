@@ -1,4 +1,4 @@
-# BUG-008 — Registering an extension after boot strands it silently, and the engine still reports `ready`
+# BUG-010 — Registering an extension after boot strands it silently, and the engine still reports `ready`
 
 **Reported date:** 2026-08-25
 **Severity:** Medium (a feature that never starts, with no exception and no log — and a lifecycle state that says everything is fine)

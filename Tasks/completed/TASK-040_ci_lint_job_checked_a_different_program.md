@@ -207,7 +207,7 @@ The same job across the two commits, which is what makes the claim checkable:
 |---|---|---|
 | `test_gallery_emits_no_qml_runtime_warnings` | FAILED | FAILED — `BUG-006` |
 | `test_staleness_check_actually_catches_the_original_bug` | FAILED | **fixed here** |
-| `test_gate_reports_failure_when_a_required_tool_is_missing` | FAILED | FAILED — `BUG-009` |
+| `test_gate_reports_failure_when_a_required_tool_is_missing` | FAILED | FAILED — `BUG-011` |
 | `test_roster_screen_emits_no_qml_runtime_warnings` | FAILED | passed — `BUG-006`'s coin-flip |
 | | `4 failed, 1257 passed` | `2 failed, 1259 passed` |
 
@@ -218,7 +218,7 @@ Neither remaining failure is reachable from this task's change, and neither is f
   is *entirely* empty. Already open, and the bug report quotes this exact warning. Fixing it
   means choosing among the three options its requirement 2 lists — a judgement call about what
   the guard is for, not an environment fix.
-- **`BUG-009`** — filed by this task. `subprocess.run(capture_output=True, text=True)` returns
+- **`BUG-011`** — filed by this task. `subprocess.run(capture_output=True, text=True)` returns
   `stdout=None` on Windows for the `pwsh` invocation, so the test dies before its assertions.
   Not reproducible in this Linux container (no `pwsh`, so it skips), and the obvious one-line
   patch would turn a crash into a guard that can pass without reading the output it checks — the

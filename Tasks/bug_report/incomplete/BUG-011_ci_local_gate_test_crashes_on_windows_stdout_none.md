@@ -1,4 +1,4 @@
-# BUG-009 — `test_ci_local_gate_missing_tool` crashes on Windows: `result.stdout` is `None` despite `capture_output=True`
+# BUG-011 — `test_ci_local_gate_missing_tool` crashes on Windows: `result.stdout` is `None` despite `capture_output=True`
 
 **Reported date:** 2026-08-25
 **Severity:** Medium (a `TASK-028` regression guard that cannot report on the one platform it guards)
