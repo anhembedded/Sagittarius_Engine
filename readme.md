@@ -47,6 +47,7 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
 - **Cooperative cancellation** — cancel long-running background tasks gracefully using `CancellationToken`.
 - **Unified dispatcher** — route commands and queries through a single `app.dispatch()` call.
 - **Multiple Event Bus strategies** — synchronous, thread-pool, and asyncio variants.
+- **Wiring diagnostics** — `sagittarius-doctor` reports mis-wiring (typo'd event names, unbound dependencies, dependency cycles, extensions that never initialised) as a build failure instead of a runtime surprise. See below.
 A **Remote Audit Dashboard (TUI)** was listed here until 2026-08-25 — "inspect live engine
 telemetry from a separate terminal via the built-in HTTP telemetry server". Every part of that
 sentence was wrong, so the bullet is gone rather than reworded:
@@ -102,6 +103,81 @@ app.boot()
 print(f"Engine booted: {config.get('app.name')}")
 app.stop()
 ```
+
+---
+
+## Checking your wiring — `sagittarius-doctor`
+
+Installing the package puts one command on your `PATH`. Point it at a factory that returns a
+booted `App` and it reports what does not add up:
+
+```console
+$ sagittarius-doctor myapp.main:build_app --handler-package myapp
+Wiring report: 1 error(s), 1 warning(s), 3 info.
+  [A2] ERROR: order.cancelld — a handler is subscribed to this name, but no event is
+       registered under it — the handler can never run
+        → did you mean "order.cancelled"?
+  [B2] WARNING: ReportHandler.store — needs IReportStore, which is not bound. This does not
+       raise: the container will construct IReportStore itself and inject that
+        → bind IReportStore explicitly if a real implementation was intended
+```
+
+Both of those are defects that a passing test suite will not show you. The first is a handler
+wired to a name nothing emits — it simply never runs. The second is worse: nothing raises. The
+container constructs the annotation itself and injects an empty stand-in, so the application
+starts, serves, and behaves wrongly.
+
+### The arguments
+
+| | |
+| :--- | :--- |
+| `factory` | `package.module:callable` returning a booted `App`. The working directory is put on `sys.path`, so a factory in the project you are standing in resolves. |
+| `--handler-package` | Search this package for command/query handlers. Repeatable. **Without it, handlers are not checked** — nothing registers them, so there is nothing to enumerate. |
+| `--expect-unheard` | An event you deliberately do not listen to; stops it being reported. Repeatable. |
+| `--json` | Machine-readable. Boot output goes to stderr, so the document is never corrupted by an application that prints while starting. |
+| `--strict` | Exit non-zero on warnings as well as errors. |
+
+Exit codes: `0` clean · `1` findings · `2` the doctor could not run. The last is separate on
+purpose — *"your wiring is wrong"* and *"the tool never started"* need different responses from
+whoever reads the build.
+
+### In CI
+
+```yaml
+- run: |
+    pip install -e .
+    sagittarius-doctor myapp.main:build_app --handler-package myapp --strict
+```
+
+This repository runs exactly that against `examples/student_management`.
+
+### Two things worth knowing
+
+**It boots your application.** Wiring does not exist until something wires it, so there is no
+way to inspect it without running your own composition — the factory you name runs, with
+whatever side effects it has. Point it at one that uses a throwaway database, the way
+[`examples/student_management/doctor_target.py`](examples/student_management/doctor_target.py)
+does.
+
+**It does not resolve, construct, emit, or start anything to produce a finding.** Every check is
+a set difference or a static signature walk. A diagnostic that built objects in order to
+describe them would run half your application as a side effect of a question — and could not
+honestly run at boot, which is the only place it is worth running.
+
+### Inside the engine, instead of as a command
+
+```python
+from sagittarius_engine.extensions.diagnostics import DiagnosticsExtension
+
+app.use(DiagnosticsExtension(fail_fast=True))
+app.boot()   # report is logged; a wiring error aborts here
+```
+
+`fail_fast` defaults to `False` — an engine that refuses to start over a diagnostic is a worse
+default than one that says loudly what is wrong.
+
+Full reference, including every check and its severity:
+[`.agents/context/diagnostics.md`](.agents/context/diagnostics.md).
 
 ---
 
