@@ -4,36 +4,11 @@
 
 from __future__ import annotations
 
-from enum import Enum, auto
-
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from ..style import StyleRole, apply_role, semantic_colour
+from ..controls import Badge
+from ..style import StyleRole, Tone, apply_role, tone_colour
 from ..surface import Card
-
-
-class Tone(Enum):
-    """
-    @brief Whether a figure reads as good, bad, or merely a number.
-
-    @details A semantic name, not a colour. The reference consumer computes
-    `BULL_COLOR if net_profit >= 0 else BEAR_COLOR` upstream and hands the
-    widget a raw hex string — which is exactly the "a literal with extra
-    steps" pattern the token vocabulary exists to end. The comparison stays
-    upstream, where the domain knowledge is; only its *answer* crosses into
-    the widget, and this package decides what green means.
-    """
-
-    NEUTRAL = auto()
-    POSITIVE = auto()
-    NEGATIVE = auto()
-
-
-_TONE_TOKENS: dict[Tone, str] = {
-    Tone.NEUTRAL: "textPrimary",
-    Tone.POSITIVE: "success",
-    Tone.NEGATIVE: "danger",
-}
 
 
 class StatCard(Card):
@@ -73,20 +48,18 @@ class StatCard(Card):
         value_row.addWidget(self._value_label)
 
         self._suffix_label = QLabel(suffix)
-        apply_role(self._suffix_label, StyleRole.SECTION_LABEL)
+        apply_role(self._suffix_label, StyleRole.CAPTION)
         self._suffix_label.setVisible(bool(suffix))
         value_row.addWidget(self._suffix_label)
 
-        self._badge_label = QLabel()
-        apply_role(self._badge_label, StyleRole.BADGE)
-        self._badge_label.setVisible(False)
+        self._badge_label = Badge()
         value_row.addWidget(self._badge_label)
 
         value_row.addStretch(1)
         self.body_layout.addLayout(value_row)
 
         self._caption_label = QLabel(caption)
-        apply_role(self._caption_label, StyleRole.SECTION_LABEL)
+        apply_role(self._caption_label, StyleRole.CAPTION)
         self._caption_label.setVisible(bool(caption))
         self.body_layout.addWidget(self._caption_label)
 
@@ -107,9 +80,7 @@ class StatCard(Card):
     def set_value(self, value: str, *, tone: Tone = Tone.NEUTRAL) -> None:
         """@brief Sets the headline figure and how it should read."""
         self._value_label.setText(value)
-        self._value_label.setStyleSheet(
-            f"color: {semantic_colour(_TONE_TOKENS[tone])};"
-        )
+        self._value_label.setStyleSheet(f"color: {tone_colour(tone)};")
 
     def set_suffix(self, suffix: str) -> None:
         self._suffix_label.setText(suffix)
@@ -127,13 +98,11 @@ class StatCard(Card):
         self._badge_label.setVisible(bool(text))
         if not text:
             return
-        apply_role(self._badge_label, StyleRole.BADGE)
         # Appended, not rebuilt: `BADGE` renders a flat property list with no
         # selector, so a later `color:` overrides the role's own by ordinary
         # CSS last-declaration-wins. This would silently stop working if
         # `BADGE` ever grew a `QLabel { ... }` selector — a test pins the
         # tone actually reaching the rendered QSS.
         self._badge_label.setStyleSheet(
-            f"{self._badge_label.styleSheet()}color: "
-            f"{semantic_colour(_TONE_TOKENS[tone])};"
+            f"{self._badge_label.styleSheet()}color: {tone_colour(tone)};"
         )

@@ -24,7 +24,16 @@ styling behaviour lives in `apply_role()` (composition), not inheritance.
 
 from __future__ import annotations
 
-from .controls import DateTimeField, StyledButton, StyledCheckBox, StyledField
+from .controls import (
+    Badge,
+    DateTimeField,
+    SectionLabel,
+    StyledButton,
+    StyledCheckBox,
+    StyledField,
+    StyledLabel,
+    StyledProgressBar,
+)
 from .guards import (
     BareQtBaseFinding,
     InlineStylesheetFinding,
@@ -35,7 +44,14 @@ from .guards import (
 )
 from .overlay import Overlay
 from .overlays import ConfirmOverlay, PickerItem, PickerOverlay
-from .style import StyleRole, WidgetState, apply_role, semantic_colour
+from .style import (
+    StyleRole,
+    Tone,
+    WidgetState,
+    apply_role,
+    semantic_colour,
+    tone_colour,
+)
 from .surface import Card, Panel, SelectableCard, Surface
 from .surfaces import (
     Banner,
@@ -50,10 +66,10 @@ from .surfaces import (
     Tab,
     TabBar,
     TableCard,
-    Tone,
 )
 
 __all__ = [
+    "Badge",
     "Banner",
     "BareQtBaseFinding",
     "Card",
@@ -70,6 +86,7 @@ __all__ = [
     "PickerItem",
     "PickerOverlay",
     "RowAction",
+    "SectionLabel",
     "SelectableCard",
     "Severity",
     "StatCard",
@@ -77,6 +94,8 @@ __all__ = [
     "StyledButton",
     "StyledCheckBox",
     "StyledField",
+    "StyledLabel",
+    "StyledProgressBar",
     "Surface",
     "Tab",
     "TabBar",
@@ -84,9 +103,10 @@ __all__ = [
     "Tone",
     "WidgetState",
     "apply_role",
-    "semantic_colour",
     "find_bare_qt_base_widgets",
     "find_inline_stylesheets",
     "format_bare_qt_base_findings",
     "format_inline_stylesheet_findings",
+    "semantic_colour",
+    "tone_colour",
 ]

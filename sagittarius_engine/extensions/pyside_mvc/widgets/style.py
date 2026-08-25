@@ -77,8 +77,21 @@ class StyleRole(Enum):
     BANNER_INFO = auto()
     BANNER_WARN = auto()
     BANNER_DANGER = auto()
-    #: A small muted all-caps heading over a group of content.
+    #: A small muted heading over a group of content — bold and letter-
+    #: spaced, no tick. Two of the reference consumer's three section
+    #: headings look exactly like this.
     SECTION_LABEL = auto()
+    #: The same heading with an accent tick down its leading edge. Its own
+    #: role rather than a flag on `SECTION_LABEL`, because only one of the
+    #: three headings has the tick — defaulting it on would give the other
+    #: two a visual element they never had, and `apply_role`'s second
+    #: parameter is a `WidgetState`, which a tick is not.
+    SECTION_LABEL_TICKED = auto()
+    #: Muted secondary text, neither bold nor letter-spaced — a stat card's
+    #: unit suffix or its caption line. Split from `SECTION_LABEL` because a
+    #: quiet line of explanatory text should not compete with the heading
+    #: above it.
+    CAPTION = auto()
     #: The column-header strip of a `TableCard`.
     TABLE_HEADER = auto()
     PROGRESS = auto()
@@ -134,6 +147,43 @@ def apply_role(
     exists) before constructing any widget from this package.
     """
     widget.setStyleSheet(_build_qss(role, state))
+
+
+class Tone(Enum):
+    """
+    @brief Whether a figure reads as good, bad, or merely a number.
+
+    @details A semantic name, not a colour. The reference consumer computes
+    `BULL_COLOR if net_profit >= 0 else BEAR_COLOR` upstream and hands its
+    widgets a raw hex string — the "literal with extra steps" pattern the
+    token vocabulary exists to end. The comparison stays upstream, where the
+    domain knowledge is; only its *answer* crosses into a widget, and this
+    module decides what green means.
+
+    Lives here rather than beside its first consumer because it turned out
+    to have three: a stat card's headline figure, that card's badge, and a
+    data row's status pill. Every one of them is really asking positive /
+    negative / neutral, including the ones that look like they need an
+    arbitrary colour — the app's long-vs-short and profit-vs-loss badges
+    are exactly this question with hardcoded greens and reds.
+    """
+
+    NEUTRAL = auto()
+    POSITIVE = auto()
+    NEGATIVE = auto()
+
+
+#: Which semantic colour token each tone resolves to.
+TONE_TOKENS: dict[Tone, str] = {
+    Tone.NEUTRAL: "textPrimary",
+    Tone.POSITIVE: "success",
+    Tone.NEGATIVE: "danger",
+}
+
+
+def tone_colour(tone: Tone) -> str:
+    """@brief The live palette value for a tone."""
+    return _token(TONE_TOKENS[tone])
 
 
 def semantic_colour(name: str) -> str:
@@ -237,8 +287,43 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"color: {banner_accent};"
         )
 
-    if role is StyleRole.SECTION_LABEL:
-        return f"background-color: transparent;color: {_token('muted')};"
+    if role in (StyleRole.SECTION_LABEL, StyleRole.SECTION_LABEL_TICKED):
+        # `3px` and `0.8px` are written as literals, like the `1px` borders
+        # every other branch here uses: this file is where measurements
+        # live, and the guard `find_inline_stylesheets` polices colour
+        # literals, not lengths. Both match the consumer's existing heading.
+        base = (
+            f"background-color: transparent;"
+            f"color: {_token('muted')};"
+            f"font-size: {_px('fontSizeSm')};"
+            f"font-weight: bold;"
+            f"letter-spacing: 0.8px;"
+        )
+        if role is StyleRole.SECTION_LABEL:
+            return base
+        # The accent tick as a `border-left`, not a child widget — EPIC-007C
+        # required trying the QSS form and recording the outcome rather than
+        # assuming equivalence. The consumer builds a `QHBoxLayout` holding
+        # a 3x12px `QFrame` beside the text purely to draw this line: three
+        # objects per heading for what one property expresses.
+        #
+        # It is not pixel-identical, and that is the recorded difference: a
+        # border spans the label's full height, where the old frame was a
+        # fixed 12px regardless. A single-line 11px heading looks the same;
+        # a wrapped two-line one now gets a tick as tall as it is, which the
+        # old version could not do. Judged an improvement, not a regression
+        # — but it is a change, so it is written down here rather than
+        # discovered later.
+        return base + (
+            f"border-left: 3px solid {_token('accent')};padding-left: {_px('spaceSm')};"
+        )
+
+    if role is StyleRole.CAPTION:
+        return (
+            f"background-color: transparent;"
+            f"color: {_token('muted')};"
+            f"font-size: {_px('fontSizeSm')};"
+        )
 
     if role is StyleRole.TABLE_HEADER:
         return (

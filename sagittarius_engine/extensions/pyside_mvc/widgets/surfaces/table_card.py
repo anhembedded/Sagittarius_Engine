@@ -204,7 +204,7 @@ class TableCard(Card):
         row = QHBoxLayout(host)
 
         self._count_label = QLabel()
-        apply_role(self._count_label, StyleRole.SECTION_LABEL)
+        apply_role(self._count_label, StyleRole.CAPTION)
         self._count_label.setVisible(False)
         row.addWidget(self._count_label)
         row.addStretch(1)
