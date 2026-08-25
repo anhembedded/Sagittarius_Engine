@@ -102,6 +102,31 @@ def discover_handlers(*package_prefixes: str) -> tuple[type, ...]:
     return tuple(sorted(found, key=lambda c: f"{c.__module__}.{c.__qualname__}"))
 
 
+def unmatched_prefixes(*package_prefixes: str) -> tuple[str, ...]:
+    """
+    @brief The given prefixes that match no loaded module at all.
+
+    @details `discover_handlers()` searches `sys.modules`, so a prefix that
+    names nothing loaded returns no handlers — indistinguishable, from its
+    return value alone, from a package that genuinely contains none. The two
+    need different responses: the second is fine, the first means the check the
+    operator asked for did not run.
+
+    Separated from `discover_handlers()` rather than folded into it because
+    discovery answers "which handlers?" and this answers "was the question even
+    answerable?". A caller that only wants handlers should not have to care.
+
+    @return Prefixes with no match, in the order given, so the caller can name
+        exactly which argument was wrong.
+    """
+    loaded = tuple(name for name, module in sys.modules.items() if module is not None)
+    return tuple(
+        prefix
+        for prefix in package_prefixes
+        if not any(name.startswith(prefix) for name in loaded)
+    )
+
+
 def as_handler_tuple(handlers: Iterable[type]) -> tuple[type, ...]:
     """@brief Normalises an explicitly supplied handler list, dropping anything
     that is not dispatchable-shaped so a typo in the list is not reported as a

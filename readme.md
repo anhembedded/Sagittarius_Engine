@@ -176,6 +176,10 @@ app.boot()   # report is logged; a wiring error aborts here
 `fail_fast` defaults to `False` — an engine that refuses to start over a diagnostic is a worse
 default than one that says loudly what is wrong.
 
+Step-by-step for adopting it in your own project — writing the factory, the first run,
+CI, and every way it refuses to run:
+[`.agents/context/diagnostics_usage.md`](.agents/context/diagnostics_usage.md).
+
 Full reference, including every check and its severity:
 [`.agents/context/diagnostics.md`](.agents/context/diagnostics.md).
 

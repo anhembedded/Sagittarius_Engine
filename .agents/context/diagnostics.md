@@ -5,6 +5,11 @@ reports the difference — at boot, deterministically, rather than on a user's f
 
 ---
 
+> **Adopting it in your own application?** Start with
+> [`diagnostics_usage.md`](diagnostics_usage.md) — writing the factory, the first
+> run, CI, and every way it refuses to run. This file is the reference: what each
+> check means and why.
+
 ## 1. What it is for
 
 A DI container and an event bus are a deliberate trade: flexibility bought by giving up static
