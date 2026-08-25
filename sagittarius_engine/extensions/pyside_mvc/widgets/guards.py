@@ -46,7 +46,12 @@ _HEX_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b
 #: deliberate, reviewed exception, visible on the same line as the literal.
 _EXEMPT_MARKER = "token-exempt"
 
-#: The one file inline-stylesheet literals are permitted in.
+#: The one file inline-stylesheet literals are permitted in, for this
+#: package's own tree. A consuming app keeps its colours somewhere else —
+#: the reference consumer's is `assets/palette.py` — and names it through
+#: `find_inline_stylesheets`'s `colour_source_names`. Hardcoding this one
+#: name meant an app could never reach zero findings: the file defining its
+#: tokens was itself reported, fifteen times, for containing tokens.
 _STYLE_MODULE_NAME = "style.py"
 
 #: `class Name(QFrame)` / `class Name(QDialog)` / `class Name(QWidget)` as a
@@ -118,19 +123,32 @@ class BareQtBaseFinding:
 
 
 def find_inline_stylesheets(
-    root: Path, exempt_dirs: Iterable[Path] = ()
+    root: Path,
+    exempt_dirs: Iterable[Path] = (),
+    colour_source_names: Iterable[str] = (),
 ) -> list[InlineStylesheetFinding]:
     """
-    @brief Scans every `.py` file under `root` (except `style.py`) for a
-    hardcoded colour literal, returning one finding per occurrence.
+    @brief Scans every `.py` file under `root` for a hardcoded colour
+    literal, returning one finding per occurrence.
     @param exempt_dirs Directories excluded entirely — prefer the inline
     `token-exempt` marker for a single justified literal where possible.
+    @param colour_source_names File names that legitimately *define* colours
+    and so are skipped, alongside this package's own `style.py`. A consuming
+    app passes its palette module here (the reference consumer:
+    `("palette.py",)`).
+
+    @details Matched by file name, not path, because that is what the
+    existing `style.py` skip and `_BASE_DEFINITION_FILES` both already do —
+    a second matching convention in the same module would be the more
+    surprising choice. Names are exact, so a file merely containing
+    "palette" is not excused.
     """
     exempt_dirs = [Path(d).resolve() for d in exempt_dirs]
+    skipped_names = {_STYLE_MODULE_NAME, *colour_source_names}
     findings: list[InlineStylesheetFinding] = []
 
     for py_file in sorted(root.rglob("*.py")):
-        if py_file.name == _STYLE_MODULE_NAME:
+        if py_file.name in skipped_names:
             continue
         resolved = py_file.resolve()
         if any(_is_within(resolved, exempt) for exempt in exempt_dirs):

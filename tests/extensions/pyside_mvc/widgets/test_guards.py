@@ -184,3 +184,35 @@ def test_token_exempt_does_not_silence_the_base_class_guard(tmp_path: Path):
 
     assert len(findings) == 1
     assert findings[0].qt_base == "QFrame"
+
+
+def test_a_consuming_apps_palette_module_can_be_named_as_a_colour_source(
+    tmp_path: Path,
+):
+    """EPIC-007D: an app's colours live in its own palette module, not in a
+    file called `style.py`. Before this, that module was reported for
+    containing the very tokens it exists to define, so "zero findings" was
+    unreachable for any consumer."""
+    _write(tmp_path / "palette.py", 'BG_CARD = "#111318"\n')
+    _write(tmp_path / "screen.py", 'w.setStyleSheet("background: #111318;")\n')
+
+    findings = find_inline_stylesheets(tmp_path, colour_source_names=("palette.py",))
+
+    assert len(findings) == 1
+    assert findings[0].file.name == "screen.py"
+
+
+def test_naming_a_colour_source_does_not_excuse_a_lookalike(tmp_path: Path):
+    _write(tmp_path / "palette_helpers.py", 'BG = "#111318"\n')
+
+    findings = find_inline_stylesheets(tmp_path, colour_source_names=("palette.py",))
+
+    assert len(findings) == 1
+
+
+def test_style_py_is_still_skipped_without_being_named(tmp_path: Path):
+    """The package's own convention keeps working for callers that pass
+    nothing — this parameter is additive, not a replacement."""
+    _write(tmp_path / "style.py", 'QSS = "color: #ffffff;"\n')
+
+    assert find_inline_stylesheets(tmp_path) == []
