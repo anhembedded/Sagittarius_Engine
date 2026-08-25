@@ -80,7 +80,24 @@ jobs:
         python-version: ["3.12"]
 
     steps:
+      # Full history, not the default shallow (`fetch-depth: 1`) clone.
+      # `tests/test_agents_docs_resolve.py::test_staleness_check_actually_catches_the_original_bug`
+      # runs the staleness checker against the exact pre-fix text of
+      # `.agents/context/repository.md` by reading it out of commit `0bd461b`
+      # (2026-08-02) -- that is the whole point of the test: proving the
+      # mechanism catches a bug that really sat undetected, rather than only
+      # agreeing with a fixture someone wrote to make it pass. A depth-1
+      # checkout does not contain that commit, so the test could only ever
+      # fail here: `git show` exits 128 and the assertion is never reached.
+      #
+      # It went unnoticed because this job has been *skipped*, not run, since
+      # `lint` went red -- the same gating trap TASK-040 exists to close. Only
+      # this job runs the whole `tests/` tree, so only this checkout needs the
+      # history; the others name single files that do not touch git. The cost
+      # is small and measured: 794 commits, 2.77 MiB packed.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5

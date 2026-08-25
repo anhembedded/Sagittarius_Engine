@@ -97,3 +97,87 @@ already — so it is confirmed by the CI run on the branch rather than asserted.
 - `TASK-021` — added `examples/` and `tools/` to the lint scope; the missing runtime deps
   predate it
 - `EPIC-006E` — its CI gate was among the five silently skipped
+
+---
+
+## What the unblocked jobs then exposed
+
+Unblocking `lint` was necessary but not sufficient: the five jobs came back and immediately
+reported three further defects, none of which could have been seen while they were skipped.
+Each is recorded here rather than in a new task, because each is the *same* defect this task is
+about — CI checking something other than what it claimed to check — and none was visible until
+this task's fix landed.
+
+### 3. Every Linux job needed the Qt libraries, not just the Import Guard
+
+`pytest-qt` imports Qt during `pytest_configure`, so the `test` job died on the same
+`libEGL.so.1` error as the guard — before collecting a single test. Rather than repeat the
+`apt-get` block in five places, the install moved into a composite action,
+`.github/actions/qt-system-libs/action.yml` (`if: runner.os == 'Linux'`), used by `test`,
+`architecture`, `examples`, `benchmark` and `import-guard`. `QT_QPA_PLATFORM: offscreen` is set
+once at workflow level: every runner here is headless, and `offscreen` is a real plugin on
+Windows too, so one declaration covers the whole matrix.
+
+### 4. A duplicate `env:` key silently invalidated the entire workflow
+
+Adding that workflow-level `env:` as a *second* top-level `env:` block produced a run with
+**zero jobs and conclusion `failure`** — GitHub rejects the file outright. The local check that
+was supposed to catch this did not: `yaml.safe_load` accepts duplicate mapping keys and keeps
+the last one, so the workflow parsed clean locally while being invalid to the thing that
+actually runs it.
+
+Fixed by merging into the existing block, and re-verified with a loader that *rejects*
+duplicate keys instead of silently resolving them. A validator more permissive than the
+consumer is not a validator — the same shape of fault as a linter checking a different program.
+
+### 5. A test that could never pass in CI: `test_agents_docs_resolve.py`
+
+With `test` finally running, exactly one test failed, on both `ubuntu-latest` and
+`windows-latest`:
+
+```
+FAILED tests/test_agents_docs_resolve.py::test_staleness_check_actually_catches_the_original_bug
+  - subprocess.CalledProcessError: Command '['git', 'show', '0bd461b:.agents/context/repository.md']'
+    returned non-zero exit status 128
+1 failed, 1260 passed, 7 skipped -- coverage 90.72% (threshold 80%, passed)
+```
+
+The test reads the pre-fix text of `.agents/context/repository.md` out of commit `0bd461b`
+(2026-08-02) and re-runs the staleness checker over it, proving the checker flags
+`Sagittarius_ForkBoy` — a bug that really sat undetected for three weeks. Reading it from git,
+rather than from a fixture someone wrote to make the test pass, *is* the test's argument.
+
+`actions/checkout@v4` clones with `fetch-depth: 1`. That commit is not in a depth-1 clone, so
+`git show` exits 128 and the assertions are never reached — the test could only ever fail in
+CI, from the day it was written. It went unnoticed for the ordinary reason: this job was
+skipped, not run.
+
+Fixed with `fetch-depth: 0` on the `test` job's checkout only. That is the sole job running the
+whole `tests/` tree; the others name single files that never shell out to git. The cost is
+measured, not assumed: 794 commits, 2.77 MiB packed.
+
+The alternative — vendoring the old blob as a fixture — was rejected. It would remove the git
+dependency, but a committed copy is a copy: the test would then assert that the checker agrees
+with a file in this repository, which is the exact thing the test was written to be stronger
+than.
+
+#### Verified both directions
+
+| Clone | `0bd461b` present | `pytest tests/test_agents_docs_resolve.py` |
+|---|---|---|
+| `git clone --depth 1` (CI's default) | no | `1 failed, 1 passed` — CI's error, exactly |
+| `git clone` (what `fetch-depth: 0` gives) | yes | `2 passed` |
+
+Full suite on Python 3.12 with CI's own command
+(`pytest tests/ examples/student_management/tests/ --cov-fail-under=80`): **1258 passed, 8
+skipped**, coverage 90.69%.
+
+#### Not a defect: the QML `Theme is null` output
+
+The `test` job's log tail is flooded with hundreds of
+`TypeError: Cannot read property 'accent' of null` lines from `DateTimePicker.qml`,
+`AppDataTable.qml` and others. They are emitted at interpreter shutdown, *after* the pytest
+summary, and they fail nothing — the same lines appear on a fully green local run. They are
+noise that buries the one line that matters, which is why this failure looked like a QML
+problem for as long as it did. `BUG-006` already covers the QML warning tests; this is not
+that, and nothing here was changed for it.
