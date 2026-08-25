@@ -133,3 +133,26 @@ def test_action_labels_come_from_the_caller(qtbot):
 
     assert panel.copy_button.text() == "Sao chép"
     assert panel.clear_button.text() == "Xoá"
+
+
+def test_badge_format_carries_the_units_the_panel_cannot_guess(qtbot):
+    """EPIC-007E: the reference consumer's badge reads "340 EVENTS", not
+    "340". The count is the panel's to know; what it counts is not."""
+    panel = LogPanel("Log", badge_format="{count} EVENTS")
+    qtbot.addWidget(panel)
+
+    assert panel.count_text == "0 EVENTS"
+
+    model = _FakeLogModel()
+    for i in range(7):
+        model.append(f"line {i}")
+    panel.set_log_model(model)
+
+    assert panel.count_text == "7 EVENTS"
+
+
+def test_badge_format_defaults_to_the_bare_count(qtbot):
+    panel = LogPanel("Log")
+    qtbot.addWidget(panel)
+
+    assert panel.count_text == "0"
