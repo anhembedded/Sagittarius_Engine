@@ -56,11 +56,28 @@ class BaseEvent(IDomainEvent):
 
     #: Excluded from `repr` so a log line shows the event's payload rather
     #: than a UUID and a timestamp on every entry.
+    #:
+    #: `compare=False` is load-bearing. Without it these two join the generated
+    #: `__eq__`, and since `_event_id` is a fresh UUID per instance, *no two
+    #: events are ever equal* — `Failed(reason="x") == Failed(reason="x")`
+    #: returns `False`. That silently breaks every content comparison a
+    #: consumer makes: asserting an expected event in a test, de-duplicating a
+    #: queue, comparing two runs' output. Identity metadata describes *this
+    #: occurrence*; equality is about *what happened*, which is the payload.
+    #: Found when `Sagittarius_Elite_Warrior`'s `EPIC-008F` moved four domain
+    #: events onto this base and a batch-vs-incremental equivalence test began
+    #: comparing events that printed identically yet compared unequal.
     _event_id: str = field(
-        default_factory=lambda: str(uuid.uuid4()), kw_only=True, repr=False
+        default_factory=lambda: str(uuid.uuid4()),
+        kw_only=True,
+        repr=False,
+        compare=False,
     )
     _occurred_on: datetime = field(
-        default_factory=lambda: datetime.now(UTC), kw_only=True, repr=False
+        default_factory=lambda: datetime.now(UTC),
+        kw_only=True,
+        repr=False,
+        compare=False,
     )
 
     #: The key `IEventBus` addresses this event by. Defaults to the subclass's

@@ -126,3 +126,28 @@ def test_metadata_stays_out_of_the_generated_repr():
         repr(_ProgressEvent("BTCUSDT", 10))
         == "_ProgressEvent(symbol='BTCUSDT', total=10)"
     )
+
+
+def test_two_events_with_the_same_payload_are_equal():
+    """Regression for `EPIC-008F`: `_event_id`/`_occurred_on` must not join the
+    generated `__eq__`.
+
+    A fresh UUID per instance means that without `compare=False` no two events
+    are ever equal, however identical their payloads — which silently breaks
+    asserting an expected event, de-duplicating a queue, or diffing two runs.
+    Equality is about *what happened*; the metadata describes *this
+    occurrence*."""
+
+    @dataclass
+    class Failed(BaseEvent):
+        reason: str
+
+    first = Failed(reason="no data")
+    second = Failed(reason="no data")
+
+    assert first == second
+    assert first != Failed(reason="something else")
+    # Still individually identifiable — the metadata is present and unique,
+    # it just does not participate in equality.
+    assert first.event_id != second.event_id
+    assert first.occurred_on is not None
