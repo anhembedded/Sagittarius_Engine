@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: [main, develop]
 
-# Every runner here is headless. Qt refuses to start without a platform plugin,
-# and `offscreen` is the one that needs no display server; it is a real plugin
-# on Windows too, so this is set once for the whole workflow rather than per job.
-env:
-  QT_QPA_PLATFORM: offscreen
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -23,6 +17,10 @@ defaults:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   ACTIONS_NODE20_DEPRECATION_WARNING: 'false'
+  # Every runner here is headless. Qt refuses to start without a platform
+  # plugin, and `offscreen` is the one that needs no display server; it is a
+  # real plugin on Windows too, so one declaration covers the whole matrix.
+  QT_QPA_PLATFORM: offscreen
 
 jobs:
   # ──────────────────────────────────────────────────────────────
