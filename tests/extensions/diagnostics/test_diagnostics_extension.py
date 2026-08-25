@@ -154,3 +154,59 @@ def test_stopping_leaves_the_state_stopped_not_ready():
 
     assert not app.context.lifecycle.is_ready
     assert app.context.lifecycle.is_stopped
+
+
+# ------------------------------------------- EPIC-006D: handlers at readiness
+
+
+class _IThing:
+    """Unbound plain dependency — the silent case."""
+
+
+class _Handler:
+    def __init__(self, thing: _IThing) -> None:
+        self._thing = thing
+
+    def execute(self, dto):
+        return None
+
+
+def test_handlers_named_explicitly_are_pre_flighted_at_readiness():
+    app = _app()
+    diagnostics = DiagnosticsExtension(handlers=[_Handler])
+    app.use(diagnostics)
+
+    app.boot()
+
+    report = diagnostics.last_report
+    assert report is not None
+    assert [f.check for f in report.findings if f.check.startswith("B")]
+    app.stop()
+
+
+def test_handler_packages_are_searched_when_no_list_is_given():
+    app = _app()
+    diagnostics = DiagnosticsExtension(handler_packages=[__name__])
+    app.use(diagnostics)
+
+    app.boot()
+
+    report = diagnostics.last_report
+    assert report is not None
+    subjects = {f.subject for f in report.findings if f.check == "B3"}
+    assert "_Handler" in subjects
+    app.stop()
+
+
+def test_a_non_handler_in_the_explicit_list_is_dropped_not_reported():
+    """A typo in the list is not a wiring defect in the application."""
+    app = _app()
+    diagnostics = DiagnosticsExtension(handlers=[_IThing])
+    app.use(diagnostics)
+
+    app.boot()
+
+    report = diagnostics.last_report
+    assert report is not None
+    assert [f for f in report.findings if f.check.startswith("B")] == []
+    app.stop()

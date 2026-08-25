@@ -179,51 +179,140 @@ class WiringInspector:
                 # already-built singleton has proved itself by existing.
                 continue
 
-            for param_name, annotation in self._constructor_dependencies(concrete):
-                if annotation in registered:
-                    continue
+            findings.extend(
+                self._unbindable_dependencies(
+                    concrete,
+                    registered,
+                    abstract_check="C1",
+                    plain_check="C2",
+                )
+            )
 
-                if isinstance(annotation, type) and issubclass(annotation, ABC):
-                    if inspect.isabstract(annotation):
-                        findings.append(
-                            Finding(
-                                check="C1",
-                                severity="error",
-                                subject=f"{concrete.__name__}.{param_name}",
-                                message=(
-                                    f"needs {annotation.__name__}, which is abstract "
-                                    "and is not bound — resolving this raises"
-                                ),
-                                hint=(
-                                    f"container.bind({annotation.__name__}, "
-                                    "<implementation>)"
-                                ),
-                            )
-                        )
-                        continue
+        findings.extend(self._cycles(registrations))
+        return tuple(findings)
 
-                # EPIC-006 §2.3: the silent one. An unbound *plain* class does
-                # not raise -- the container constructs the annotation itself
-                # and injects that, so the application receives an empty stand-in
-                # for its real implementation and simply behaves wrongly.
+    def _unbindable_dependencies(
+        self,
+        owner: type,
+        registered: set[type],
+        *,
+        abstract_check: str,
+        plain_check: str,
+    ) -> list[Finding]:
+        """
+        @brief Constructor dependencies of `owner` that the container cannot
+        satisfy — shared by the container check (C1/C2) and the handler
+        pre-flight (B1/B2).
+
+        @details The two callers differ only in *what* they are inspecting, not
+        in what "unsatisfiable" means, so the check ids are parameters rather
+        than the logic being written twice and drifting.
+        """
+        findings: list[Finding] = []
+
+        for param_name, annotation in self._constructor_dependencies(owner):
+            if annotation in registered:
+                continue
+
+            if (
+                isinstance(annotation, type)
+                and issubclass(annotation, ABC)
+                and inspect.isabstract(annotation)
+            ):
                 findings.append(
                     Finding(
-                        check="C2",
-                        severity="warning",
-                        subject=f"{concrete.__name__}.{param_name}",
+                        check=abstract_check,
+                        severity="error",
+                        subject=f"{owner.__name__}.{param_name}",
                         message=(
-                            f"needs {annotation.__name__}, which is not bound. "
-                            "This does not raise: the container will construct "
-                            f"{annotation.__name__} itself and inject that"
+                            f"needs {annotation.__name__}, which is abstract "
+                            "and is not bound — resolving this raises"
                         ),
                         hint=(
-                            f"bind {annotation.__name__} explicitly if a real "
-                            "implementation was intended"
+                            f"container.bind({annotation.__name__}, <implementation>)"
+                        ),
+                    )
+                )
+                continue
+
+            # EPIC-006 §2.3: the silent one. An unbound *plain* class does not
+            # raise — the container constructs the annotation itself and injects
+            # that, so the application receives an empty stand-in for its real
+            # implementation and simply behaves wrongly.
+            findings.append(
+                Finding(
+                    check=plain_check,
+                    severity="warning",
+                    subject=f"{owner.__name__}.{param_name}",
+                    message=(
+                        f"needs {annotation.__name__}, which is not bound. "
+                        "This does not raise: the container will construct "
+                        f"{annotation.__name__} itself and inject that"
+                    ),
+                    hint=(
+                        f"bind {annotation.__name__} explicitly if a real "
+                        "implementation was intended"
+                    ),
+                )
+            )
+
+        return findings
+
+    # ---------------------------------------------------------------- handlers
+
+    def inspect_handlers(
+        self,
+        handlers: Iterable[type],
+        container: IContainer,
+    ) -> tuple[Finding, ...]:
+        """
+        @brief Checks B1–B3: can every dispatchable handler actually be built?
+
+        @details `Dispatcher.dispatch()` resolves the handler class straight
+        from the container, with no registration step. Nothing binds a handler,
+        so `inspect_container()` never sees one — and a handler whose
+        constructor dependency is unbound therefore fails **only when a user
+        triggers that command**, in production, on a real request. This pulls
+        that failure forward to boot.
+
+        Same definition of "unsatisfiable" as C1/C2, deliberately: the ids
+        differ so a report line says which surface it came from, but a
+        dependency that cannot be bound is one thing, not two.
+
+        @param handlers The classes to check — from `discover_handlers()` or
+            named explicitly by the application.
+        """
+        findings: list[Finding] = []
+        registered = set(container.registrations())
+
+        for handler in sorted(handlers, key=lambda h: h.__qualname__):
+            findings.extend(
+                self._unbindable_dependencies(
+                    handler,
+                    registered,
+                    abstract_check="B1",
+                    plain_check="B2",
+                )
+            )
+
+            # B3: "what does this actually depend on" is a question people ask
+            # of a DI container and could not previously answer for a handler,
+            # since handlers appear in no registry.
+            dependencies = self._constructor_dependencies(handler)
+            if dependencies:
+                findings.append(
+                    Finding(
+                        check="B3",
+                        severity="info",
+                        subject=handler.__qualname__,
+                        message=f"dispatchable, {len(dependencies)} dependencies",
+                        hint=", ".join(
+                            f"{name}: {getattr(annotation, '__name__', annotation)}"
+                            for name, annotation in dependencies
                         ),
                     )
                 )
 
-        findings.extend(self._cycles(registrations))
         return tuple(findings)
 
     def _cycles(self, registrations: Any) -> list[Finding]:
@@ -427,6 +516,7 @@ class WiringInspector:
         hosted_services: Any = None,
         scheduler: Any = None,
         expected_unheard: Iterable[str] = (),
+        handlers: Iterable[type] = (),
     ) -> WiringReport:
         """@brief Runs every check for which a subsystem was supplied."""
         findings: list[Finding] = []
@@ -435,6 +525,9 @@ class WiringInspector:
             findings.extend(self.inspect_events(bus, expected_unheard=expected_unheard))
         if container is not None:
             findings.extend(self.inspect_container(container))
+            # Handlers need the container to know what is bound, so this is
+            # only meaningful alongside it.
+            findings.extend(self.inspect_handlers(handlers, container))
 
         findings.extend(
             self.inspect_lifecycle(

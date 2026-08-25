@@ -12,6 +12,7 @@ from typing import Any
 
 from sagittarius_engine.interfaces import IExtension
 
+from .handlers import as_handler_tuple, discover_handlers
 from .inspector import WiringInspector
 from .report import WiringReport
 
@@ -42,6 +43,13 @@ class DiagnosticsExtension(IExtension[Any]):
     @param expected_unheard Event names this application deliberately does not
         listen to (check A1). Declared by the application; the framework never
         decides an event is legitimately unheard on its behalf.
+    @param handlers Dispatchable handler classes to pre-flight (checks B1–B3).
+        Exact, and preferred where the list is short.
+    @param handler_packages Dotted package prefixes to search for handlers
+        instead of listing them — e.g. `("myapp.application",)`. Imports
+        nothing; see `discover_handlers()`. A prefix is required because
+        searching everything would sweep in unrelated classes that happen to
+        have an `execute` method.
     """
 
     def __init__(
@@ -49,9 +57,13 @@ class DiagnosticsExtension(IExtension[Any]):
         *,
         fail_fast: bool = False,
         expected_unheard: Iterable[str] = (),
+        handlers: Iterable[type] = (),
+        handler_packages: Iterable[str] = (),
     ) -> None:
         self.fail_fast = fail_fast
         self.expected_unheard = tuple(expected_unheard)
+        self.handlers = as_handler_tuple(handlers)
+        self.handler_packages = tuple(handler_packages)
         self.dependencies: list[str] = []
         #: The report from the most recent run, or `None` before readiness.
         #: Kept so a test or an operator can read the findings directly rather
@@ -76,6 +88,16 @@ class DiagnosticsExtension(IExtension[Any]):
     def shutdown(self, context: Any) -> None:
         pass
 
+    def _resolve_handlers(self) -> tuple[type, ...]:
+        """@brief Explicit handlers, plus anything found under the configured
+        packages. Discovery runs at inspection time rather than construction:
+        the application may not have imported its handler modules yet when the
+        extension is built."""
+        discovered = (
+            discover_handlers(*self.handler_packages) if self.handler_packages else ()
+        )
+        return tuple(dict.fromkeys((*self.handlers, *discovered)))
+
     def _inspect(self, context: Any) -> None:
         report = WiringInspector().inspect(
             bus=context.event_bus,
@@ -84,6 +106,7 @@ class DiagnosticsExtension(IExtension[Any]):
             hosted_services=getattr(context, "hosted_services", None),
             scheduler=getattr(context, "scheduler", None),
             expected_unheard=self.expected_unheard,
+            handlers=self._resolve_handlers(),
         )
         self.last_report = report
 

@@ -15,6 +15,7 @@ if not report.ok:
 """
 
 from .extension import DiagnosticsError, DiagnosticsExtension
+from .handlers import discover_handlers, looks_dispatchable
 from .inspector import WiringInspector
 from .report import Finding, Severity, WiringReport
 
@@ -22,6 +23,8 @@ __all__ = [
     "DiagnosticsExtension",
     "DiagnosticsError",
     "WiringInspector",
+    "discover_handlers",
+    "looks_dispatchable",
     "WiringReport",
     "Finding",
     "Severity",
