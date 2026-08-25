@@ -1,0 +1,109 @@
+"""Tests for `widgets.surfaces.tab_bar.TabBar`."""
+
+from __future__ import annotations
+
+from sagittarius_engine.extensions.pyside_mvc.widgets import Panel, Tab, TabBar
+
+
+def test_is_a_panel_and_selects_the_first_tab(qtbot):
+    bar = TabBar([Tab("trades", "DANH SÁCH LỆNH"), Tab("logs", "NHẬT KÝ")])
+    qtbot.addWidget(bar)
+
+    assert isinstance(bar, Panel)
+    assert bar.current_id == "trades"
+    assert bar.current_index == 0
+
+
+def test_an_empty_bar_has_no_current_tab(qtbot):
+    bar = TabBar()
+    qtbot.addWidget(bar)
+
+    assert bar.current_id is None
+    assert bar.current_index == -1
+
+
+def test_clicking_emits_index_and_id(qtbot):
+    bar = TabBar([Tab("trades", "Lệnh"), Tab("logs", "Nhật ký")])
+    qtbot.addWidget(bar)
+
+    with qtbot.waitSignal(bar.tab_selected, timeout=1000) as blocker:
+        bar._buttons[1].click()
+
+    assert blocker.args == [1, "logs"]
+    assert bar.current_id == "logs"
+
+
+def test_set_current_id_does_not_emit(qtbot):
+    """A programmatic set that emitted would loop straight back through a
+    consumer's own sync handler — and the filter row this class also has to
+    serve is exactly that shape."""
+    bar = TabBar([Tab("a", "A"), Tab("b", "B")])
+    qtbot.addWidget(bar)
+
+    with qtbot.assertNotEmitted(bar.tab_selected):
+        bar.set_current_id("b")
+
+    assert bar.current_id == "b"
+    assert bar.current_index == 1
+
+
+def test_badges_update_in_place_without_rebuilding(qtbot):
+    """The consumer rebuilds every button on every `set_tabs_model` call,
+    and calls it on every arriving log line — so a running backtest
+    rebuilds the row hundreds of times to change one number."""
+    bar = TabBar([Tab("trades", "Lệnh", "0 LỆNH"), Tab("logs", "Nhật ký", "0 EVENTS")])
+    qtbot.addWidget(bar)
+    buttons_before = list(bar._buttons)
+
+    bar.set_tabs(
+        [Tab("trades", "Lệnh", "12 LỆNH"), Tab("logs", "Nhật ký", "340 EVENTS")]
+    )
+
+    assert bar._buttons == buttons_before
+    assert bar._buttons[1]._badge.text() == "340 EVENTS"
+
+
+def test_changing_the_ids_does_rebuild(qtbot):
+    bar = TabBar([Tab("a", "A")])
+    qtbot.addWidget(bar)
+    buttons_before = list(bar._buttons)
+
+    bar.set_tabs([Tab("x", "X"), Tab("y", "Y")])
+
+    assert bar._buttons != buttons_before
+    assert len(bar._buttons) == 2
+
+
+def test_selection_survives_an_in_place_badge_refresh(qtbot):
+    bar = TabBar([Tab("a", "A", "1"), Tab("b", "B", "2")])
+    qtbot.addWidget(bar)
+    bar.set_current_id("b")
+
+    bar.set_tabs([Tab("a", "A", "9"), Tab("b", "B", "8")])
+
+    assert bar.current_id == "b"
+
+
+def test_selection_falls_back_when_its_tab_disappears(qtbot):
+    bar = TabBar([Tab("a", "A"), Tab("b", "B")])
+    qtbot.addWidget(bar)
+    bar.set_current_id("b")
+
+    bar.set_tabs([Tab("a", "A"), Tab("c", "C")])
+
+    assert bar.current_id == "a"
+
+
+def test_an_empty_badge_is_hidden(qtbot):
+    bar = TabBar([Tab("a", "A"), Tab("b", "B", "7")])
+    qtbot.addWidget(bar)
+
+    assert bar._buttons[0]._badge.isVisibleTo(bar._buttons[0]) is False
+    assert bar._buttons[1]._badge.isVisibleTo(bar._buttons[1]) is True
+
+
+def test_the_active_tab_renders_differently(qtbot, fake_theme_bridge):
+    bar = TabBar([Tab("a", "A"), Tab("b", "B")])
+    qtbot.addWidget(bar)
+
+    assert bar._buttons[0].styleSheet() != bar._buttons[1].styleSheet()

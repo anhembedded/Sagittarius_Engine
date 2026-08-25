@@ -49,6 +49,48 @@ This is also why adding unrelated tests changes the failure count of the full su
 order, and both times the message was this same font warning — no QML binding was involved
 either time.
 
+## Second contaminant, found on Linux 2026-08-25 (during `EPIC-007A`)
+
+The font warning above is Windows-specific — its own reproduction paths are `C:/...`, and on
+Linux neither order in the block above fails (`19 passed` both ways). **The ordering
+sensitivity still reproduces there**, with a different message: QML `TypeError` warnings from
+`RosterScreen.qml` itself.
+
+```text
+RosterScreen.qml:87:  TypeError: Cannot read property 'averageGpa' of null
+RosterScreen.qml:82:  TypeError: Cannot read property 'totalStudents' of null
+RosterScreen.qml:133: TypeError: Cannot read property 'students' of null
+   ... 32 of them
+```
+
+These come from bindings re-evaluating against a root context object that is already gone, at
+**process teardown**. In a clean run all 32 land after pytest's own summary line, where nothing
+is listening:
+
+```text
+line 244:  971 passed, 8 skipped, 10 warnings in 23.86s
+line 483:  file://.../RosterScreen.qml:87: TypeError: Cannot read property 'averageGpa' of null
+```
+
+Adding four unrelated test files under `tests/extensions/pyside_mvc/widgets/overlays/` shifted
+teardown timing enough that some arrived *inside* `test_roster_screen_emits_no_qml_runtime_warnings`'s
+message handler, failing it. Editing one of those new tests shifted it back to green. The test
+passes in isolation in every case.
+
+Two consequences for the fix in Requirements below:
+
+1. **Option 2 ("make the environment not produce the platform warning") no longer closes this
+   bug.** It addresses the font warning only; this contaminant is emitted by the app's own QML
+   during teardown and would survive it.
+2. This is a **false negative** in the sense §"Why this matters" describes, and a live one: the
+   suite has been green on Linux only because these 32 warnings happen to land after the
+   summary. Any change that shifts teardown timing flips it, so a green result here says
+   nothing about whether the QML is clean.
+
+Worth checking separately whether the 32 teardown `TypeError`s are themselves a defect in
+`RosterScreen.qml`'s bindings (a `null` root context guard) rather than only noise — that is
+not this bug, but nobody has looked.
+
 ## Why this matters beyond the noise
 
 The tests were written for a good reason, documented in their own docstrings:

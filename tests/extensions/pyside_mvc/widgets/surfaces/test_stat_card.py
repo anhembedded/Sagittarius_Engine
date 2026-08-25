@@ -1,0 +1,94 @@
+"""Tests for `widgets.surfaces.stat_card.StatCard`."""
+
+from __future__ import annotations
+
+from sagittarius_engine.extensions.pyside_mvc.widgets import Card, StatCard, Tone
+
+
+def test_is_a_card_carrying_its_title(qtbot):
+    card = StatCard("Net Profit")
+    qtbot.addWidget(card)
+
+    assert isinstance(card, Card)
+    assert card.title == "Net Profit"
+
+
+def test_optional_slots_are_hidden_when_not_given(qtbot):
+    card = StatCard("Total")
+    qtbot.addWidget(card)
+
+    assert card._suffix_label.isVisibleTo(card) is False
+    assert card._caption_label.isVisibleTo(card) is False
+    assert card._badge_label.isVisibleTo(card) is False
+
+
+def test_suffix_and_caption_appear_when_given(qtbot):
+    card = StatCard(
+        "Est. Database Size", value="1.4", suffix="GB", caption="on-disk SQLite"
+    )
+    qtbot.addWidget(card)
+
+    assert card.value == "1.4"
+    assert card._suffix_label.isVisibleTo(card) is True
+    assert card.caption == "on-disk SQLite"
+    assert card._caption_label.isVisibleTo(card) is True
+
+
+def test_badge_hides_itself_again_when_cleared(qtbot):
+    card = StatCard("Win rate")
+    qtbot.addWidget(card)
+
+    card.set_badge("+12.34%", tone=Tone.POSITIVE)
+    assert card.badge_text == "+12.34%"
+    assert card._badge_label.isVisibleTo(card) is True
+
+    card.set_badge("")
+    assert card._badge_label.isVisibleTo(card) is False
+
+
+def test_tone_reaches_the_rendered_value_qss(qtbot, fake_theme_bridge):
+    card = StatCard("Net Profit")
+    qtbot.addWidget(card)
+
+    card.set_value("-812.40", tone=Tone.NEGATIVE)
+    assert "<danger>" in card._value_label.styleSheet()
+
+    card.set_value("812.40", tone=Tone.POSITIVE)
+    assert "<success>" in card._value_label.styleSheet()
+
+    card.set_value("0.00")
+    assert "<textPrimary>" in card._value_label.styleSheet()
+
+
+def test_badge_tone_survives_the_role_being_reapplied(qtbot, fake_theme_bridge):
+    """`set_badge` appends `color:` after `apply_role(BADGE)` and relies on
+    last-declaration-wins. If `BADGE` ever grows a selector block, the
+    append stops overriding and this fails — which is the point."""
+    card = StatCard("Drawdown")
+    qtbot.addWidget(card)
+
+    card.set_badge("Rủi ro", tone=Tone.NEGATIVE)
+
+    qss = card._badge_label.styleSheet()
+    assert qss.rstrip().endswith("<danger>;")
+
+
+def test_tone_resolves_through_the_palette_not_a_baked_colour(qtbot):
+    """The whole reason `Tone` exists rather than a colour parameter: the
+    consumer passes `BULL_COLOR`/`BEAR_COLOR` hex strings today.
+
+    The rendered QSS does of course contain a hex — that is what a token
+    resolves *to*. What matters is that it came from the live palette, so
+    a palette change reaches this widget. `guards.find_inline_stylesheets`
+    covers the other half (no literal in the source); see
+    `test_no_literal_colours_in_the_surfaces_package`.
+    """
+    from sagittarius_engine.extensions.pyside_mvc.tokens import get_theme_bridge
+
+    card = StatCard("Profit factor")
+    qtbot.addWidget(card)
+
+    card.set_value("1.8", tone=Tone.POSITIVE)
+
+    live_success = str(get_theme_bridge().value("success"))
+    assert live_success in card._value_label.styleSheet()

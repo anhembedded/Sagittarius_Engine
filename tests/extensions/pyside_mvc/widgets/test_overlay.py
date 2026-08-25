@@ -23,6 +23,32 @@ def test_overlay_itself_is_abstract(qtbot):
         Overlay("title")
 
 
+def test_abstract_error_only_names_subclasses_that_exist(qtbot):
+    """BUG-004: the message told the reader to instantiate `ConfirmOverlay`
+    or `PickerOverlay`, and neither existed anywhere in the shipped package
+    — an error message sending someone to an API nobody wrote.
+
+    Asserted by resolving the names out of the message itself rather than
+    against a hardcoded list, so rewording the suggestion cannot quietly
+    reintroduce a phantom: whatever it names, it must be importable."""
+    import re
+
+    from sagittarius_engine.extensions.pyside_mvc import widgets
+
+    with pytest.raises(TypeError) as excinfo:
+        Overlay("title")
+
+    suggested = re.findall(r"\b([A-Z]\w*Overlay)\b", str(excinfo.value))
+    suggested = [name for name in suggested if name != "Overlay"]
+
+    assert suggested, "the message should still suggest at least one subclass"
+    for name in suggested:
+        resolved = getattr(widgets, name, None)
+        assert resolved is not None, f"{name} is named but does not resolve"
+        assert issubclass(resolved, Overlay)
+        assert name in widgets.__all__
+
+
 def test_subclass_constructs_as_a_qdialog(qtbot):
     overlay = _ConfirmOverlay("Confirm delete")
     qtbot.addWidget(overlay)

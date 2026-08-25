@@ -34,24 +34,57 @@ from .guards import (
     format_inline_stylesheet_findings,
 )
 from .overlay import Overlay
-from .style import StyleRole, WidgetState, apply_role
+from .overlays import ConfirmOverlay, PickerItem, PickerOverlay
+from .style import StyleRole, WidgetState, apply_role, semantic_colour
 from .surface import Card, Panel, SelectableCard, Surface
+from .surfaces import (
+    Banner,
+    Column,
+    DataRow,
+    LogModel,
+    LogPanel,
+    Pagination,
+    RowAction,
+    Severity,
+    StatCard,
+    Tab,
+    TabBar,
+    TableCard,
+    Tone,
+)
 
 __all__ = [
+    "Banner",
     "BareQtBaseFinding",
     "Card",
+    "Column",
+    "ConfirmOverlay",
+    "DataRow",
     "DateTimeField",
     "InlineStylesheetFinding",
+    "LogModel",
+    "LogPanel",
     "Overlay",
+    "Pagination",
     "Panel",
+    "PickerItem",
+    "PickerOverlay",
+    "RowAction",
     "SelectableCard",
+    "Severity",
+    "StatCard",
     "StyleRole",
     "StyledButton",
     "StyledCheckBox",
     "StyledField",
     "Surface",
+    "Tab",
+    "TabBar",
+    "TableCard",
+    "Tone",
     "WidgetState",
     "apply_role",
+    "semantic_colour",
     "find_bare_qt_base_widgets",
     "find_inline_stylesheets",
     "format_bare_qt_base_findings",

@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QPushButton, QWidget
 DEV_MODE_CONFIG_KEY = "dev.mode"
 
 
-class BaseView(QWidget):
+class BaseView(QWidget):  # base-exempt: an MVC view root, not a styled surface
     """
     @brief Base class for every PySide6 View in an app built on this framework.
 

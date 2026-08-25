@@ -4,6 +4,7 @@ for why no such base exists)."""
 
 from __future__ import annotations
 
+import pytest
 from PySide6.QtWidgets import QFrame
 
 from sagittarius_engine.extensions.pyside_mvc.tokens import get_theme_bridge
@@ -112,3 +113,91 @@ def test_checkbox_and_field_roles_ignore_disabled_state():
     normal_field_qss = field_widget.styleSheet()
     apply_role(field_widget, StyleRole.FIELD, state=WidgetState.DISABLED)
     assert field_widget.styleSheet() == normal_field_qss
+
+
+# ---------------------------------------------------------------------- #
+# EPIC-007B roles
+# ---------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("role", list(StyleRole))
+def test_every_role_renders_without_falling_through(qtbot, role):
+    """`_build_qss` ends in a dict lookup over the three button roles, with
+    no default branch. A role added to the enum without its own `if` reaches
+    that lookup and raises `KeyError` at construction time — not at import,
+    and not in any test that does not happen to use it. This parametrises
+    over `StyleRole` itself, so the enum entry and the branch cannot be added
+    apart."""
+    from PySide6.QtWidgets import QWidget
+
+    widget = QWidget()
+    qtbot.addWidget(widget)
+
+    apply_role(widget, role)
+
+    assert widget.styleSheet() != ""
+
+
+@pytest.mark.parametrize(
+    ("role", "token"),
+    [
+        (StyleRole.BANNER_INFO, "accent"),
+        (StyleRole.BANNER_WARN, "warning"),
+        (StyleRole.BANNER_DANGER, "danger"),
+    ],
+)
+def test_each_banner_severity_uses_its_own_semantic_token(
+    qtbot, fake_theme_bridge, role, token
+):
+    from PySide6.QtWidgets import QWidget
+
+    widget = QWidget()
+    qtbot.addWidget(widget)
+
+    apply_role(widget, role)
+
+    assert f"<{token}>" in widget.styleSheet()
+
+
+def test_the_three_banner_severities_are_visually_distinct(qtbot, fake_theme_bridge):
+    """The reason `warning` was added to the required token vocabulary at
+    all: the reference consumer renders a warning banner directly beside an
+    accent-coloured info banner, so the two must not collapse."""
+    from PySide6.QtWidgets import QWidget
+
+    rendered = set()
+    for role in (
+        StyleRole.BANNER_INFO,
+        StyleRole.BANNER_WARN,
+        StyleRole.BANNER_DANGER,
+    ):
+        widget = QWidget()
+        qtbot.addWidget(widget)
+        apply_role(widget, role)
+        rendered.add(widget.styleSheet())
+
+    assert len(rendered) == 3
+
+
+def test_badge_selected_state_differs_from_normal(qtbot, fake_theme_bridge):
+    from PySide6.QtWidgets import QWidget
+
+    widget = QWidget()
+    qtbot.addWidget(widget)
+
+    apply_role(widget, StyleRole.BADGE, state=WidgetState.NORMAL)
+    normal = widget.styleSheet()
+    apply_role(widget, StyleRole.BADGE, state=WidgetState.SELECTED)
+
+    assert widget.styleSheet() != normal
+
+
+def test_progress_disabled_chunk_uses_the_muted_token(qtbot, fake_theme_bridge):
+    from PySide6.QtWidgets import QWidget
+
+    widget = QWidget()
+    qtbot.addWidget(widget)
+
+    apply_role(widget, StyleRole.PROGRESS, state=WidgetState.DISABLED)
+
+    assert "<muted>" in widget.styleSheet()

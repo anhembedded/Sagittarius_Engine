@@ -49,9 +49,29 @@ REQUIRED_COLOUR_TOKENS: tuple[TokenSpec, ...] = (
     TokenSpec("textPrimary", "colour", "Primary text colour"),
     TokenSpec("accent", "colour", "Accent / brand colour"),
     TokenSpec("success", "colour", "Success / positive semantic colour"),
+    TokenSpec("warning", "colour", "Warning / caution semantic colour"),
     TokenSpec("danger", "colour", "Danger / negative semantic colour"),
     TokenSpec("muted", "colour", "Muted / secondary text or icon colour"),
 )
+
+#: `warning` joined the required set in EPIC-007B, and it is the one entry
+#: added after a consumer already shipped — so it is worth saying why it is
+#: required rather than optional, given that adding it breaks every app that
+#: does not supply it.
+#:
+#: The reference consumer had two banners ("stale results", "coverage gap")
+#: rendering `#2a1c07` / `#d97706` / `#fbbf24` as inline literals, in a
+#: codebase whose whole token effort exists to remove inline literals. That
+#: amber is neither `accent` (its brand yellow) nor `danger` (its red): a
+#: warning banner sitting next to an accent-coloured info banner has to read
+#: as a different thing, so folding the two together would have destroyed a
+#: distinction the UI actually makes, not merely shifted a pixel value.
+#:
+#: Optional-with-a-default was the obvious cheaper route and was rejected on
+#: this module's own stated grounds — an engine-supplied default colour "would
+#: just be a hidden literal with extra steps". Three semantic states (success,
+#: warning, danger) is also the smallest set that is not lopsided; shipping
+#: two thirds of it was the actual anomaly.
 
 REQUIRED_COLOUR_TOKEN_NAMES: frozenset[str] = frozenset(
     spec.name for spec in REQUIRED_COLOUR_TOKENS
