@@ -1,6 +1,6 @@
 """A distinct palette for this sample — deliberately not the reference
 consumer's black/gold identity (Sagittarius_Elite_Warrior's), so this app
-reads as its own thing rather than a copy-paste. Supplies exactly the 10
+reads as its own thing rather than a copy-paste. Supplies exactly the 11
 tokens `tokens.vocabulary.REQUIRED_COLOUR_TOKENS` requires; nothing more."""
 
 STUDENT_MANAGEMENT_PALETTE: dict[str, str] = {
@@ -12,6 +12,7 @@ STUDENT_MANAGEMENT_PALETTE: dict[str, str] = {
     "textPrimary": "#e6edf3",
     "accent": "#4fb0ff",
     "success": "#3ecf8e",
+    "warning": "#e0a23c",
     "danger": "#f2545b",
     "muted": "#7c8b99",
 }

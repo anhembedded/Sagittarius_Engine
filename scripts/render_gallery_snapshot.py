@@ -52,6 +52,7 @@ _REFERENCE_PALETTE = {
     "textPrimary": "#e8e9ec",
     "accent": "#F3BA2F",
     "success": "#0ECB81",
+    "warning": "#d97706",
     "danger": "#F6465D",
     "muted": "#848E9C",
 }

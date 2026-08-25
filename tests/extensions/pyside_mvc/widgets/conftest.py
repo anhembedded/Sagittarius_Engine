@@ -43,6 +43,7 @@ _PLACEHOLDER_PALETTE = {
     "textPrimary": "#600000",
     "accent": "#700000",
     "success": "#800000",
+    "warning": "#b00000",
     "danger": "#900000",
     "muted": "#a00000",
 }

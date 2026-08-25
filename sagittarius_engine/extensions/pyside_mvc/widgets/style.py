@@ -57,6 +57,32 @@ class StyleRole(Enum):
     CHECKBOX = auto()
     FIELD = auto()
 
+    # --- EPIC-007B ----------------------------------------------------- #
+    # Every one below needs its own `if` branch in `_build_qss()`. There is
+    # no default: the function ends in a dict lookup over the three button
+    # roles, so a role added here without a branch raises `KeyError` the
+    # first time a widget is constructed, not when the enum is defined.
+    # That fail-fast is `controls.py`'s deliberate choice, kept — but it
+    # means "add the enum entry" is half the change, never all of it.
+
+    #: A small pill carrying a count or a short status word, sitting beside
+    #: a label (`LogPanel`'s "340 EVENTS", a `TabBar` tab's count). Reads
+    #: `SELECTED` as its emphasised form.
+    BADGE = auto()
+    #: The three banner severities. Separate roles rather than one `BANNER`
+    #: role plus a severity argument, because `apply_role()` takes a role and
+    #: a `WidgetState`, and severity is not a state — a banner does not
+    #: transition between info and danger the way a button transitions
+    #: between normal and disabled.
+    BANNER_INFO = auto()
+    BANNER_WARN = auto()
+    BANNER_DANGER = auto()
+    #: A small muted all-caps heading over a group of content.
+    SECTION_LABEL = auto()
+    #: The column-header strip of a `TableCard`.
+    TABLE_HEADER = auto()
+    PROGRESS = auto()
+
 
 class WidgetState(Enum):
     """Structural state `apply_role()` renders differently. Not every role
@@ -110,6 +136,27 @@ def apply_role(
     widget.setStyleSheet(_build_qss(role, state))
 
 
+def semantic_colour(name: str) -> str:
+    """
+    @brief Reads one semantic colour token by name.
+
+    @details The escape hatch for the case `apply_role()` cannot express: a
+    colour chosen per *instance* rather than per *role*. `StatCard`'s value
+    is the motivating one — whether a figure reads positive or negative is
+    decided per card at runtime, and encoding it as roles would mean a
+    `POSITIVE_VALUE`/`NEGATIVE_VALUE`/`NEUTRAL_VALUE` triple for every place
+    that ever needs a tone.
+
+    Returns a token value, never a literal, so `guards.find_inline_stylesheets`
+    stays satisfied and a palette change still reaches every caller. Prefer
+    `apply_role()` wherever the colour is a property of what the widget *is*.
+
+    @raise KeyError If no such token exists — same fail-fast as an unknown
+    role, rather than rendering a widget with an empty colour.
+    """
+    return _token(name)
+
+
 def _token(name: str) -> str:
     """Reads one token value from the shared theme bridge as a string —
     every token this module reads is either a colour (already `str`) or a
@@ -120,6 +167,17 @@ def _token(name: str) -> str:
 
 def _px(name: str) -> str:
     return f"{_token(name)}px"
+
+
+#: Which semantic colour token each banner severity reads. A mapping rather
+#: than three near-identical `if` bodies — the three banners differ only in
+#: this one token, and writing them out separately invites the drift where
+#: one severity quietly grows a rule the other two lack.
+_BANNER_ACCENTS: dict[StyleRole, str] = {
+    StyleRole.BANNER_INFO: "accent",
+    StyleRole.BANNER_WARN: "warning",
+    StyleRole.BANNER_DANGER: "danger",
+}
 
 
 def _build_qss(role: StyleRole, state: WidgetState) -> str:
@@ -156,6 +214,52 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"border: 1px solid {_token('border')};"
             f"border-radius: {_px('radiusSm')};"
             f"padding: 0 {_px('spaceSm')};"
+        )
+
+    if role is StyleRole.BADGE:
+        emphasised = state is WidgetState.SELECTED
+        return (
+            f"background-color: "
+            f"{_token('stateActiveTint') if emphasised else _token('stateIdleBg')};"
+            f"border: 1px solid "
+            f"{_token('accent') if emphasised else _token('border')};"
+            f"border-radius: {_px('radiusSm')};"
+            f"color: {_token('accent') if emphasised else _token('muted')};"
+            f"padding: 0 {_px('spaceXs')};"
+        )
+
+    if role in _BANNER_ACCENTS:
+        banner_accent = _token(_BANNER_ACCENTS[role])
+        return (
+            f"background-color: {_token('bgCardHeader')};"
+            f"border: 1px solid {banner_accent};"
+            f"border-radius: {_px('radiusMd')};"
+            f"color: {banner_accent};"
+        )
+
+    if role is StyleRole.SECTION_LABEL:
+        return f"background-color: transparent;color: {_token('muted')};"
+
+    if role is StyleRole.TABLE_HEADER:
+        return (
+            f"background-color: {_token('bgCardHeader')};"
+            f"border-radius: {_px('radiusSm')};"
+            f"color: {_token('muted')};"
+        )
+
+    if role is StyleRole.PROGRESS:
+        return (
+            f"QProgressBar {{"
+            f"background-color: {_token('stateIdleBg')};"
+            f"border: 1px solid {_token('border')};"
+            f"border-radius: {_px('radiusSm')};"
+            f"color: {_token('textPrimary')};"
+            f"text-align: center;"
+            f"}}"
+            f"QProgressBar::chunk {{"
+            f"background-color: {_token('muted') if disabled else _token('accent')};"
+            f"border-radius: {_px('radiusSm')};"
+            f"}}"
         )
 
     accent = {
