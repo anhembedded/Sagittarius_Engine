@@ -146,7 +146,39 @@ def apply_role(
     `Sagittarius_Elite_Warrior`'s `EPIC-006C` for that wiring once it
     exists) before constructing any widget from this package.
     """
-    widget.setStyleSheet(_build_qss(role, state))
+    widget.setStyleSheet(_scope_qss(widget, _build_qss(role, state)))
+
+
+def _scope_qss(widget: QWidget, qss: str) -> str:
+    """
+    @brief Confines `qss` to `widget` itself — the `BUG-008` fix.
+
+    @details Qt applies a stylesheet set via `setStyleSheet()` to the
+    widget it was set on **and** to every descendant with no stylesheet of
+    its own. A bare property list — no selector at all — is the universal
+    selector, so a `Card`'s own background/border/colour used to repaint
+    its entire subtree, including children (e.g. a toolbar's buttons) that
+    never asked to be restyled. Roles that already write their own type
+    selector (`SELECTABLE_CARD`, `PROGRESS`, the three button roles) are
+    left untouched — wrapping them again would nest a second, redundant
+    selector around one that is already scoped.
+
+    Scoped to `widget`'s own runtime class, not a hardcoded name, because
+    `apply_role()` is always called with the real instance (`self`), so
+    `type(widget).__name__` already resolves to the most derived class
+    (`ChartCard`, not `Card`, when `ChartCard(Card)` calls it). The
+    selector is deliberately left bare rather than dot-prefixed
+    (`.ChartCard`): Qt matches a bare type selector against subclasses of
+    it too, but since the selector is already built from the exact
+    runtime type, that only ever reaches a *further* subclass of this same
+    widget — never an unrelated sibling elsewhere in the tree — so the
+    subclass-matching a dotted selector would suppress is never actually in
+    play here, and bare stays consistent with how every already-scoped
+    role in this module writes its own selector.
+    """
+    if "{" in qss:
+        return qss
+    return f"{type(widget).__name__} {{ {qss} }}"
 
 
 class Tone(Enum):
