@@ -112,6 +112,12 @@ class StyleRole(Enum):
     #: over a *group inside* a panel. 3 real consumers, which between them
     #: used two near-identical sizes (13px and 14px); collapsing that pair
     #: onto one token is exactly what this epic exists to do.
+    #:
+    #: Reads `fontSizeLg`, not `fontSizeMd`. It was first written on
+    #: `fontSizeMd` — the same token `BODY_LABEL` reads — which made the two
+    #: impossible to separate: an app cannot have 12px body labels and 14px
+    #: headings when both resolve through one token. A heading is the large
+    #: tier by definition; that is the tier it must name.
     HEADING = auto()
 
 
@@ -386,7 +392,7 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
         return (
             f"background-color: transparent;"
             f"color: {_token('accent')};"
-            f"font-size: {_px('fontSizeMd')};"
+            f"font-size: {_px('fontSizeLg')};"
             f"font-weight: bold;"
         )
 

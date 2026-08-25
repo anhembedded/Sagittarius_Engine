@@ -237,11 +237,17 @@ def test_heading_is_accent_and_bold_where_section_label_is_muted(
     assert "<muted>" in section.styleSheet()
 
 
-def test_body_label_and_heading_share_one_size_token(qtbot, fake_theme_bridge):
-    """Both consumer groups arrived carrying near-duplicate hardcoded sizes
-    (12px vs 13px for body, 13px vs 14px for headings). Collapsing each onto
-    one token is the point; this pins that they did not quietly re-diverge
-    into two literals inside this module."""
+def test_body_label_and_heading_read_different_size_tokens(qtbot, fake_theme_bridge):
+    """A heading and a body label must be separately sizable by the app.
+
+    Both were first written on `fontSizeMd`, which looked tidy and was
+    unusable: the reference app wants 12px body labels and 14px headings,
+    and one token cannot be two numbers. Sharing a token is not
+    consolidation when the two things were never the same size.
+
+    Each still resolves through a token rather than a literal — that part
+    was right and is pinned below.
+    """
     from PySide6.QtWidgets import QWidget
 
     body = QWidget()
@@ -253,7 +259,7 @@ def test_body_label_and_heading_share_one_size_token(qtbot, fake_theme_bridge):
     apply_role(heading, StyleRole.HEADING)
 
     assert "<fontSizeMd>" in body.styleSheet()
-    assert "<fontSizeMd>" in heading.styleSheet()
+    assert "<fontSizeLg>" in heading.styleSheet()
 
 
 def test_progress_disabled_chunk_uses_the_muted_token(qtbot, fake_theme_bridge):
