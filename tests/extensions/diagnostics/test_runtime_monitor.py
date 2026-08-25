@@ -60,21 +60,39 @@ def test_remove_is_silent_for_an_unregistered_observer():
     bus_observers.remove_bus_observer(RuntimeMonitor())  # must not raise
 
 
+class _BrokenObserver(bus_observers.IBusObserver):
+    def event_emitted(self, event_name, handler_count):
+        raise RuntimeError("observer is broken")
+
+
 def test_a_broken_observer_cannot_break_the_application(bus):
-    """The one place swallowing is right: a diagnostic that can raise into the
-    dispatch path is a worse failure mode than the ones it reports."""
-
-    class Broken(bus_observers.IBusObserver):
-        def event_emitted(self, event_name, handler_count):
-            raise RuntimeError("observer is broken")
-
+    """The one place not propagating is right: a diagnostic that can raise into
+    the dispatch path is a worse failure mode than the ones it reports."""
     received = []
-    bus_observers.add_bus_observer(Broken())
+    bus_observers.add_bus_observer(_BrokenObserver())
     bus.on("e", received.append)
 
     bus.emit("e", "payload")
 
-    assert received == ["payload"], "a broken observer swallowed the delivery"
+    assert received == ["payload"], "a broken observer stopped the delivery"
+
+
+def test_a_broken_observer_is_counted_rather_than_silenced(bus):
+    """Contained is not the same as silent. The counter replaced a bare
+    `except: pass` that Bandit flagged as B110 and was right to — it keeps the
+    containment and drops the silence, which beats the `#nosec` the finding
+    invited. A log line here would flood: one per emit is the BUG-042 failure
+    mode that froze a UI thread.
+
+    Read as a delta because the counter is process-global and never resets.
+    """
+    before = bus_observers.notification_failures()
+    bus_observers.add_bus_observer(_BrokenObserver())
+
+    bus.emit("e", None)
+    bus.emit("e", None)
+
+    assert bus_observers.notification_failures() - before == 2
 
 
 # --------------------------------------------------------- R1: into the void

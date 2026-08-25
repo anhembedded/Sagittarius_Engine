@@ -48,7 +48,8 @@ class IBusObserver(ABC):
 
     @warning These run **inside the dispatch path**, on whichever thread is
     emitting. An implementation must be fast, must not block, and must not
-    raise — see `_notify()` for what happens if it does.
+    raise — one that does is contained and counted, never propagated; see
+    `notification_failures()`.
     """
 
     def event_emitted(self, event_name: str, handler_count: int) -> None:
@@ -93,17 +94,41 @@ def bus_observers() -> tuple[IBusObserver, ...]:
     return _observers
 
 
-# Both functions below swallow whatever an observer raises, and duplicate the
-# `try`/`except` rather than sharing a helper. Two deliberate decisions:
+#: How many times an observer raised and was contained. See the note below for
+#: why this is a counter rather than a log line or a `pass`.
+_notification_failures = 0
+
+
+def notification_failures() -> int:
+    """@brief How many observer calls have raised, process-wide.
+
+    @details A non-zero value means some observer is broken and the diagnostics
+    it was installed to provide are incomplete. Exposed so that "a broken
+    observer" is *discoverable* rather than merely survivable — a test can
+    assert on it, and `tests/extensions/diagnostics/` does.
+    """
+    return _notification_failures
+
+
+# Both functions below contain whatever an observer raises, and duplicate the
+# `try`/`except` rather than sharing a helper. Three deliberate decisions:
 #
-# **Why swallow.** This is the one place in this repository where it is right.
-# An observer is a *diagnostic*; a broken one that could raise into the
-# dispatch path would break the application it was installed to watch, turning
-# an optional monitor into a failure mode strictly worse than the ones it
-# reports. It cannot report the failure either — the only channel here is the
-# bus logger, and an observer that raises on every emit would flood it. The
-# honest trade, recorded rather than hidden: **a broken observer goes quiet,
-# it does not go loud.**
+# **Why contain it.** This is the one place in this repository where not
+# propagating is right. An observer is a *diagnostic*; a broken one that could
+# raise into the dispatch path would break the application it was installed to
+# watch, turning an optional monitor into a failure mode strictly worse than
+# the ones it reports.
+#
+# **Why a counter and not a log line.** The only channel available here is the
+# bus logger, and an observer that raises on every emit would flood it — the
+# `BUG-042` failure mode, where one log line per event froze a UI thread. A
+# counter is O(1), costs nothing on the success path, and still makes the
+# breakage discoverable through `notification_failures()`.
+#
+# The counter replaced a bare `except: pass`, which Bandit flagged as `B110`
+# and was right to: silent is not the same as contained. This keeps the
+# containment and drops the silence, which is a better answer than the `#nosec`
+# the finding invited.
 #
 # **Why duplicated.** The shared `_notify(method, *args)` helper this replaced
 # cost an extra call frame per observer per emit — measured at ~65 ns, against
@@ -118,17 +143,19 @@ def notify_event_emitted(event_name: str, handler_count: int) -> None:
     @warning Callers guard on `_observers` being non-empty before calling —
     see `dispatch_trace.log_event_emitted()` for the measurement that made
     that worth doing."""
+    global _notification_failures
     for observer in _observers:
         try:
             observer.event_emitted(event_name, handler_count)
-        except Exception:  # noqa: BLE001 - see the note above
-            pass
+        except Exception:  # noqa: BLE001 - contained and counted; see above
+            _notification_failures += 1
 
 
 def notify_handler_failed(event_name: str, handler: str, exc: BaseException) -> None:
     """@brief Fans a handler failure out to the observers."""
+    global _notification_failures
     for observer in _observers:
         try:
             observer.handler_failed(event_name, handler, exc)
-        except Exception:  # noqa: BLE001 - see the note above
-            pass
+        except Exception:  # noqa: BLE001 - contained and counted; see above
+            _notification_failures += 1

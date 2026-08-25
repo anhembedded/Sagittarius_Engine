@@ -153,3 +153,29 @@ another application's events), and a raising handler still does not stop the oth
 Full suite **1293 passed, 8 skipped**, coverage 90.88%; `ruff`, `ruff format --check` and `mypy`
 clean over CI's scope. Architecture guard passes — infrastructure holds the registry, the
 extension registers *into* it, so nothing in `infrastructure/` imports `extensions/`.
+
+
+## A third defect, found by CI rather than by me (2026-08-25)
+
+`Security Audit` went from 5 findings to 7 on this branch. Bandit flagged both of
+`bus_observers.py`'s containment blocks as `B110` — *try, except, pass* — and was right to.
+
+The containment itself is correct and stays: an observer is a diagnostic, and a broken one that
+could raise into the dispatch path would break the application it was installed to watch. But
+**contained is not the same as silent**, and `except: pass` is silent. A broken observer went
+quiet in a way nothing could detect.
+
+`# nosec B110` was the obvious answer and the worse one. The block now increments a counter,
+readable through `notification_failures()`:
+
+- It keeps the containment and drops the silence.
+- It costs nothing on the success path — the increment only runs when an observer already raised.
+- A log line was rejected for a measured reason: one per emit is the `BUG-042` failure mode,
+  where a log line per event froze the consuming application's UI thread.
+
+Bandit is back to the repository's pre-existing 5 findings. Those are `TASK-040`'s separate,
+still-open item; this branch neither fixes nor adds to them.
+
+The general point is worth keeping: a linter finding on new code is a bug report until proven
+otherwise. Checking rather than assuming "that job is always red" is what caught it — the job
+*was* always red, and this was still new.
