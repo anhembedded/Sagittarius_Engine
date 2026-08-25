@@ -1,7 +1,38 @@
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any, Literal, TypeVar
 
 T = TypeVar("T", bound=Any)
+
+Lifetime = Literal["singleton", "transient", "scoped"]
+
+
+@dataclass(frozen=True)
+class Registration:
+    """
+    @brief One entry in a container's registry — what `registrations()` reports.
+
+    @details A read-only description of a registration, never a handle to the
+    instance itself: a diagnostic that resolves things in order to describe
+    them would construct half the application as a side effect of being asked
+    a question.
+
+    @param abstract The type callers pass to `resolve()`.
+    @param concrete The type that will be constructed, where the container
+        knows it. `None` for a singleton registered as a factory or lambda,
+        whose result type is unknowable before it runs.
+    @param lifetime `"singleton"`, `"transient"` or `"scoped"`.
+    @param instantiated Whether an instance already exists. `False` for a
+        singleton that has been registered but never resolved — the
+        distinction matters when the question is "what has actually been
+        built so far".
+    """
+
+    abstract: type
+    concrete: type | None
+    lifetime: Lifetime
+    instantiated: bool
 
 
 class IContainer(ABC):
@@ -88,3 +119,35 @@ class IContainer(ABC):
         @return A context manager (ScopeContext) that activates and deactivates the scope.
         """
         ...
+
+    def registrations(self) -> Mapping[type, Registration]:
+        """
+        @brief Everything currently registered, keyed by the abstract type.
+
+        @details `resolve()` answers "give me a T" for a T the caller already
+        names. This answers "what have you got", which is what a caller needs
+        in order to check registrations it was never told about — that every
+        binding is constructible, that nothing was registered twice under
+        conflicting lifetimes, that a handler's dependency is actually
+        satisfiable before a user triggers it rather than after (`EPIC-006`).
+
+        @return Abstract type -> `Registration`. Where the same abstract is
+        registered more than once, the entry reports the lifetime `resolve()`
+        would actually use, not every registration made. The mapping is a
+        snapshot and never triggers construction.
+
+        @par Why this is concrete rather than abstract
+        Same reason as `IEventBus.subscriptions()`: an `IContainer` implemented
+        outside this repository keeps working. A default of empty is
+        indistinguishable from a container with nothing registered, so a caller
+        that must tell those apart can check whether it was overridden:
+
+        @code
+        introspectable = type(c).registrations is not IContainer.registrations
+        @endcode
+
+        `StdLibContainer` overrides it, and
+        `tests/test_architecture.py::test_containers_implement_registrations`
+        fails if a new container does not.
+        """
+        return {}

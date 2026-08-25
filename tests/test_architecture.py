@@ -240,3 +240,104 @@ def test_deprecation_warnings():
 
         container.bind(DummyQuery, DummyQuery)
         app.query(DummyQuery, {})
+
+
+# ---------------------------------------------------------------------------
+# EPIC-006A: introspection defaults must never apply to a class we ship
+# ---------------------------------------------------------------------------
+#
+# `IEventBus.subscriptions()` and `IContainer.registrations()` are concrete with
+# an empty default, so that an implementation outside this repository keeps
+# working (`code-rule.md` §L forbids the NotImplementedError alternative). The
+# price is that "no subscriptions" and "cannot introspect" look identical from
+# the outside.
+#
+# These two tests buy the guarantee back for anything shipped here: every
+# concrete implementation in the package must override, so a caller can trust an
+# empty answer from an engine class to mean genuinely empty. A new bus that
+# forgets fails here rather than silently reporting nothing to a diagnostic that
+# believed it.
+
+
+def _concrete_implementations(interface):
+    """Every non-abstract subclass of `interface` reachable from the package."""
+    import importlib
+    import inspect
+    import pkgutil
+
+    import sagittarius_engine
+
+    for info in pkgutil.walk_packages(
+        sagittarius_engine.__path__, "sagittarius_engine."
+    ):
+        try:
+            module = importlib.import_module(info.name)
+        except Exception:
+            # Import failures are `test_all_modules_importable.py`'s job to
+            # report; swallowing them here keeps this test's failure message
+            # about the thing it actually checks.
+            continue
+        for _, obj in inspect.getmembers(module, inspect.isclass):
+            if (
+                issubclass(obj, interface)
+                and obj is not interface
+                and not inspect.isabstract(obj)
+                and obj.__module__.startswith("sagittarius_engine.")
+            ):
+                yield obj
+
+
+def test_event_buses_implement_subscriptions():
+    from sagittarius_engine.interfaces import IEventBus
+
+    missing = sorted(
+        f"{cls.__module__}.{cls.__qualname__}"
+        for cls in set(_concrete_implementations(IEventBus))
+        if cls.subscriptions is IEventBus.subscriptions
+    )
+
+    assert not missing, (
+        "These IEventBus implementations inherit the empty default of "
+        "`subscriptions()`, so they report no subscriptions no matter what is "
+        "registered on them, and any diagnostic reading them is silently "
+        "wrong:\n  " + "\n  ".join(missing)
+    )
+
+
+def test_containers_implement_registrations():
+    from sagittarius_engine.interfaces import IContainer
+
+    missing = sorted(
+        f"{cls.__module__}.{cls.__qualname__}"
+        for cls in set(_concrete_implementations(IContainer))
+        if cls.registrations is IContainer.registrations
+    )
+
+    assert not missing, (
+        "These IContainer implementations inherit the empty default of "
+        "`registrations()`, so they report nothing registered no matter what "
+        "is bound, and any diagnostic reading them is silently wrong:\n  "
+        + "\n  ".join(missing)
+    )
+
+
+def test_async_event_bus_also_implements_subscriptions():
+    """`AsyncioEventBus` is not an `IEventBus`.
+
+    It satisfies `IAsyncEventBus`, a Protocol, so it sits in a separate
+    hierarchy that `test_event_buses_implement_subscriptions` cannot reach via
+    `issubclass`. It is still a bus an application runs on, and `EPIC-006` must
+    be able to introspect it, so it is pinned explicitly rather than left to a
+    guard that structurally cannot see it.
+    """
+    from sagittarius_engine.infrastructure.event_bus.asyncio_event_bus import (
+        AsyncioEventBus,
+    )
+    from sagittarius_engine.interfaces import IEventBus
+
+    assert not issubclass(AsyncioEventBus, IEventBus), (
+        "if this becomes an IEventBus, delete this test — the generic guard "
+        "above covers it and this one would be redundant"
+    )
+    assert callable(getattr(AsyncioEventBus, "subscriptions", None))
+    assert AsyncioEventBus.subscriptions is not IEventBus.subscriptions

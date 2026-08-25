@@ -1,11 +1,11 @@
 import inspect
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any, TypeVar, cast
 
 from sagittarius_engine.exceptions import DependencyResolutionError
 from sagittarius_engine.infrastructure.container.scope_context import ScopeContext
-from sagittarius_engine.interfaces import IContainer
+from sagittarius_engine.interfaces import IContainer, Registration
 
 T = TypeVar("T")
 
@@ -102,6 +102,67 @@ class StdLibContainer(IContainer):
             else:
                 # Concrete instance — store directly.
                 self._instances[abstract] = instance_or_factory
+
+    def registrations(self) -> Mapping[type, Registration]:
+        """
+        @brief Everything registered here, as `resolve()` would see it.
+
+        @details The four stores this class keeps are not a flat registry, and
+        two of them overlap in a way that matters. `singleton()` given a class
+        installs a lazy factory in `_factories`; on first resolve that factory
+        pops itself and the result lands in `_instances`. The same abstract is
+        therefore a singleton in both states, and only `instantiated`
+        distinguishes them — reporting the factory entry after construction, or
+        losing the registration entirely, would both be wrong.
+
+        Entries are built in ascending order of the precedence `resolve()`
+        applies, so a later write overwrites an earlier one and what comes out
+        is what would actually be resolved: bindings (transient) first, then
+        factories and instances (singleton), then the scope registry, which
+        `resolve()` consults before anything else.
+
+        Taken under the lock, and never resolves anything: describing a
+        registration must not construct it.
+        """
+        with self._lock:
+            found: dict[type, Registration] = {}
+
+            for abstract, concrete in self._bindings.items():
+                found[abstract] = Registration(
+                    abstract=abstract,
+                    concrete=concrete,
+                    lifetime="transient",
+                    instantiated=False,
+                )
+
+            for abstract in self._factories:
+                # A factory's return type is unknowable before it runs, and
+                # running it here would build the object as a side effect of
+                # asking what is registered.
+                found[abstract] = Registration(
+                    abstract=abstract,
+                    concrete=None,
+                    lifetime="singleton",
+                    instantiated=False,
+                )
+
+            for abstract, instance in self._instances.items():
+                found[abstract] = Registration(
+                    abstract=abstract,
+                    concrete=type(instance),
+                    lifetime="singleton",
+                    instantiated=True,
+                )
+
+            for abstract, concrete in self._scoped_registry.items():
+                found[abstract] = Registration(
+                    abstract=abstract,
+                    concrete=concrete,
+                    lifetime="scoped",
+                    instantiated=False,
+                )
+
+            return found
 
     def resolve(self, abstract: type[Any]) -> Any:
         """

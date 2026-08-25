@@ -1,5 +1,5 @@
 import concurrent.futures
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from sagittarius_engine.infrastructure.event_bus.bus_logger import (
@@ -88,6 +88,22 @@ class ThreadPoolEventBus(IEventBus):
                     report_handler_failure(self.logger, event, h, exc)
 
             future.add_done_callback(_report)
+
+    def subscriptions(self) -> Mapping[str, tuple[Callable[..., Any], ...]]:
+        """
+        @brief Delegates to the wrapped bus, which is where the handlers are.
+
+        @details This class keeps no `_handlers` of its own — `on()` and
+        `off()` forward straight to `_inner_bus`, and only `emit()` differs, by
+        dispatching to a thread pool. Anything reading `self._handlers` to
+        discover subscriptions therefore finds nothing here, which is the
+        concrete reason this had to be an interface method rather than a
+        diagnostic poking at private attributes (`EPIC-006` §2.1).
+
+        Handlers are registered on the inner bus unwrapped, so no unwrapping is
+        needed on the way back out — unlike `ResilientEventBus`.
+        """
+        return self._inner_bus.subscriptions()
 
     def on(self, event_name_or_type: str | Any, handler: Callable[..., Any]) -> None:
         """

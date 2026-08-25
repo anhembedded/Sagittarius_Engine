@@ -1,5 +1,5 @@
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from sagittarius_engine.infrastructure.event_bus.bus_logger import (
@@ -129,6 +129,37 @@ class ResilientEventBus(IEventBus):
 
         if wrapper:
             self.inner_bus.off(event_name_or_type, wrapper)
+
+    def subscriptions(self) -> Mapping[str, tuple[Callable[..., Any], ...]]:
+        """
+        @brief The inner bus's subscriptions, reported as the handlers callers
+        actually registered rather than the retry wrappers standing in for them.
+
+        @details `on()` never registers the caller's handler on the inner bus.
+        It registers a `resilient_wrapper` closure and remembers the pairing in
+        `_wrapper_map[(event_name, handler)]`. Asking the inner bus directly
+        would therefore answer with a list of identically-named
+        `resilient_wrapper` objects — technically the truth, and useless for
+        the question this method exists to serve, since a diagnostic that
+        reports "the handler for student.added is resilient_wrapper" has named
+        the decorator instead of the subscriber.
+
+        So the wrapper map is inverted and each wrapper is translated back to
+        the handler it stands for. A wrapper with no entry in the map is passed
+        through unchanged rather than dropped: something subscribed to the
+        inner bus without going through this decorator, and hiding it would
+        make a real subscription invisible.
+        """
+        with self._lock:
+            unwrap = {
+                wrapper: handler
+                for (_name, handler), wrapper in self._wrapper_map.items()
+            }
+
+        return {
+            name: tuple(unwrap.get(h, h) for h in handlers)
+            for name, handlers in self.inner_bus.subscriptions().items()
+        }
 
     def get_dlq(self) -> list[tuple[str, Any, Callable, Exception]]:
         """

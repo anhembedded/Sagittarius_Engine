@@ -1,6 +1,6 @@
 # EPIC-006: Wiring & Readiness Diagnostics
 
-- **Status**: 📋 **Spec awaiting approval — nothing implemented yet**
+- **Status**: 🟡 **In Progress — 1/6 subtasks done** (`EPIC-006A` ✅ 2026-08-25)
 - **Created**: 2026-08-25
 - **Priority**: P1
 - **Category**: Diagnostics / Runtime Correctness
@@ -88,11 +88,12 @@ groundwork first.
 | Capability needed | Available? | Notes |
 | :--- | :--- | :--- |
 | Declared event catalogue | ✅ | `EventRegistry.all()` → `EventEntry(event_name, event_class, module)` |
-| Live subscriptions | ✅ | `IEventBus.get_handlers(name)` is on the interface; `MemoryEventBus` backs it with `_handlers: dict[str, tuple[Callable, ...]]` |
+| Live subscriptions, one name | ✅ | `IEventBus.get_handlers(name)` — answers only about a name the caller already holds |
+| **Enumerate subscriptions** | ✅ **added by `EPIC-006A`** | `IEventBus.subscriptions()`. Was the blocker for check A2: a typo'd name cannot be found by asking about the correct one |
 | Extension declared dependencies | ✅ | `self.dependencies` (e.g. `AuditExtension.dependencies = ["HealthExtension"]`) |
 | Started hosted services | ✅ | `hosted_services.started_services` |
 | Registered scheduler jobs | ✅ | `scheduler.jobs` |
-| **Enumerate DI bindings** | ⚠️ **private only** | `StdLibContainer` holds `_bindings`, `_instances`, `_factories`, `_scoped_registry`. Needs a public read-only API — see §2.1 |
+| **Enumerate DI bindings** | ✅ **added by `EPIC-006A`** | `IContainer.registrations() -> Mapping[type, Registration]`. Was private-only across four stores |
 | **Command → handler map** | ❌ **does not exist** | See §2.2 — changes the shape of the dispatch check |
 | **Readiness / "stable" state** | ❌ **does not exist** | `grep -riE "ready\|readiness\|stable\|settled"` over `kernel/` and `extensions/health/` returns nothing |
 
@@ -109,6 +110,17 @@ work is to *add a narrow, read-only public API*, not to reach in:
   the existing per-name `get_handlers()`.
 
 Both are small and independently useful. They are the first subtask for that reason.
+
+**✅ Done — `EPIC-006A`, 2026-08-25.** Both landed as **concrete methods with an empty default**
+rather than abstract: `code-rule.md` §L forbids the `NotImplementedError` alternative, and making
+them abstract would break any implementation outside this repository at instantiation. Two
+architecture guards ensure the default never applies to a class shipped here.
+
+The rejected alternative is worth recording, because the codebase proves it would not merely have
+been untidy but **wrong**: `ThreadPoolEventBus` has no `_handlers` at all (it delegates to an
+inner bus), so a diagnostic reading privates reports a fully-wired application as having zero
+subscriptions; and `ResilientEventBus` registers `resilient_wrapper` closures rather than the
+caller's handlers, so reading through would name the decorator instead of the subscriber.
 
 ### 2.2 The dispatcher has no handler registry — and that changes the check
 
@@ -217,7 +229,7 @@ Four consumers of one diagnostic result, in increasing order of intrusiveness:
 
 | ID | Scope | Done when |
 | :--- | :--- | :---: |
-| **EPIC-006A** | Public read-only introspection: `IContainer.registrations()`, `IEventBus.subscriptions()` (§2.1) | Both on the interface with implementations and tests; no diagnostic code reads a private attribute |
+| **EPIC-006A** | Public read-only introspection: `IContainer.registrations()`, `IEventBus.subscriptions()` (§2.1) | ✅ **Done 2026-08-25** — [`completed/EPIC-006A_introspection_read_api.md`](completed/EPIC-006A_introspection_read_api.md). Both concrete-with-empty-default (not abstract: `code-rule.md` §L), implemented across all five buses and `StdLibContainer`, with architecture guards proving no shipped class inherits the default |
 | **EPIC-006B** | Checks A + C + D, `WiringReport`, `report()` | A deliberately mis-wired fixture app produces the exact expected findings — including the A2 typo case |
 | **EPIC-006C** | Readiness state machine + `app.ready` (§E), checks run at that milestone | `app.ready` fires exactly once, after all four preconditions; a late subscriber can query state instead of missing the event |
 | **EPIC-006D** | Check B — `IDispatchable` discovery and resolvability pre-flight | A handler with an unbindable constructor dependency is reported at boot, not on first dispatch |

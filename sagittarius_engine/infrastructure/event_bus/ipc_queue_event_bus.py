@@ -1,7 +1,7 @@
 import logging
 import queue
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from multiprocessing.queues import Queue
 from typing import Any
 
@@ -77,6 +77,23 @@ class IPCQueueEventBus(IEventBus):
             current_handlers = self._handlers.get(event_name, ())
             if handler not in current_handlers:
                 self._handlers[event_name] = current_handlers + (handler,)
+
+    def subscriptions(self) -> Mapping[str, tuple[Callable[..., Any], ...]]:
+        """
+        @brief Every event name with at least one handler, mapped to them.
+
+        @details Taken under the same lock `on()`/`off()` write with, so the
+        snapshot cannot straddle a concurrent subscription change.
+
+        `off()` leaves an empty tuple behind rather than deleting the key; an
+        emptied name is not a subscription, so those are dropped here. Without
+        that, a name that briefly had a handler would look subscribed forever,
+        and `EPIC-006`'s registry-vs-bus diff would report it as live.
+        """
+        with self._handlers_lock:
+            return {
+                name: handlers for name, handlers in self._handlers.items() if handlers
+            }
 
     def off(self, event_name_or_type: str | Any, handler: Callable[..., Any]) -> None:
         """
