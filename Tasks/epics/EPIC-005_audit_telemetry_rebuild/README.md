@@ -116,10 +116,18 @@ by reading.
 | D4 | **The two schemas do not match**, so D3 could not be fixed by calling the constructor. Server sends `uptime`, `tasks`, `extensions`, `environment{os, os_release, python_version, cpu_percent, ram_mb}`; the entity expects `uptime_seconds`, `active_tasks`, `loaded_extensions`, `environment{hostname, os_name, python_version, memory_usage_mb: float, cpu_cores: int}`. Different names, different types (`cpu_percent` is a formatted `str` like `"12.3%"`), fields on each side the other never produces. | `audit_service.py:49-61` vs `Domain/entities.py` |
 | D5 | **The client imports a package that does not exist.** `from src.base_event import ...`, `from src.interfaces import ICommand, IEventBus` — there is no `src/` here (it is `sagittarius_engine/`). Both sit behind `try/except ImportError` that substitutes stubs, so the use-case and event layers are decorative: `ICommand.execute` is `pass`, `IEventBus.emit` is `pass`. | `event/dashboard_events.py:4`, `application/receive_audit_use_case.py:8`; `ls src` → not found |
 | D6 | **`sagittarius-audit` is broken twice.** (a) Bare inner imports (`from application...`) only resolve if cwd is `tools/audit_dashboard/` → `ModuleNotFoundError: No module named 'application'`. (b) The entry point `tools.audit_dashboard:main` binds `main` to the **module**, so `sys.exit(main())` would raise `TypeError: 'module' object is not callable` even after (a) is fixed. | Ran `.venv/bin/sagittarius-audit`; inspected the generated script and `pyproject.toml:31` |
-| D7 | **The GUI never ships.** `tools/audit_dashboard/` has no `__init__.py`, so `find_packages(include=["sagittarius_engine*","tools*"])` returns `['tools']` alone. A `pip install` yields the `sagittarius-audit` command but not the package it points at. | `find_packages(...)` → `['tools']` |
+| D7 | **The console script's dependencies are undeclared.** The wheel is zero-dependency by design, but `tools/audit_dashboard/main.py` imports `PySide6.QtWidgets` at module level. A real `pip install sagittarius-engine` therefore yields a `sagittarius-audit` command that dies on `ModuleNotFoundError: No module named 'PySide6'` before reaching any of its own code. The `[audit]` extra covers only `rich` (for the CLI); nothing declares the GUI's needs. | Installed the built wheel into a clean venv and ran the command |
 | D8 | **The framework hard-codes demo-app events.** `_subscribe_events()` subscribes `student.added`, `student.updated`, `student.deleted`, `report.completed` — `examples/student_management` domain events, from inside the engine. A layering inversion, and useless for any other app. | `audit_service.py:96-100` |
 | D9 | **Every event triggers a full state re-collection and broadcast.** No coalescing, no rate limit, no delta. A task-heavy workload makes the observer a load source on the thing it observes. | `audit_service.py:69-79` |
 | D10 | **Zero client tests.** All 13 audit tests cover the engine side. Nothing tests any client, which is how D1–D6 survived. | `pytest -k audit --collect-only` → 13 tests, all under `tests/extensions/` |
+
+**Correction (2026-08-25).** D7 originally read *"the GUI never ships — `find_packages(...)`
+returns `['tools']` alone"*. **That was wrong.** `[tool.setuptools.packages.find]` in
+`pyproject.toml` defaults to `namespaces = true`, so the build uses
+`find_namespace_packages`, which resolves `tools.audit_dashboard` and all five of its
+subpackages despite the missing `__init__.py`. The wheel does contain them — verified by
+listing the built archive. The original claim came from calling `find_packages` by hand, which
+defaults the other way. The corrected D7 above records what actually breaks the command instead.
 
 Smaller, same cleanup: `AuditService` reaches into privates (`eb._handlers`, `config._config`);
 `get_full_config()` guesses at four attribute names and returns `{"error": ...}` as if it were
@@ -444,8 +452,10 @@ this epic. Do not close a milestone without it.
 `compileall`s it, and imports every shipped module — stronger than what this section asked for,
 and it closes the defect class that shipped `v2.1.0` and `v2.2.0` broken.
 
-The remaining gap is exactly the one `TASK-002` fell through: the guard imports modules, but does
-not resolve and invoke the declared **console scripts**. `sagittarius-audit` binds a module
-rather than a function, and its package is not in the wheel at all — neither fault is visible to
-an import sweep over `sagittarius_engine`. See `EPIC-006` §8; closing it is a few lines on
-infrastructure that already exists.
+The remaining gap is exactly the one `TASK-002` fell through: the guard sweeps
+`sagittarius_engine` only, and it imports modules rather than resolving and invoking the declared
+**console scripts**. `sagittarius-audit` fails three ways over — undeclared `PySide6` (D7), bare
+inner imports needing a specific cwd, and an entry point binding a module rather than a function
+(D6) — and none of the three is visible to an import sweep over a package the script does not
+live in. Verified by installing the built wheel into a clean venv and running the command. See
+`EPIC-006` §8; closing it is a few lines on infrastructure that already exists.

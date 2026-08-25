@@ -277,11 +277,13 @@ throwaway venv, `compileall`s it and imports every module. That is stronger than
 `EPIC-005` §7 asked for, and it closes the class of defect that shipped `v2.1.0` and `v2.2.0`
 broken.
 
-**One gap remains, and it is precisely the one `TASK-002` fell through:** the guard imports
-modules, but does not **resolve and invoke the declared console scripts**. `sagittarius-audit`
-is `tools.audit_dashboard:main`, which binds a *module* rather than a function, and
-`tools/audit_dashboard` is not in the wheel at all — an import sweep over `sagittarius_engine`
-cannot see either fault.
+**One gap remains, and it is precisely the one `TASK-002` fell through:** the guard sweeps the
+`sagittarius_engine` package only, and it *imports modules* rather than **resolving and invoking
+the declared console scripts**. Installing the built wheel into a clean venv and running
+`sagittarius-audit` fails three ways over: `PySide6` is imported at module level but declared
+nowhere (the wheel is zero-dependency); the inner imports are bare and need a specific cwd; and
+the entry point `tools.audit_dashboard:main` binds a *module* rather than a function. None of
+the three is reachable by an import sweep over a package the script does not live in.
 
 Extending the existing script to iterate `[project.scripts]`, resolve each target, and assert
 it is callable is a small delta on infrastructure that already exists. Recommended as a
