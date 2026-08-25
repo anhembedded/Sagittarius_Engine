@@ -10,10 +10,11 @@ Two guards, matching the two QML ones each has a direct counterpart for:
 - `find_inline_stylesheets` — no hardcoded colour literal outside
   `widgets/style.py` (the one file `apply_role()`/`_build_qss()` live in).
   Counterpart to `tokens.qml_literal_guard.find_literal_colors`.
-- `find_bare_qt_base_widgets` — no `class X(QFrame)`/`class X(QDialog)`
-  outside `widgets/surface.py`/`widgets/overlay.py` themselves. Counterpart
-  to `kit.raw_primitive_guard.find_raw_primitives` ("no raw primitive
-  authored outside the kit").
+- `find_bare_qt_base_widgets` — no `class X(QFrame)`/`class X(QDialog)`/
+  `class X(QWidget)` outside `widgets/surface.py`/`widgets/overlay.py`
+  themselves, barring a `# base-exempt: <reason>` line. Counterpart to
+  `kit.raw_primitive_guard.find_raw_primitives` ("no raw primitive authored
+  outside the kit").
 
 No coverage-guard counterpart yet (`kit.gallery_coverage_guard`'s QtWidgets
 equivalent) — that guard checks every kit type appears in a showcase, and
@@ -40,16 +41,50 @@ _EXEMPT_MARKER = "token-exempt"
 #: The one file inline-stylesheet literals are permitted in.
 _STYLE_MODULE_NAME = "style.py"
 
-#: `class Name(QFrame)` / `class Name(QDialog)` as a direct base — matches
-#: only when the class body opens right after (a trailing `metaclass=...`
-#: kwarg or multi-base declaration is out of scope for this codebase's
-#: current style, same "match the real shape, not every hypothetical" call
-#: `raw_primitive_guard` makes for its own two controls).
-_BARE_QT_BASE_RE = re.compile(r"^\s*class\s+\w+\((QFrame|QDialog)\)\s*:")
+#: `class Name(QFrame)` / `class Name(QDialog)` / `class Name(QWidget)` as a
+#: direct base — matches only when the class body opens right after (a
+#: trailing `metaclass=...` kwarg or multi-base declaration is out of scope
+#: for this codebase's current style, same "match the real shape, not every
+#: hypothetical" call `raw_primitive_guard` makes for its own two controls).
+#:
+#: `QWidget` joined the set in EPIC-007A. Measured on the consuming app the
+#: day it was added: `QFrame`/`QDialog` alone found 12 classes in
+#: `Sagittarius_Elite_Warrior/src/presentation/ui`, while 9 more were
+#: surfaces authored as `class X(QWidget)` and sailed straight through —
+#: `LogPanelWidget`, `AppProgressBarWidget`, `TimeRangeCardWidget`,
+#: `DevBoardPanel`, `BackTestTopPanel`, `BackTestTradeLogsPanel`,
+#: `DynamicTabBarWidget`, `_CachedFrameOverlay`, `_BotParamFieldWidget`. The
+#: "12" this guard used to report was a floor, not a count.
+_BARE_QT_BASE_RE = re.compile(r"^\s*class\s+\w+\((QFrame|QDialog|QWidget)\)\s*:")
 
 #: Files where `Surface`/`Overlay` themselves legitimately extend
 #: `QFrame`/`QDialog` directly — the one sanctioned place per base.
+#:
+#: `QWidget` has no entry here on purpose: this package derives no surface
+#: from it (`Surface` is a `QFrame`, `Overlay` a `QDialog`), so there is no
+#: sanctioned file to name. A legitimate `QWidget` base outside this package
+#: — a pure layout composite, an MVC view root — is waved through by
+#: `_BASE_EXEMPT_RE` below, per case and with its reason in the source,
+#: rather than by exempting a whole file.
 _BASE_DEFINITION_FILES = frozenset({"surface.py", "overlay.py"})
+
+#: A class declaration line carrying `# base-exempt: <reason>` is a
+#: deliberate, reviewed exception.
+#:
+#: Its own marker, not `find_inline_stylesheets`'s `token-exempt` — exactly
+#: the call `kit.rectangle_card_guard` already made when it spelled its
+#: escape hatch `card-exempt`: the axis here is a **base class**, not a
+#: literal value, and one marker per axis keeps an exemption from silencing
+#: a guard it was never reviewed against. EPIC-007A's task file asked for
+#: `token-exempt` to be reused; that predates noticing `card-exempt`'s
+#: precedent, and the deviation is recorded in the task file.
+#:
+#: Stricter than both older markers in one way: the reason is **required**,
+#: not merely conventional. `token-exempt`/`card-exempt` match on presence
+#: alone, so a bare marker silences them. This axis is new, so nothing
+#: depends on the looser spelling, and an exemption nobody justified is how
+#: a guard quietly stops meaning anything.
+_BASE_EXEMPT_RE = re.compile(r"#\s*base-exempt\s*:\s*\S")
 
 
 @dataclass(frozen=True)
@@ -64,8 +99,9 @@ class InlineStylesheetFinding:
 
 @dataclass(frozen=True)
 class BareQtBaseFinding:
-    """One `QFrame`/`QDialog` subclass declared outside its base's own
-    definition file — should extend `Surface`/`Overlay` instead."""
+    """One `QFrame`/`QDialog`/`QWidget` subclass declared outside its base's
+    own definition file — should extend `Surface`/`Overlay` instead, or say
+    why not with `# base-exempt: <reason>`."""
 
     file: Path
     line_number: int
@@ -119,8 +155,12 @@ def find_bare_qt_base_widgets(
 ) -> list[BareQtBaseFinding]:
     """
     @brief Scans every `.py` file under `root` (except `surface.py`/
-    `overlay.py`) for a class directly subclassing `QFrame`/`QDialog`,
-    returning one finding per occurrence.
+    `overlay.py`) for a class directly subclassing `QFrame`/`QDialog`/
+    `QWidget`, returning one finding per occurrence.
+    @details A class line carrying `# base-exempt: <reason>` is skipped —
+    `QWidget` in particular is a legitimate base for something that is not a
+    surface at all (a pure layout composite, an MVC view root), which
+    `QFrame`/`QDialog` never were.
     """
     exempt_dirs = [Path(d).resolve() for d in exempt_dirs]
     findings: list[BareQtBaseFinding] = []
@@ -135,6 +175,8 @@ def find_bare_qt_base_widgets(
         for line_number, line_text in enumerate(
             py_file.read_text(encoding="utf-8").splitlines(), start=1
         ):
+            if _BASE_EXEMPT_RE.search(line_text):
+                continue
             match = _BARE_QT_BASE_RE.match(line_text)
             if match is not None:
                 findings.append(

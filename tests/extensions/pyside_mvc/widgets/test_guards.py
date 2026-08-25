@@ -128,3 +128,59 @@ def test_does_not_flag_controls_extending_their_own_qt_base(tmp_path: Path):
     findings = find_bare_qt_base_widgets(tmp_path)
 
     assert findings == []
+
+
+def test_finds_a_class_directly_subclassing_qwidget(tmp_path: Path):
+    """EPIC-007A: the gap that let 9 of the consuming app's surfaces through.
+    A `class X(QWidget)` is the same "authored a raw primitive" mistake as
+    `class X(QFrame)`; only the spelling differed."""
+    _write(
+        tmp_path / "log_panel_widget.py", "class LogPanelWidget(QWidget):\n    x=1\n"
+    )
+
+    findings = find_bare_qt_base_widgets(tmp_path)
+
+    assert len(findings) == 1
+    assert findings[0].qt_base == "QWidget"
+
+
+def test_base_exempt_marker_with_a_reason_waives_the_finding(tmp_path: Path):
+    _write(
+        tmp_path / "base_view.py",
+        "class BaseView(QWidget):  # base-exempt: an MVC view root, not a surface\n"
+        "    pass\n",
+    )
+
+    findings = find_bare_qt_base_widgets(tmp_path)
+
+    assert findings == []
+
+
+def test_base_exempt_marker_without_a_reason_does_not_waive(tmp_path: Path):
+    """Deliberately stricter than `token-exempt`/`card-exempt`, which match on
+    presence alone — see `_BASE_EXEMPT_RE`'s note. A bare marker is an
+    exemption nobody justified, so it does not count as one."""
+    _write(
+        tmp_path / "sneaky.py",
+        "class Sneaky(QWidget):  # base-exempt:\n    pass\n",
+    )
+
+    findings = find_bare_qt_base_widgets(tmp_path)
+
+    assert len(findings) == 1
+    assert findings[0].qt_base == "QWidget"
+
+
+def test_token_exempt_does_not_silence_the_base_class_guard(tmp_path: Path):
+    """The two markers are separate on purpose: one axis is a literal colour
+    value, the other a base class. An exemption reviewed for one must not
+    wave the other through."""
+    _write(
+        tmp_path / "wrong_marker.py",
+        "class MyPanel(QFrame):  # token-exempt: migration leftover\n    pass\n",
+    )
+
+    findings = find_bare_qt_base_widgets(tmp_path)
+
+    assert len(findings) == 1
+    assert findings[0].qt_base == "QFrame"
