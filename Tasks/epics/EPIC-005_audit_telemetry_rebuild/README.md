@@ -1,11 +1,36 @@
 # EPIC-005: Audit Telemetry — Teardown, and Rebuild as a Trace *Recorder*
 
-- **Status**: 📋 **Spec approved in principle — nothing deleted, nothing implemented yet**
-- **Created**: 2026-08-25 · **Revised**: 2026-08-25 (scope cut, see §5)
-- **Priority**: P2
+- **Status**: ⏸️ **On hold — spec complete and approved in principle; deferred behind `EPIC-006`**
+- **Created**: 2026-08-25 · **Revised**: 2026-08-25 (scope cut §5; then deferred §0.1)
+- **Priority**: P2 — *behind `EPIC-006`, which answers the more urgent question*
 - **Category**: Observability / Diagnostics
 - **Supersedes**: `TASK-002` (`AuditExtension` & CLI Inspector, marked ✅ Completed 2026-07-28 — see §2)
-- **Related**: `TASK-033` (renamed `audit_dashboard.py` → `audit_dashboard_cli.py`)
+- **Related**: `TASK-033` (renamed `audit_dashboard.py` → `audit_dashboard_cli.py`);
+  **`EPIC-006`** (Wiring & Readiness Diagnostics — the work that goes first)
+
+---
+
+## 0.1 Why this is on hold
+
+Nothing below is withdrawn — the analysis in §2 stands, the teardown in §3 is still the right
+call, and the scope cut in §5 still holds. What changed is **priority**, once the maintainer
+stated what the tool is actually for:
+
+> *"…always detect anomalies early at runtime, and trace whether the system has stabilised,
+> whether all events are loaded, what the handlers are…"*
+
+Those are questions about **wiring correctness**, not about **execution cost**. A trace recorder
+answers "what ran, and for how long". It cannot answer "is this handler bound to an event name
+that exists". Both are worth having; only one of them is what was being asked for, and it is an
+order of magnitude cheaper — see `EPIC-006` §1.2 for the comparison.
+
+`EPIC-006` also has the stronger claim to the argument this epic makes for itself in §5: that
+the framework's unique contribution is knowing the *meaning* of its own internals. Nothing
+outside the engine can audit its DI wiring, whereas `py-spy`, `viztracer` and Perfetto already
+cover much of what a tracer would do.
+
+**Resume this epic when the live question becomes "why is it slow" rather than "why is it
+wrong".** The specification is complete and does not need rework to be picked up.
 
 ---
 
@@ -413,3 +438,14 @@ completely dead feature still shipped as done, because nobody ran it end to end 
 Criterion 1 is the direct guard against a repeat: **install from a built wheel into a clean venv
 and actually run the command.** It is worth more to this repository than any single feature in
 this epic. Do not close a milestone without it.
+
+**Update (`49c941b`, landed after this spec was first written):** half of that guard now exists.
+`scripts/verify_wheel_importable.py` builds the wheel, installs it into a throwaway venv,
+`compileall`s it, and imports every shipped module — stronger than what this section asked for,
+and it closes the defect class that shipped `v2.1.0` and `v2.2.0` broken.
+
+The remaining gap is exactly the one `TASK-002` fell through: the guard imports modules, but does
+not resolve and invoke the declared **console scripts**. `sagittarius-audit` binds a module
+rather than a function, and its package is not in the wheel at all — neither fault is visible to
+an import sweep over `sagittarius_engine`. See `EPIC-006` §8; closing it is a few lines on
+infrastructure that already exists.
