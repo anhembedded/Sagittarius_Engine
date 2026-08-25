@@ -145,6 +145,30 @@ subclass and prove each one can be constructed. That is more valuable than a reg
 would have been, and it is only possible because the container can be asked to resolve without
 executing anything.
 
+### 2.3 The container does not fail on an unbound dependency — it silently builds the interface
+
+Found 2026-08-25 while prototyping check C against the `EPIC-006A` API. Resolving a class whose
+constructor annotation is unbound behaves in two completely different ways:
+
+| Unbound dependency | Result |
+| :--- | :--- |
+| An **ABC** | `DependencyResolutionError: Cannot instantiate abstract ...` — check C catches it |
+| A **plain class** | **Resolves successfully**, and injects an instance of the annotation itself |
+
+The second is the dangerous one, and it is silent: the caller receives a bare `IMailer()` where
+its real implementation was intended. No exception, no log line, and the application simply
+behaves wrongly.
+
+**Consequence for check B1/C1:** "resolve it and see whether it raises" is not sufficient — it
+passes on exactly the case worth finding. The check must also ask whether each dependency was
+*explicitly bound*, or whether the container fell back to constructing the annotation. That
+question is answerable now: compare the injected type against `registrations()`; an annotation
+that resolves to itself and appears nowhere in the registry was an implicit fallback, not a
+decision anyone made.
+
+Whether that fallback should keep happening at all is a separate question, and a bigger one —
+raise it as its own task rather than changing resolution semantics inside this epic.
+
 ---
 
 ## 3. The checks
