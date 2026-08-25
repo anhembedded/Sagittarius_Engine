@@ -19,6 +19,10 @@ _PACKAGE_ROOT = Path(surfaces.__file__).parent
 #: described with. Listed literally rather than derived from `__all__`, so
 #: this fails if something is dropped from the package as well as if the
 #: re-export is forgotten.
+#:
+#: `Tone` was here until EPIC-007C and now lives in `widgets.style`: once
+#: `Badge` needed it too, "how does this figure read" stopped being a stat
+#: card's idea and became a styling one.
 _EXPECTED_EXPORTS = (
     "Banner",
     "Column",
@@ -32,7 +36,6 @@ _EXPECTED_EXPORTS = (
     "Tab",
     "TabBar",
     "TableCard",
-    "Tone",
 )
 
 

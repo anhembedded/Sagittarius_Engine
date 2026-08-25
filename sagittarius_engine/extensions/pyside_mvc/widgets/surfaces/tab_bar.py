@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
+from ..controls import Badge
 from ..style import StyleRole, WidgetState, apply_role
 from ..surface import Panel
 
@@ -44,15 +45,13 @@ class _TabButton(QPushButton):  # base-exempt: a tab is a button, not a surface
         self._label = QLabel(tab.label)
         row.addWidget(self._label)
 
-        self._badge = QLabel(tab.badge)
-        self._badge.setVisible(bool(tab.badge))
+        self._badge = Badge(tab.badge)
         row.addWidget(self._badge)
 
         self.set_active(False)
 
     def set_badge(self, badge: str) -> None:
         self._badge.setText(badge)
-        self._badge.setVisible(bool(badge))
 
     def set_label(self, label: str) -> None:
         self._label.setText(label)
@@ -63,11 +62,7 @@ class _TabButton(QPushButton):  # base-exempt: a tab is a button, not a surface
             StyleRole.SECONDARY_BUTTON,
             state=WidgetState.NORMAL if active else WidgetState.DISABLED,
         )
-        apply_role(
-            self._badge,
-            StyleRole.BADGE,
-            state=WidgetState.SELECTED if active else WidgetState.NORMAL,
-        )
+        self._badge.set_emphasised(active)
 
 
 class TabBar(Panel):

@@ -8,10 +8,10 @@ from __future__ import annotations
 from typing import Protocol
 
 from PySide6.QtCore import QModelIndex
-from PySide6.QtWidgets import QAbstractItemView, QLabel, QListView, QWidget
+from PySide6.QtWidgets import QAbstractItemView, QListView, QWidget
 
-from ..controls import StyledButton
-from ..style import StyleRole, apply_role
+from ..controls import Badge, StyledButton
+from ..style import StyleRole
 from ..surface import Card
 
 #: Fallback action labels — English, for the same reason `ConfirmOverlay`'s
@@ -77,8 +77,7 @@ class LogPanel(Card):
         self._model: LogModel | None = None
         self._empty_badge_text = empty_badge_text
 
-        self._count_badge = QLabel(empty_badge_text)
-        apply_role(self._count_badge, StyleRole.BADGE)
+        self._count_badge = Badge(empty_badge_text)
         self.header_actions.addWidget(self._count_badge)
 
         self.copy_button = StyledButton(copy_text, role=StyleRole.SECONDARY_BUTTON)

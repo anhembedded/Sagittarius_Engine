@@ -16,11 +16,19 @@ Two guards, matching the two QML ones each has a direct counterpart for:
   `kit.raw_primitive_guard.find_raw_primitives` ("no raw primitive authored
   outside the kit").
 
-No coverage-guard counterpart yet (`kit.gallery_coverage_guard`'s QtWidgets
-equivalent) — that guard checks every kit type appears in a showcase, and
-no QtWidgets showcase/preview exists yet to check against. Add one once
-`Sagittarius_Elite_Warrior`'s `EPIC-006C` (or a dedicated preview harness)
-gives this package a real showcase to enforce coverage against.
+The coverage-guard counterpart (`kit.gallery_coverage_guard`'s QtWidgets
+equivalent) exists as of EPIC-007C, but not as a function here: it needs a
+running `QApplication` to construct the gallery, which every other guard in
+this module deliberately does not. It lives in
+`tests/extensions/pyside_mvc/widgets/test_showcase_coverage.py`, reading
+`tools.widget_showcase.showcased_types()`, and fails when a type in
+`widgets.__all__` is never built by the showcase.
+
+Both guards here scan text, so neither needs Qt — which is also why neither
+is wired to any real source tree today. They are exercised only through
+`tmp_path` fixtures. Pointing them at `sagittarius_engine/` and at a
+consuming app's `presentation/ui` is still outstanding; a guard nobody runs
+protects nothing.
 """
 
 from __future__ import annotations
