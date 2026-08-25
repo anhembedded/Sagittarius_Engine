@@ -34,16 +34,20 @@ from .guards import (
     format_inline_stylesheet_findings,
 )
 from .overlay import Overlay
+from .overlays import ConfirmOverlay, PickerItem, PickerOverlay
 from .style import StyleRole, WidgetState, apply_role
 from .surface import Card, Panel, SelectableCard, Surface
 
 __all__ = [
     "BareQtBaseFinding",
     "Card",
+    "ConfirmOverlay",
     "DateTimeField",
     "InlineStylesheetFinding",
     "Overlay",
     "Panel",
+    "PickerItem",
+    "PickerOverlay",
     "SelectableCard",
     "StyleRole",
     "StyledButton",
