@@ -52,6 +52,10 @@ __all__ = [
     "LoggerExtension",
     # Thread Manager
     "ThreadManagerModule",
+    # Diagnostics (EPIC-006)
+    "DiagnosticsExtension",
+    "WiringInspector",
+    "WiringReport",
 ]
 
 #: Maps each public name to the one submodule that defines it. Exhaustive —
@@ -73,6 +77,9 @@ _LAZY_ATTRS: dict[str, str] = {
     "HealthCheckDTO": ".health.health_check_query",
     "LoggerExtension": ".logger.logger_module",
     "ThreadManagerModule": ".thread_manager.thread_manager_module",
+    "DiagnosticsExtension": ".diagnostics",
+    "WiringInspector": ".diagnostics",
+    "WiringReport": ".diagnostics",
 }
 
 

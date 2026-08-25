@@ -186,7 +186,11 @@ def test_kernel_facade_and_components():
     assert app.context.config is None  # not bound yet
 
     # 2. Verify EngineLifecycle state transitions
-    assert app.lifecycle.is_stopped
+    # EPIC-006C: a freshly constructed app is CREATED, not STOPPED — "never
+    # started" and "has been shut down" are different answers to the only
+    # question anything monitoring an engine asks first.
+    assert app.lifecycle.is_created
+    assert not app.lifecycle.is_stopped
     assert not app.lifecycle.is_booting
     assert not app.lifecycle.is_booted
 
@@ -213,9 +217,11 @@ def test_kernel_facade_and_components():
         and "Responsible for executing handlers through the middleware pipeline."
         in Dispatcher.__doc__
     )
+    # Reworded by EPIC-006C, which gave this class the `app.ready` milestone
+    # on top of the state it already owned.
     assert (
         EngineLifecycle.__doc__ is not None
-        and "Responsible for managing engine state." in EngineLifecycle.__doc__
+        and "Owns the engine's state" in EngineLifecycle.__doc__
     )
     assert (
         ModuleLoader.__doc__ is not None

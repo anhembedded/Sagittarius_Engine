@@ -174,3 +174,14 @@ bite someone working here:
   platform warning (`QFontDatabase: Cannot find font directory`) lands on whichever of them
   collection order puts first. Adding an unrelated test file changes which one fails. It is
   **not** flaky-random; it is order-dependent and reproducible in both directions.
+
+---
+
+## 8. Checking the wiring, not just the catalog
+
+The catalog above says what *can* be emitted. It says nothing about what is actually subscribed,
+and a handler bound to a name no event uses fails silently forever — `bus.on("student.updatd",
+handler)` never runs and nothing reports it.
+
+`sagittarius-doctor` joins the two and reports the difference. See
+[`diagnostics.md`](diagnostics.md).

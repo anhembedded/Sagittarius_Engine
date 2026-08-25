@@ -350,10 +350,10 @@ taken seriously.
 
 | ID | Scope | Done when |
 | :-- | :--- | :--- |
-| **A** | Teardown + `contracts.py` + protocol v1 + ring-buffer recorder + rebuilt transport | Old tree tagged and deleted; recorder unit-tested including eviction and drop-count; overhead benchmark meets §4.2; auth + readiness tests restored green; a raw `websockets` client receives a schema-valid `hello` + `trace` batch |
-| **B** | Instrumentation of the §4.3 subsystems + app-facing `ctx.trace` API | The demo app produces spans for every listed subsystem; task-run spans reconstruct to the same durations the task manager reports; zero-overhead-when-disabled benchmark passes |
-| **C** | Exporters: `.sagtrace` save/load, **Perfetto**, **OpenTelemetry** | A recording of the demo app opens in `ui.perfetto.dev` with correct lanes and nested spans; the same run appears as a trace in a local OTLP collector |
-| **D** | `sagittarius-audit` thin attach CLI + packaging + docs | `pip install dist/*.whl` in a clean venv, the command attaches to a running app, streams the live event log and task stats, and saves a `.sagtrace`; `.agents/context/` updated; `TASK-002` marked superseded |
+| **[A](incomplete/EPIC-005A_teardown_contracts_ringbuffer.md)** | Teardown + `contracts.py` + protocol v1 + ring-buffer recorder + rebuilt transport | Old tree tagged and deleted; recorder unit-tested including eviction and drop-count; overhead benchmark meets §4.2; auth + readiness tests restored green; a raw `websockets` client receives a schema-valid `hello` + `trace` batch |
+| **[B](incomplete/EPIC-005B_instrumentation_and_trace_api.md)** | Instrumentation of the §4.3 subsystems + app-facing `ctx.trace` API | The demo app produces spans for every listed subsystem; task-run spans reconstruct to the same durations the task manager reports; zero-overhead-when-disabled benchmark passes |
+| **[C](incomplete/EPIC-005C_exporters_perfetto_and_otel.md)** | Exporters: `.sagtrace` save/load, **Perfetto**, **OpenTelemetry** | A recording of the demo app opens in `ui.perfetto.dev` with correct lanes and nested spans; the same run appears as a trace in a local OTLP collector |
+| **[D](incomplete/EPIC-005D_thin_attach_cli_and_packaging.md)** | `sagittarius-audit` thin attach CLI + packaging + docs | `pip install dist/*.whl` in a clean venv, the command attaches to a running app, streams the live event log and task stats, and saves a `.sagtrace`; `.agents/context/` updated; `TASK-002` marked superseded |
 
 **Order matters.** C before D: Perfetto validates the trace model against a viewer we did not
 write — the cheapest possible way to discover the model is wrong. And within A/B the round-trip

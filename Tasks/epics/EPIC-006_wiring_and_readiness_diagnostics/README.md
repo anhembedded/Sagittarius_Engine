@@ -1,6 +1,6 @@
 # EPIC-006: Wiring & Readiness Diagnostics
 
-- **Status**: 📋 **Spec awaiting approval — nothing implemented yet**
+- **Status**: 🟡 **In Progress — 5/6 subtasks done** (`EPIC-006A`–`E` ✅ 2026-08-25; only `F` remains, deferred)
 - **Created**: 2026-08-25
 - **Priority**: P1
 - **Category**: Diagnostics / Runtime Correctness
@@ -88,13 +88,14 @@ groundwork first.
 | Capability needed | Available? | Notes |
 | :--- | :--- | :--- |
 | Declared event catalogue | ✅ | `EventRegistry.all()` → `EventEntry(event_name, event_class, module)` |
-| Live subscriptions | ✅ | `IEventBus.get_handlers(name)` is on the interface; `MemoryEventBus` backs it with `_handlers: dict[str, tuple[Callable, ...]]` |
+| Live subscriptions, one name | ✅ | `IEventBus.get_handlers(name)` — answers only about a name the caller already holds |
+| **Enumerate subscriptions** | ✅ **added by `EPIC-006A`** | `IEventBus.subscriptions()`. Was the blocker for check A2: a typo'd name cannot be found by asking about the correct one |
 | Extension declared dependencies | ✅ | `self.dependencies` (e.g. `AuditExtension.dependencies = ["HealthExtension"]`) |
 | Started hosted services | ✅ | `hosted_services.started_services` |
 | Registered scheduler jobs | ✅ | `scheduler.jobs` |
-| **Enumerate DI bindings** | ⚠️ **private only** | `StdLibContainer` holds `_bindings`, `_instances`, `_factories`, `_scoped_registry`. Needs a public read-only API — see §2.1 |
-| **Command → handler map** | ❌ **does not exist** | See §2.2 — changes the shape of the dispatch check |
-| **Readiness / "stable" state** | ❌ **does not exist** | `grep -riE "ready\|readiness\|stable\|settled"` over `kernel/` and `extensions/health/` returns nothing |
+| **Enumerate DI bindings** | ✅ **added by `EPIC-006A`** | `IContainer.registrations() -> Mapping[type, Registration]`. Was private-only across four stores |
+| **Command → handler map** | ❌ **does not exist**, and handlers are in no registry at all — `EPIC-006D` discovers them structurally | See §2.2 — changes the shape of the dispatch check |
+| **Readiness / "stable" state** | ✅ **added by `EPIC-006C`** | `EngineState.READY`, `lifecycle.when_ready()`, `app.ready`. Did not exist when this table was written — the same grep returned nothing across `kernel/` and `extensions/health/` |
 
 ### 2.1 Constraint: no reaching into privates
 
@@ -109,6 +110,17 @@ work is to *add a narrow, read-only public API*, not to reach in:
   the existing per-name `get_handlers()`.
 
 Both are small and independently useful. They are the first subtask for that reason.
+
+**✅ Done — `EPIC-006A`, 2026-08-25.** Both landed as **concrete methods with an empty default**
+rather than abstract: `code-rule.md` §L forbids the `NotImplementedError` alternative, and making
+them abstract would break any implementation outside this repository at instantiation. Two
+architecture guards ensure the default never applies to a class shipped here.
+
+The rejected alternative is worth recording, because the codebase proves it would not merely have
+been untidy but **wrong**: `ThreadPoolEventBus` has no `_handlers` at all (it delegates to an
+inner bus), so a diagnostic reading privates reports a fully-wired application as having zero
+subscriptions; and `ResilientEventBus` registers `resilient_wrapper` closures rather than the
+caller's handlers, so reading through would name the decorator instead of the subscriber.
 
 ### 2.2 The dispatcher has no handler registry — and that changes the check
 
@@ -132,6 +144,30 @@ So the dispatch check becomes a **resolvability pre-flight**: discover every `ID
 subclass and prove each one can be constructed. That is more valuable than a registry audit
 would have been, and it is only possible because the container can be asked to resolve without
 executing anything.
+
+### 2.3 The container does not fail on an unbound dependency — it silently builds the interface
+
+Found 2026-08-25 while prototyping check C against the `EPIC-006A` API. Resolving a class whose
+constructor annotation is unbound behaves in two completely different ways:
+
+| Unbound dependency | Result |
+| :--- | :--- |
+| An **ABC** | `DependencyResolutionError: Cannot instantiate abstract ...` — check C catches it |
+| A **plain class** | **Resolves successfully**, and injects an instance of the annotation itself |
+
+The second is the dangerous one, and it is silent: the caller receives a bare `IMailer()` where
+its real implementation was intended. No exception, no log line, and the application simply
+behaves wrongly.
+
+**Consequence for check B1/C1:** "resolve it and see whether it raises" is not sufficient — it
+passes on exactly the case worth finding. The check must also ask whether each dependency was
+*explicitly bound*, or whether the container fell back to constructing the annotation. That
+question is answerable now: compare the injected type against `registrations()`; an annotation
+that resolves to itself and appears nowhere in the registry was an implicit fallback, not a
+decision anyone made.
+
+Whether that fallback should keep happening at all is a separate question, and a bigger one —
+raise it as its own task rather than changing resolution semantics inside this epic.
 
 ---
 
@@ -217,12 +253,12 @@ Four consumers of one diagnostic result, in increasing order of intrusiveness:
 
 | ID | Scope | Done when |
 | :--- | :--- | :---: |
-| **EPIC-006A** | Public read-only introspection: `IContainer.registrations()`, `IEventBus.subscriptions()` (§2.1) | Both on the interface with implementations and tests; no diagnostic code reads a private attribute |
-| **EPIC-006B** | Checks A + C + D, `WiringReport`, `report()` | A deliberately mis-wired fixture app produces the exact expected findings — including the A2 typo case |
-| **EPIC-006C** | Readiness state machine + `app.ready` (§E), checks run at that milestone | `app.ready` fires exactly once, after all four preconditions; a late subscriber can query state instead of missing the event |
-| **EPIC-006D** | Check B — `IDispatchable` discovery and resolvability pre-flight | A handler with an unbindable constructor dependency is reported at boot, not on first dispatch |
-| **EPIC-006E** | `sagittarius-doctor` CLI + generated wiring document + docs | Runs in CI against `examples/student_management`; `.agents/context/` updated |
-| **EPIC-006F** | Runtime anomaly detection (§F) | *Deferred — specify after C lands and "settled" is well-defined* |
+| **EPIC-006A** | Public read-only introspection: `IContainer.registrations()`, `IEventBus.subscriptions()` (§2.1) | ✅ **Done 2026-08-25** — [`completed/EPIC-006A_introspection_read_api.md`](completed/EPIC-006A_introspection_read_api.md). Both concrete-with-empty-default (not abstract: `code-rule.md` §L), implemented across all five buses and `StdLibContainer`, with architecture guards proving no shipped class inherits the default |
+| **EPIC-006B** | Checks A + C + D, `WiringReport`, `report()` | ✅ **Done 2026-08-25** — [`completed/EPIC-006B_wiring_report_and_checks.md`](completed/EPIC-006B_wiring_report_and_checks.md). `extensions/diagnostics/`; 33 tests; nothing is resolved or constructed to produce a finding; A1 is advisory so a clean app reports 0 errors / 0 warnings |
+| **[EPIC-006C](completed/EPIC-006C_readiness_state_machine.md)** | Readiness state machine + `app.ready` (§E), checks run at that milestone | ✅ **Done 2026-08-25** — `CREATED`/`READY` added, guarded transitions, `app.ready` once, `when_ready()` for late arrivals, `DiagnosticsExtension` attached at the milestone. The stranded-extension gate was removed after measuring that boot cannot reach that state — `BUG-008` |
+| **[EPIC-006D](completed/EPIC-006D_dispatch_resolvability_preflight.md)** | Check B — `IDispatchable` discovery and resolvability pre-flight | ✅ **Done 2026-08-25** — structural discovery, not `__init_subclass__`: measured, a subclass registry would have found 0 of the demo app's 7 handlers, because `IDispatchable` is a duck-typed marker and no handler inherits it |
+| **[EPIC-006E](completed/EPIC-006E_doctor_cli_and_docs.md)** | `sagittarius-doctor` CLI + generated wiring document + docs | ✅ **Done 2026-08-25** — `sagittarius-doctor`, three exit codes, runs in CI against the sample app with `--strict`. The committed wiring document was dropped: measured deterministic, but it would have documented the demo app and needed regenerating on every engine event |
+| **[EPIC-006F](incomplete/EPIC-006F_runtime_anomaly_detection.md)** | Runtime anomaly detection (§F) | *Deferred — specify after C lands and "settled" is well-defined* |
 
 Order: **A → B → C → D → E.** A is groundwork and small; B delivers the flagship value on its
 own and is independently shippable.

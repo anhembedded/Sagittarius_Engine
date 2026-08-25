@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any, TypeVar
 
 from sagittarius_engine.domain.base_event import BaseEvent
@@ -67,3 +67,43 @@ class IEventBus(ABC):
         @brief Returns registered handlers for an event.
         """
         return ()
+
+    def subscriptions(self) -> Mapping[str, tuple[Callable[..., Any], ...]]:
+        """
+        @brief Every event name this bus currently has at least one handler for,
+        mapped to those handlers.
+
+        @details `get_handlers()` answers "who handles X" for an X the caller
+        already knows. This answers "which X exist at all", which is the only
+        way to reach a name nobody meant to register: a subscription to
+        `"student.updatd"` can never be found by asking about
+        `"student.updated"`. Joining this against
+        `sagittarius_engine.domain.EventRegistry` is what turns a silent typo
+        into a boot-time report (`EPIC-006`).
+
+        @return Event name -> handlers, in no guaranteed order. Names whose
+        handlers have all been removed via `off()` are omitted: an emptied name
+        is not a subscription. The mapping is a snapshot; mutating the bus
+        afterwards does not change it.
+
+        @par Why this is concrete rather than abstract
+        Mirrors `get_handlers()` directly above, and for the same reason: an
+        `IEventBus` implemented outside this repository keeps working without
+        changes. Declaring it abstract would break every such implementation at
+        instantiation, and the usual alternative -- a base that raises
+        `NotImplementedError` -- is forbidden outright by `code-rule.md` §L.
+
+        The cost of a default is that a bus which does not override this is
+        indistinguishable from a bus with nothing subscribed. A caller that
+        must tell those apart can ask whether the method was overridden:
+
+        @code
+        introspectable = type(bus).subscriptions is not IEventBus.subscriptions
+        @endcode
+
+        Every bus shipped with this engine overrides it, and
+        `tests/test_architecture.py::test_event_buses_implement_subscriptions`
+        fails if a new one does not -- so the ambiguity never applies to a bus
+        from this package.
+        """
+        return {}

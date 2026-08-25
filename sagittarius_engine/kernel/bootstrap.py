@@ -90,3 +90,22 @@ class Bootstrap:
         )
 
         self.context.event_bus.emit(APP_BOOTED_EVENT_NAME, self.context.app)
+
+        # Readiness follows unconditionally, and deliberately so.
+        #
+        # An earlier draft gated this on "no extension was left stranded",
+        # reasoning that `boot()` returning is not the same as everything
+        # having come up. Measured, that gate was dead code: during boot,
+        # `initialize_and_start()` raises for both ways an extension can fail
+        # to initialise — `ExtensionDependencyError` for a dependency that was
+        # never registered, `ExtensionCircularDependencyError` for a cycle — so
+        # control never reaches here with anything stranded. Keeping the check
+        # would have implied a boot outcome this engine cannot produce.
+        #
+        # Stranding is real, but only *after* boot: `register()` defers an
+        # extension with unmet dependencies and never raises, so a plugin added
+        # to a running engine can sit uninitialised while the state still reads
+        # `ready`. A one-shot gate here could not have caught that either. It is
+        # `BUG-008`, and `EPIC-006B`'s check D1 already reports it at any point
+        # in the engine's life, which is what that case needs.
+        self.context.lifecycle.set_ready()

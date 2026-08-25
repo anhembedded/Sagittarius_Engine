@@ -1,6 +1,6 @@
 from .i_async_event_bus import IAsyncEventBus
 from .i_config import IConfig
-from .i_container import IContainer
+from .i_container import IContainer, Lifetime, Registration
 from .i_dispatchable import IDispatchable
 from .i_dispatcher import IDispatcher
 from .i_engine_context import IEngineContext
@@ -25,6 +25,8 @@ __all__ = [
     "IEventBus",
     "IAsyncEventBus",
     "IContainer",
+    "Registration",
+    "Lifetime",
     "IMiddleware",
     "ILogger",
     "IConfig",

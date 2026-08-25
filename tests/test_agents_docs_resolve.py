@@ -41,6 +41,11 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         "TInput",
         "TOutput",
         "EventName",
+        # Python builtins quoted in prose about behaviour the language provides,
+        # not names this repository owns. `context/diagnostics.md` cites
+        # NameError as what makes a class-based subscription impossible to
+        # misspell.
+        "NameError",
         # IExtension lifecycle method names and descriptor attributes, quoted
         # bare in prose about the interface shape (context/project.md,
         # context/troubleshooting.md) — not package/class names to resolve.
