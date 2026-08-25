@@ -192,6 +192,70 @@ def test_badge_selected_state_differs_from_normal(qtbot, fake_theme_bridge):
     assert widget.styleSheet() != normal
 
 
+# ---------------------------------------------------------------------- #
+# EPIC-007F roles
+# ---------------------------------------------------------------------- #
+
+
+def test_body_label_is_full_contrast_where_caption_is_muted(qtbot, fake_theme_bridge):
+    """The distinction that justifies BODY_LABEL existing beside CAPTION: a
+    form field's label is text the user reads to operate the screen, so it
+    must not recede the way an explanatory caption deliberately does."""
+    from PySide6.QtWidgets import QWidget
+
+    body = QWidget()
+    qtbot.addWidget(body)
+    caption = QWidget()
+    qtbot.addWidget(caption)
+
+    apply_role(body, StyleRole.BODY_LABEL)
+    apply_role(caption, StyleRole.CAPTION)
+
+    assert "<textPrimary>" in body.styleSheet()
+    assert "<muted>" in caption.styleSheet()
+    assert body.styleSheet() != caption.styleSheet()
+
+
+def test_heading_is_accent_and_bold_where_section_label_is_muted(
+    qtbot, fake_theme_bridge
+):
+    """HEADING names a whole panel or dialog; SECTION_LABEL labels a group
+    inside one. Collapsing them would make a dialog title recede to the same
+    weight as the group headings underneath it."""
+    from PySide6.QtWidgets import QWidget
+
+    heading = QWidget()
+    qtbot.addWidget(heading)
+    section = QWidget()
+    qtbot.addWidget(section)
+
+    apply_role(heading, StyleRole.HEADING)
+    apply_role(section, StyleRole.SECTION_LABEL)
+
+    assert "<accent>" in heading.styleSheet()
+    assert "font-weight: bold" in heading.styleSheet()
+    assert "<muted>" in section.styleSheet()
+
+
+def test_body_label_and_heading_share_one_size_token(qtbot, fake_theme_bridge):
+    """Both consumer groups arrived carrying near-duplicate hardcoded sizes
+    (12px vs 13px for body, 13px vs 14px for headings). Collapsing each onto
+    one token is the point; this pins that they did not quietly re-diverge
+    into two literals inside this module."""
+    from PySide6.QtWidgets import QWidget
+
+    body = QWidget()
+    qtbot.addWidget(body)
+    heading = QWidget()
+    qtbot.addWidget(heading)
+
+    apply_role(body, StyleRole.BODY_LABEL)
+    apply_role(heading, StyleRole.HEADING)
+
+    assert "<fontSizeMd>" in body.styleSheet()
+    assert "<fontSizeMd>" in heading.styleSheet()
+
+
 def test_progress_disabled_chunk_uses_the_muted_token(qtbot, fake_theme_bridge):
     from PySide6.QtWidgets import QWidget
 
