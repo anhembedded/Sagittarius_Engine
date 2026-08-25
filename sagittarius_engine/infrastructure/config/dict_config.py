@@ -30,7 +30,7 @@ class DictConfig(IConfig):
         if cast is not None and val is not None and not isinstance(val, cast):
             try:
                 return cast(val)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 return val
         return val
 

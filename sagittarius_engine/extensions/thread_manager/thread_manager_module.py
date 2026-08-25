@@ -36,7 +36,7 @@ class ThreadManagerExtension(IExtension[IThreadManagerContext]):
 
         try:
             max_workers = int(max_workers)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             max_workers = 4
 
         thread_manager = ThreadManager(max_workers=max_workers)
