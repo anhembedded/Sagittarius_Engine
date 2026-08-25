@@ -41,6 +41,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-037** | `IView` dual QML/QWidget rendering backend — enroll-form prototype validated, then rolled out to the full roster screen (`WidgetRosterView`, `run.ps1 -QtWidget`) | Architecture / Presentation Layer | 2026-08-23 | [TASK-037_iview_dual_backend_prototype_validated.md](completed/TASK-037_iview_dual_backend_prototype_validated.md) |
 | **TASK-038** | `pyside_mvc.widgets` — QtWidgets base classes (`Surface`/`Card`/`Panel`/`Overlay`/`Styled*`) replacing the QML kit, built for Elite's `EPIC-006` (drop QML project-wide) | Architecture / Presentation Layer | 2026-08-24 | [TASK-038_qtwidgets_base_classes_surface_overlay_controls.md](completed/TASK-038_qtwidgets_base_classes_surface_overlay_controls.md) |
 | **TASK-034** | `extensions/__init__.py` barrel made lazy (PEP 562 `__getattr__`) — deep-importing one extension no longer pulls in its five siblings | Architecture / Package Boundaries | 2026-08-24 | [TASK-034_extensions_barrel_eager_imports_everything.md](completed/TASK-034_extensions_barrel_eager_imports_everything.md) |
+| **TASK-039** | Wheel guard now resolves every advertised console script; caught `sagittarius-audit`, which has never run since `TASK-002` and is removed rather than repaired | Build / Packaging — Release Gate | 2026-08-25 | [TASK-039_wheel_guard_never_checked_console_scripts.md](completed/TASK-039_wheel_guard_never_checked_console_scripts.md) |
 
 ### 🟡 In Progress (`Tasks/in_progress/`)
 

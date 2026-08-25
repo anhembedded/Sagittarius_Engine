@@ -452,10 +452,13 @@ this epic. Do not close a milestone without it.
 `compileall`s it, and imports every shipped module — stronger than what this section asked for,
 and it closes the defect class that shipped `v2.1.0` and `v2.2.0` broken.
 
-The remaining gap is exactly the one `TASK-002` fell through: the guard sweeps
-`sagittarius_engine` only, and it imports modules rather than resolving and invoking the declared
-**console scripts**. `sagittarius-audit` fails three ways over — undeclared `PySide6` (D7), bare
-inner imports needing a specific cwd, and an entry point binding a module rather than a function
-(D6) — and none of the three is visible to an import sweep over a package the script does not
-live in. Verified by installing the built wheel into a clean venv and running the command. See
-`EPIC-006` §8; closing it is a few lines on infrastructure that already exists.
+**That gap is now closed too, by `TASK-039` (2026-08-25).** The guard's third step resolves
+every `console_scripts` entry point the installed distribution declares and asserts each is
+callable. Run against `sagittarius-audit` it failed immediately, confirming the three stacked
+faults recorded in D6 and D7 — undeclared `PySide6`, bare inner imports needing a specific cwd,
+and an entry point naming a module where a function is required.
+
+That entry point has been **removed rather than repaired** (§3 schedules its target for deletion
+anyway; repairing it would be work on doomed code). **Milestone D's replacement console script
+is gated by this check before it can reach a consumer** — criterion 1 is now enforced by CI
+rather than by remembering.

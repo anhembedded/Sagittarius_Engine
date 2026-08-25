@@ -28,7 +28,20 @@ Repository = "https://github.com/anhembedded/Sagittarius-Engine.git"
 Documentation = "https://github.com/anhembedded/Sagittarius-Engine/tree/main/.agents"
 
 [project.scripts]
-sagittarius-audit = "tools.audit_dashboard:main"
+# `sagittarius-audit = "tools.audit_dashboard:main"` was removed here, not
+# fixed. The command could not start for any consumer, in three independent
+# ways: the target module imports PySide6 at module scope while this wheel
+# declares no dependencies; its inner imports are bare (`from application...`)
+# and resolve only when the process starts in one specific directory; and this
+# entry point names a module where a function is required. It shipped in
+# v2.1.0 and v2.2.0 advertising a command that has never run.
+#
+# Repairing it would be work on a component `EPIC-005` §3 schedules for
+# deletion, so the honest minimum is to stop promising it. `EPIC-005`
+# Milestone D re-adds a console script pointing at something that works.
+#
+# `scripts/verify_wheel_importable.py` step 3 now resolves every entry point
+# declared here, so the next one cannot ship broken the way this one did.
 
 [tool.setuptools.packages.find]
 include = ["sagittarius_engine*", "tools*"]

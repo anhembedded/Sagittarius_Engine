@@ -285,7 +285,12 @@ nowhere (the wheel is zero-dependency); the inner imports are bare and need a sp
 the entry point `tools.audit_dashboard:main` binds a *module* rather than a function. None of
 the three is reachable by an import sweep over a package the script does not live in.
 
-Extending the existing script to iterate `[project.scripts]`, resolve each target, and assert
-it is callable is a small delta on infrastructure that already exists. Recommended as a
-standalone `TASK`, ahead of both epics — it is a few lines and it guards every entry point this
-epic and `EPIC-005` will add.
+**✅ Closed by `TASK-039` (2026-08-25), ahead of both epics as recommended.** The guard now has
+a third step that reads `console_scripts` from the installed distribution's metadata, resolves
+each `module:attr` the way the generated launcher does, and asserts the result is callable —
+resolving but never invoking, since running a console script would start the application. It
+caught `sagittarius-audit` on the first run; that entry point was removed rather than repaired,
+since `EPIC-005` §3 schedules its target for deletion.
+
+**Milestone E's `sagittarius-doctor` is therefore already gated** before it can reach a
+consumer, which is exactly why this was worth doing first.
