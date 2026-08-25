@@ -240,3 +240,43 @@ jobs:
 
       - name: Validate distribution metadata with Twine
         run: twine check dist/*
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 8: Package Import Guard
+  # ──────────────────────────────────────────────────────────────
+  import-guard:
+    name: Package Import Guard
+    runs-on: ubuntu-latest
+
+    # Deliberately NO `needs:`. Every other job here gates on `lint`, and that
+    # is precisely how df51202 shipped: five Python 2 `except A, B:` clauses
+    # landed on main, mypy went red, and because lint failed the test,
+    # architecture, examples and package jobs were all *skipped* -- for days.
+    # The one class of defect that makes the published artifact worthless is
+    # the one a gated job can never report, so this job answers "can a
+    # consumer install and import this?" on its own, every time.
+    #
+    # ruff cannot stand in for it: ruff 0.16.4 accepts the bare tuple in an
+    # except clause and exits 0 on a file CPython refuses to compile. The
+    # `Ruff — lint` step passed on the very commit that broke the package.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tracks pyproject's requires-python floor. If that floor is lowered,
+      # lower this too: the guard is only meaningful on the oldest interpreter
+      # the package claims to support, since that is where a consumer breaks.
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14-dev"
+          allow-prereleases: true
+          cache: "pip"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build the wheel, install it clean, compile and import every module
+        run: python scripts/verify_wheel_importable.py
