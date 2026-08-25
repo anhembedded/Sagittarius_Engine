@@ -14,7 +14,8 @@ directly when an event is added, removed, or renamed.
 | `extension.initializing` | `ExtensionInitializing` | `sagittarius_engine.kernel.events` | extension_name |
 | `extension.started` | `ExtensionStarted` | `sagittarius_engine.kernel.events` | extension_name |
 | `extension.stopped` | `ExtensionStopped` | `sagittarius_engine.kernel.events` | extension_name |
-| `health.updated` | `HealthUpdatedEvent` | `sagittarius_engine.extensions.health.health_module` | — |
+| `health.check_requested` | `HealthCheckRequested` | `sagittarius_engine.extensions.health.health_check_requested` | — |
+| `health.updated` | `HealthUpdatedEvent` | `sagittarius_engine.extensions.health.health_updated_event` | — |
 | `runtime.hosted.started` | `HostedServiceStarted` | `sagittarius_engine.runtime.hosted.events` | service_name |
 | `runtime.hosted.stopped` | `HostedServiceStopped` | `sagittarius_engine.runtime.hosted.events` | service_name |
 | `runtime.scheduler.started` | `SchedulerStarted` | `sagittarius_engine.runtime.scheduler.events` | — |
