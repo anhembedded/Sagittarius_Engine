@@ -1,5 +1,5 @@
 """
-@brief `TabBar` — a `Panel` of selectable tabs, each with an optional badge.
+@brief `TabBar` — a row of selectable tabs, each with an optional badge.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from ..controls import Badge
 from ..style import StyleRole, WidgetState, apply_role
-from ..surface import Panel
 
 
 @dataclass(frozen=True)
@@ -65,7 +64,7 @@ class _TabButton(QPushButton):  # base-exempt: a tab is a button, not a surface
         self._badge.set_emphasised(active)
 
 
-class TabBar(Panel):
+class TabBar(QWidget):  # base-exempt: a row of tabs is chrome, not a surface
     """
     @brief A row of tabs where exactly one is current.
 
@@ -94,6 +93,14 @@ class TabBar(Panel):
     calls it on every single log line that arrives — so a live backtest
     rebuilds that row hundreds of times to change one number. When the ids
     are unchanged, this only writes the labels and badges.
+
+    **Not a `Surface`.** It was a `Panel` at first, which gave every tab row
+    a card background, a border and a radius of its own. That is wrong for
+    the same reason `_TabButton` above already carries `base-exempt`: a tab
+    is a button, not a surface — and a row of buttons is not one either. A
+    tab bar is chrome that sits *on* a surface. An app wanting it framed
+    puts it inside a `Panel`; an app that does not, as the reference
+    consumer does not, cannot un-frame a `Panel`.
     """
 
     #: Emits `(index, id)` on a user's click. Both, because the consumer's
@@ -112,8 +119,8 @@ class TabBar(Panel):
         self._buttons: list[_TabButton] = []
         self._current_id: str | None = None
 
-        self._row = QHBoxLayout()
-        self.body_layout.addLayout(self._row)
+        self._row = QHBoxLayout(self)
+        self._row.setContentsMargins(0, 0, 0, 0)
 
         self.set_tabs(tabs)
 
