@@ -39,9 +39,16 @@ sagittarius-doctor myapp.main:build_app \
 | `--json` | Machine-readable. Boot output is redirected to stderr so the document is never corrupted by an application that prints while starting. |
 | `--strict` | Exit non-zero on warnings as well as errors. |
 
-Exit codes: `0` clean, `1` findings, `2` the doctor could not run (a mistyped argument). The
-last is separate on purpose — "your wiring is wrong" and "the tool never started" need different
-responses from whoever reads the build.
+Exit codes: `0` clean, `1` findings, `2` the doctor could not run. The last is separate on
+purpose — "your wiring is wrong" and "the tool never started" need different responses from
+whoever reads the build.
+
+`2` covers every way no report gets produced, not just a mistyped argument: a module that
+raises while being *imported* (importing runs its top-level code), and a factory that dies
+before returning an `App`, both land here. Corrected 2026-08-25 — this said "a mistyped
+argument", and the code matched that reading: both of those cases escaped as a bare traceback
+under exit `1`, which claims an inspection happened and found errors. In the failing case the
+traceback is printed in full, because it names the line that actually broke.
 
 **It boots the application.** Wiring does not exist until something wires it, so there is no way
 to inspect it without running the application's own composition. Point it at a factory that uses
