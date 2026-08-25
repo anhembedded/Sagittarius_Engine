@@ -38,8 +38,8 @@ Seven jobs, verified against `ci.yml` on 2026-08-23 (the previous version of thi
 `benchmark` entirely):
 
 1. **Lint & Type Check** — fails fast if Ruff or Mypy catches issues.
-2. **Test Matrix** — Pytest across OSs (Linux, Windows) and Python versions (including
-   3.14-dev). Minimum 80% coverage enforced (`--cov-fail-under=80`).
+2. **Test Matrix** — Pytest across OSs (Linux, Windows) on Python 3.12. Minimum 80% coverage
+   enforced (`--cov-fail-under=80`).
 3. **Architecture Guard** — runs `tests/test_architecture.py` so core boundaries can't be
    violated.
 4. **Example Integration** — runs `tests/test_examples.py`, so a framework change that breaks

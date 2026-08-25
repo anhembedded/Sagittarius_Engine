@@ -50,7 +50,7 @@ jobs:
         run: mypy sagittarius_engine tests examples tools --ignore-missing-imports --follow-imports=skip
 
   # ──────────────────────────────────────────────────────────────
-  # Job 2: Test Matrix (Python 3.14 dev on Linux & Windows)
+  # Job 2: Test Matrix (Python 3.12 on Linux & Windows)
   # ──────────────────────────────────────────────────────────────
   test:
     name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
@@ -61,7 +61,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.14-dev"]
+        python-version: ["3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +70,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
           cache: "pip"
 
       - name: Install dependencies
@@ -93,8 +92,8 @@ jobs:
             --cov-fail-under=80 \
             -q
 
-      - name: Upload coverage (Python 3.14-dev)
-        if: matrix.python-version == '3.14-dev'
+      - name: Upload coverage (Python 3.12)
+        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
@@ -266,11 +265,10 @@ jobs:
       # Tracks pyproject's requires-python floor. If that floor is lowered,
       # lower this too: the guard is only meaningful on the oldest interpreter
       # the package claims to support, since that is where a consumer breaks.
-      - name: Set up Python 3.14
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14-dev"
-          allow-prereleases: true
+          python-version: "3.12"
           cache: "pip"
 
       - name: Install build tooling

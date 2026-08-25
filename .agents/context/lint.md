@@ -46,7 +46,7 @@ rather than fails, so it cannot block someone deliberately running a newer tool 
   `X | None` and `X | Y` over `Optional`/`Union` — the `UP` rules in the ruff config above
   (`UP045`, `UP007`) enforce this, so writing `Optional[X]` now gets flagged, not encouraged.
   `TypeVar` is still current for `Generic[T]`; PEP 695 (`class Foo[T]:`) is available on this
-  repo's Python 3.14 floor but not yet applied everywhere — see `UP046` findings tracked in
+  repo's Python 3.12 floor but not yet applied everywhere — see `UP046` findings tracked in
   TASK-021 for the classes still pending a deliberate (not autofixed) conversion.
 - Run `mypy sagittarius_engine tests --ignore-missing-imports --follow-imports=skip`. **Clean —
   `Success: no issues found in 259 source files`**, as of 2026-08-23

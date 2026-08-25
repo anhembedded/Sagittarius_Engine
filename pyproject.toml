@@ -7,7 +7,7 @@ name = "sagittarius-engine"
 version = "2.3.0"
 description = "A lightweight, modular Python Application Engine"
 readme = "readme.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "AnhEmbedded Team", email = "Anh.Embedded@gmail.com"}
@@ -18,7 +18,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 
@@ -51,7 +51,7 @@ audit = ["rich>=13.0.0"]
 
 [tool.black]
 line-length = 88
-target-version = ["py314"]
+target-version = ["py312"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -78,7 +78,7 @@ src_paths = ["src"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py314"
+target-version = "py312"
 exclude = [".venv", "build", "dist", "__pycache__", ".pytest_cache", ".git"]
 
 [tool.ruff.lint]
@@ -98,7 +98,7 @@ ignore = ["E501", "C901", "UP037"]
 per-file-ignores = {"__init__.py" = ["F401"]}
 
 [tool.mypy]
-python_version = 3.14
+python_version = 3.12
 ignore_missing_imports = true
 follow_imports = "skip"
 show_error_codes = true
