@@ -18,6 +18,7 @@ import contextlib
 import importlib
 import json
 import sys
+import traceback
 from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
@@ -29,6 +30,15 @@ from .report import WiringReport
 
 #: Exit codes. Distinct so CI can tell "your wiring is wrong" from "the doctor
 #: could not run", which need different responses from whoever sees the build.
+#:
+#: `EXIT_USAGE` is named narrower than it means. It covers everything in the
+#: second category -- a mistyped argument, a module that raises while being
+#: imported, a factory that dies before returning an `App` -- because they all
+#: share the property that matters to a build: **no wiring was inspected**.
+#: Reporting any of them as `EXIT_FINDINGS` would claim an inspection happened
+#: and found errors, which is a different and false statement. The name is kept
+#: rather than corrected because it is the published contract of a shipped
+#: console script; the meaning is recorded here instead.
 EXIT_OK = 0
 EXIT_FINDINGS = 1
 EXIT_USAGE = 2
@@ -36,7 +46,7 @@ EXIT_USAGE = 2
 
 class UsageError(Exception):
     """
-    @brief The operator mistyped an argument.
+    @brief The doctor could not get as far as inspecting anything.
 
     @details Distinct from a wiring finding, and reported as `EXIT_USAGE`, so CI
     can tell "your wiring is wrong" from "the doctor could not run" — those need
@@ -45,6 +55,31 @@ class UsageError(Exception):
     Raised rather than `SystemExit`: `SystemExit(str)` always exits `1`, which
     would have made the two indistinguishable while the constants above claimed
     otherwise.
+
+    @par Correction (2026-08-25)
+    This said "the operator mistyped an argument", and `load_factory()` said
+    every failure in it was "a mistyped argument, not a defect in the
+    application under inspection". Both were false, and demonstrably so: naming
+    a module whose *module-level code* raises, or a factory that dies before
+    returning an `App`, escaped as a bare traceback and exit `1` — which this
+    file's own constants define as "inspected the wiring, found errors". Nothing
+    had been inspected.
+
+    The application starts running the moment its module is imported, so a
+    failure here is very often a defect in it. What these failures have in
+    common is not whose fault they are; it is that no report exists.
+    """
+
+
+class TargetError(UsageError):
+    """
+    @brief The target was named correctly, but running it failed.
+
+    @details A subclass rather than a sibling: callers that only care whether a
+    report exists can keep catching `UsageError`, while the message can still
+    say which of the two happened. An operator reading a build needs that
+    difference — "you typed the wrong module" and "your application crashed on
+    boot" are not the same next action.
     """
 
 
@@ -62,9 +97,13 @@ def load_factory(target: str) -> Any:
     that it is deliberate, documented, and what a user pointing a tool at their
     own project expects.
 
-    @raises UsageError Naming what was wrong, rather than a traceback: every
-        failure here is a mistyped argument, not a defect in the application
-        under inspection.
+    @raises UsageError The argument itself is wrong — no colon, no such module,
+        no such attribute, or an attribute that is not callable.
+    @raises TargetError The argument named something real, but importing it
+        raised. Importing runs the module's top-level code, so this reaches
+        anything an application does at import time; the original traceback is
+        chained rather than swallowed, because for this case it is the whole
+        diagnosis.
     """
     if ":" not in target:
         raise UsageError(f"{EXIT_USAGE_HINT}\n  got: {target!r} (missing ':')")
@@ -79,6 +118,14 @@ def load_factory(target: str) -> Any:
         module = importlib.import_module(module_name)
     except ImportError as exc:
         raise UsageError(f"cannot import {module_name!r}: {exc}") from exc
+    except Exception as exc:
+        # Deliberately broad. Importing runs the module's top-level code, which
+        # is arbitrary application code and can raise anything at all -- this
+        # was found by a `TypeError` from a module-level registration call
+        # escaping as a raw traceback under exit 1.
+        raise TargetError(
+            f"importing {module_name!r} raised {type(exc).__name__}: {exc}"
+        ) from exc
 
     factory = getattr(module, attribute, None)
     if factory is None:
@@ -174,8 +221,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     # unparseable — measured, not assumed. Diagnostics belong on stderr and the
     # payload on stdout, so the boot's output is redirected rather than the
     # report being moved out of the caller's way.
-    with contextlib.redirect_stdout(sys.stderr):
-        app = factory()
+    #
+    # The factory is the one place this tool runs someone else's code on
+    # purpose, so it is also the one place an arbitrary exception is expected
+    # rather than exceptional. Letting it escape produced a bare traceback under
+    # exit 1 — which this file defines as "wiring inspected, errors found", a
+    # claim that is false when the application never finished booting.
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            app = factory()
+    except Exception:
+        # The traceback is printed, not summarised: it points at the line in the
+        # application that failed, and no message this tool composes can be more
+        # useful than that.
+        traceback.print_exc()
+        print(
+            f"\n{args.factory} raised while building the application. "
+            "Nothing was inspected — this is not a wiring report.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
 
     context = app.context
     handlers = discover_handlers(*args.handler_package) if args.handler_package else ()

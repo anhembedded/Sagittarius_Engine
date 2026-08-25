@@ -129,3 +129,67 @@ which the namespace starts paying for itself, and it is a cheap change while bot
 
 No bump, per `release.md` §1. `a` bump when a release is cut — new feature. The changelog should
 name the new console script: `[project.scripts]` is published metadata that consumers see.
+
+---
+
+## Correction (2026-08-25): the exit-code contract was not true
+
+Found by running the tool, not by reading it — while demonstrating it on a
+deliberately mis-wired application, two of my own mistakes in the demo produced
+this:
+
+```
+$ sagittarius-doctor app:build --handler-package app
+Traceback (most recent call last):
+  ...
+TypeError: EventRegistry.register_named() missing 1 required keyword-only argument: 'module'
+$ echo $?
+1
+```
+
+Exit `1` is `EXIT_FINDINGS`, which this file's own design defines as *"the wiring was
+inspected and errors were found"*. Nothing had been inspected — the application had not
+finished importing. The build gets a false statement, and `--json` consumers get an empty
+stdout with a traceback on stderr rather than either a document or a clean usage error.
+
+`EXIT_USAGE = 2` exists precisely to carry this case. Two gaps let it through:
+
+1. `load_factory()` caught only `ImportError`. But `importlib.import_module()` runs the
+   module's **top-level code**, which is arbitrary application code and can raise anything.
+2. `main()` called `factory()` unguarded. A factory that dies before returning an `App` —
+   an unreachable database, a missing config key — is ordinary, not exceptional.
+
+Both were documented as impossible. `load_factory`'s docstring claimed *"every failure here
+is a mistyped argument, not a defect in the application under inspection"*, and `UsageError`'s
+said *"the operator mistyped an argument"*. Neither survives contact with an application that
+does work at import time, which is most of them.
+
+### What changed
+
+- `TargetError(UsageError)` — the target was named correctly but running it failed. A subclass,
+  so a caller asking only *"is there a report?"* keeps catching `UsageError`, while the message
+  can still separate a typo from a crash. Those need different next actions from an operator.
+- `load_factory()` catches a raising import and reports which module and which exception.
+- `main()` guards `factory()`, prints the **full traceback** — it names the line that actually
+  broke, and no message this tool composes could beat that — then a line saying nothing was
+  inspected, and returns `EXIT_USAGE`.
+- `EXIT_USAGE`'s comment now records that its name is narrower than its meaning, and why it was
+  not renamed: it is the published contract of a shipped console script.
+
+### Verified
+
+Four regression tests added to `tests/extensions/diagnostics/test_doctor_cli.py`, each checked
+to **fail without the fix** (stash the `cli.py` change, re-run: 4 failed) and pass with it:
+
+| Case | Before | After |
+|---|---|---|
+| module raises during import | bare traceback, exit `1` | `EXIT_USAGE`, names module + exception |
+| factory raises | bare traceback, exit `1` | `EXIT_USAGE`, traceback + "nothing was inspected" |
+| `--json` with a failing factory | half-stream + traceback | stdout empty |
+| `TargetError` is a `UsageError` | n/a | holds |
+
+Reference application still `EXIT_OK` under `--strict`. Full suite: **1262 passed, 8 skipped**,
+coverage 90.70%; `ruff`, `ruff format --check`, `mypy` clean over CI's scope.
+
+`.agents/context/diagnostics.md` corrected in place — it repeated the same "(a mistyped
+argument)" claim.
