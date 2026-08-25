@@ -14,7 +14,15 @@ if not report.ok:
 @endcode
 """
 
+from .extension import DiagnosticsError, DiagnosticsExtension
 from .inspector import WiringInspector
 from .report import Finding, Severity, WiringReport
 
-__all__ = ["WiringInspector", "WiringReport", "Finding", "Severity"]
+__all__ = [
+    "DiagnosticsExtension",
+    "DiagnosticsError",
+    "WiringInspector",
+    "WiringReport",
+    "Finding",
+    "Severity",
+]
