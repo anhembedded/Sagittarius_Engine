@@ -124,6 +124,13 @@ class DataRow(QWidget):  # base-exempt: a row inside a table is not a surface
         self._cells: list[QLabel] = []
 
         row = QHBoxLayout(self)
+        # No margins. A row draws no padding of its own — the table around
+        # it owns the inset, and a row that adds Qt's default 9px on every
+        # side cannot fit the item height its list gives it. That is not
+        # hypothetical: it squashed the first real consumer's rows to
+        # nothing, because a `QListView` sizes items from the model and the
+        # row has to live inside whatever it gets.
+        row.setContentsMargins(0, 0, 0, 0)
         for column in self._columns:
             cell = QLabel()
             cell.setAlignment(column.alignment | Qt.AlignmentFlag.AlignVCenter)

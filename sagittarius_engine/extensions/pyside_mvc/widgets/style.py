@@ -166,6 +166,12 @@ class StyleRole(Enum):
     #: why not one of those 5 was written that way. Its colour is
     #: per-instance where a row needs it (`DataRow.set_action_tone`), the
     #: same escape hatch `STAT_VALUE` uses.
+    #:
+    #: The only button role that names a font size. The three filled ones
+    #: leave it to the widget default because they sit in footers and
+    #: toolbars at whatever the app's base size is; a row action is
+    #: deliberately smaller than the data beside it, and all 5 measured
+    #: originals set a size by hand to get that.
     GHOST_BUTTON = auto()
 
 
@@ -489,6 +495,7 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"color: {outline};"
             f"border: 1px solid {outline};"
             f"border-radius: {_px('radiusSm')};"
+            f"font-size: {_px('fontSizeSm')};"
             f"padding: {_px('spaceXs')} {_px('spaceSm')};"
             f"}}"
             f"QPushButton:hover {{background-color: {_token('stateHoverBg')};}}"
