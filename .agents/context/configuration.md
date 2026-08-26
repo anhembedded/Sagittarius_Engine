@@ -105,5 +105,5 @@ containment, and `-wal`/`-shm` sidecar cleanup on removal. Override any of it vi
 
 Some extensions accept parameters directly at construction instead of going through
 `IConfig` — e.g. `DiagnosticsExtension(fail_fast=True)`, or `TraceServer(recorder, port=9999)`.
-Tools built on top of the engine (like `tools/widget_showcase`) manage their own configuration
-independently of the engine's `IConfig` entirely.
+Tools and apps built on top of the engine manage their own configuration independently of
+the engine's `IConfig` entirely.

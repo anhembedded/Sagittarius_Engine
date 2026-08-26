@@ -68,11 +68,27 @@ def test_gate_reports_failure_when_a_required_tool_is_missing(tmp_path):
         timeout=GATE_TIMEOUT_SECONDS,
     )
 
-    output = result.stdout + result.stderr
+    # `or ""` on both halves: with `capture_output=True` these are normally
+    # strings, but on the Windows runner one of them comes back `None`, and
+    # `None + str` raised a TypeError on this line -- killing the test while
+    # it was assembling a failure *message*, before any of the three
+    # assertions below could report what the gate actually did. That made a
+    # Windows-only crash look like a gate regression. This is a fix to the
+    # diagnostic path only; nothing below is weakened.
+    #
+    # It stayed hidden because the test skips wherever `pwsh` is absent (so
+    # never locally on Linux) and this CI job has been *skipped*, not run,
+    # for as long as `lint` was red -- the same gating trap the fix in this
+    # commit closes.
+    output = (result.stdout or "") + (result.stderr or "")
+    detail = (
+        f"returncode={result.returncode}, "
+        f"stdout={result.stdout!r:.200}, stderr={result.stderr!r:.200}"
+    )
 
     assert result.returncode != 0, (
         "Gate exited 0 with required tools missing from PATH -- the exact "
-        f"false-positive TASK-028 describes.\n--- output ---\n{output}"
+        f"false-positive TASK-028 describes.\n{detail}\n--- output ---\n{output}"
     )
     assert "RESULT: FAIL" in output, f"Expected RESULT: FAIL in output.\n{output}"
     assert "RESULT: PASS" not in output, f"Gate falsely reported PASS.\n{output}"
