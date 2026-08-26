@@ -390,3 +390,38 @@ class CardWidget(QFrame):
 
     assert len(findings) == 1
     assert findings[0].target == "self"
+
+
+def test_a_widget_that_holds_children_without_a_layout_is_a_container(tmp_path):
+    """`QStackedWidget` and friends hold children directly, so the
+    layout-owner check never sees them.
+
+    Not hypothetical: the reference app styled the stack holding **every
+    screen** with a bare property list, and the guard walked past the
+    largest cascade in the whole application — a dark rectangle behind
+    every label on every screen that had no background rule of its own.
+    """
+    root = _screen(
+        tmp_path,
+        """
+stacked = QStackedWidget()
+stacked.setStyleSheet("background-color: #0a0a0c; color: #e8e9ec;")
+""",
+    )
+
+    findings = find_unscoped_container_stylesheets(root)
+
+    assert len(findings) == 1
+    assert findings[0].target == "stacked"
+
+
+def test_a_scoped_stack_is_not_reported(tmp_path):
+    root = _screen(
+        tmp_path,
+        """
+stacked = QStackedWidget()
+stacked.setStyleSheet("QStackedWidget { background-color: #0a0a0c; }")
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []

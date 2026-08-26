@@ -122,6 +122,24 @@ _CASCADE_EXEMPT_MARKER = "cascade-exempt"
 #: container setting it for its labels is the normal way to do that.
 _CASCADING_PROPERTIES = ("border", "background")
 
+#: Qt widgets that hold children **without** a layout, so the layout-owner
+#: check below never sees them. Missing this class of container is not
+#: hypothetical: the reference app styled its `QStackedWidget` — the widget
+#: holding *every screen* — with a bare property list, and the guard walked
+#: straight past the largest cascade in the whole application.
+_IMPLICIT_CONTAINERS = frozenset(
+    {
+        "QStackedWidget",
+        "QTabWidget",
+        "QSplitter",
+        "QScrollArea",
+        "QMainWindow",
+        "QDockWidget",
+        "QToolBar",
+        "QMdiArea",
+    }
+)
+
 #: Layout constructors that adopt their argument as the widget they lay out.
 #: `QWidget.setLayout()` is the other way in and is matched separately.
 _LAYOUT_CONSTRUCTORS = frozenset(
@@ -288,8 +306,10 @@ def find_unscoped_container_stylesheets(
     for its labels is idiomatic rather than a mistake.
 
     **Static, and therefore conservative.** Widget ownership is read from the
-    source: a name passed to a layout constructor, or one that gets
-    `.setLayout()`. A container assembled through a helper this cannot follow
+    source: a name passed to a layout constructor, one that gets
+    `.setLayout()`, or one constructed from a Qt class that holds children
+    without a layout at all (`QStackedWidget`, `QTabWidget`, `QSplitter`,
+    ...). A container assembled through a helper this cannot follow
     is missed. A miss is the acceptable failure here — a guard that cries
     wolf on leaves gets switched off, and then it guards nothing.
 
@@ -391,6 +411,11 @@ def _layout_owners(scope: ast.AST) -> set[str]:
     via `setLayout()` — i.e. every widget with children to cascade onto."""
     owners: set[str] = set()
     for node in _walk_within_scope(scope):
+        # `x = QStackedWidget()` — holds children with no layout involved.
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            called = node.value.func
+            if isinstance(called, ast.Name) and called.id in _IMPLICIT_CONTAINERS:
+                owners.update(_target_name(t) for t in node.targets)
         if not isinstance(node, ast.Call):
             continue
         if (
