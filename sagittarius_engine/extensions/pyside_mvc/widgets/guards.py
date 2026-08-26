@@ -308,48 +308,89 @@ def find_unscoped_container_stylesheets(
         except SyntaxError:  # pragma: no cover — a file that cannot compile
             continue
         lines = source.splitlines()
-        containers = _layout_owners(tree)
 
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or not node.args:
-                continue
-            call_target = node.func
-            if (
-                not isinstance(call_target, ast.Attribute)
-                or call_target.attr != "setStyleSheet"
-            ):
-                continue
-            text = "".join(_static_str_parts(node.args[0]))
-            # No static text at all means the sheet is built elsewhere; a
-            # `{` means it carries a selector block and scopes itself.
-            if not text or "{" in text:
-                continue
-            properties = tuple(name for name in _CASCADING_PROPERTIES if name in text)
-            if not properties:
-                continue
-            target = _target_name(call_target.value)
-            if target not in containers:
-                continue
-            line_text = lines[node.lineno - 1].strip()
-            if _CASCADE_EXEMPT_MARKER in line_text:
-                continue
-            findings.append(
-                UnscopedContainerFinding(
-                    file=path,
-                    line_number=node.lineno,
-                    line_text=line_text,
-                    target=target,
-                    properties=properties,
-                )
-            )
+        for scope in _scopes(tree):
+            containers = _layout_owners(scope)
+            findings.extend(_findings_in(scope, containers, path, lines))
     return findings
 
 
-def _layout_owners(tree: ast.AST) -> set[str]:
-    """Every name in this module handed to a layout constructor or given one
+def _walk_within_scope(scope: ast.AST):
+    """`ast.walk`, but it does not descend into a nested class body — that
+    body is its own scope and gets visited on its own."""
+    queue = list(ast.iter_child_nodes(scope))
+    while queue:
+        node = queue.pop()
+        yield node
+        if isinstance(node, ast.ClassDef):
+            continue
+        queue.extend(ast.iter_child_nodes(node))
+
+
+def _findings_in(
+    scope: ast.AST,
+    containers: set[str],
+    path: Path,
+    lines: list[str],
+) -> list[UnscopedContainerFinding]:
+    findings: list[UnscopedContainerFinding] = []
+    for node in _walk_within_scope(scope):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        call_target = node.func
+        if (
+            not isinstance(call_target, ast.Attribute)
+            or call_target.attr != "setStyleSheet"
+        ):
+            continue
+        text = "".join(_static_str_parts(node.args[0]))
+        # No static text at all means the sheet is built elsewhere; a
+        # `{` means it carries a selector block and scopes itself.
+        if not text or "{" in text:
+            continue
+        properties = tuple(name for name in _CASCADING_PROPERTIES if name in text)
+        if not properties:
+            continue
+        target = _target_name(call_target.value)
+        if target not in containers:
+            continue
+        line_text = lines[node.lineno - 1].strip()
+        if _CASCADE_EXEMPT_MARKER in line_text:
+            continue
+        findings.append(
+            UnscopedContainerFinding(
+                file=path,
+                line_number=node.lineno,
+                line_text=line_text,
+                target=target,
+                properties=properties,
+            )
+        )
+    return findings
+
+
+def _scopes(tree: ast.AST) -> list[ast.AST]:
+    """Each class body, plus the module with its classes removed.
+
+    `self` has to be resolved per class, not per file. Resolving it
+    module-wide made one class that lays itself out vouch for every other
+    class in the same module — which reported a leaf widget in the
+    reference app that owns no layout at all. A guard's first false
+    positive is how it gets switched off.
+    """
+    classes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
+    module_only = ast.Module(
+        body=[n for n in getattr(tree, "body", []) if not isinstance(n, ast.ClassDef)],
+        type_ignores=[],
+    )
+    return [module_only, *classes]
+
+
+def _layout_owners(scope: ast.AST) -> set[str]:
+    """Every name in one scope handed to a layout constructor or given one
     via `setLayout()` — i.e. every widget with children to cascade onto."""
     owners: set[str] = set()
-    for node in ast.walk(tree):
+    for node in _walk_within_scope(scope):
         if not isinstance(node, ast.Call):
             continue
         if (

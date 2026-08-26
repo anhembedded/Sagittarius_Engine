@@ -349,3 +349,44 @@ layout = QVBoxLayout(tile)
 
     assert "screen.py:3" in text
     assert "tile leaks border" in text
+
+
+def test_self_is_resolved_per_class_not_per_file(tmp_path):
+    """A class that lays itself out must not vouch for its neighbours.
+
+    Resolved module-wide, `LeafWidget` below was reported because
+    `CardWidget` in the same file happens to call `QVBoxLayout(self)` — and
+    that is a real leaf in the reference app, styled correctly. A guard's
+    first false positive is how it gets switched off.
+    """
+    root = _screen(
+        tmp_path,
+        """
+class CardWidget(QFrame):
+    def __init__(self):
+        layout = QVBoxLayout(self)
+
+class LeafWidget(QFrame):
+    def __init__(self):
+        self.setStyleSheet("background-color: #ff000080;")
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []
+
+
+def test_a_class_that_lays_itself_out_is_still_reported(tmp_path):
+    root = _screen(
+        tmp_path,
+        """
+class CardWidget(QFrame):
+    def __init__(self):
+        self.setStyleSheet("border: 1px solid #282c3f;")
+        layout = QVBoxLayout(self)
+""",
+    )
+
+    findings = find_unscoped_container_stylesheets(root)
+
+    assert len(findings) == 1
+    assert findings[0].target == "self"
