@@ -121,9 +121,13 @@ def test_repaging_leaves_no_cell_of_the_previous_month_behind(qtbot):
 
     overlay.show_months_from(date(2026, 7, 1))
 
-    live = [c for c in overlay._left_month.findChildren(type(
-        overlay._left_month.cell_for(date(2026, 7, 15))))
-        if c.parent() is overlay._left_month]
+    live = [
+        c
+        for c in overlay._left_month.findChildren(
+            type(overlay._left_month.cell_for(date(2026, 7, 15)))
+        )
+        if c.parent() is overlay._left_month
+    ]
     assert len(live) == 6 * 7
 
 
