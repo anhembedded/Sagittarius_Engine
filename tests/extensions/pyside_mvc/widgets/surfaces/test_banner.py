@@ -130,3 +130,14 @@ def test_the_icon_is_coloured_with_the_message(qtbot, fake_theme_bridge):
     qtbot.addWidget(banner)
 
     assert banner.icon_label.styleSheet() == banner._message_label.styleSheet()
+
+
+def test_success_is_a_severity(qtbot, fake_theme_bridge):
+    """This class was written claiming to cover an audit banner that
+    "switches success/danger at runtime", and shipped with no success to
+    switch to — so the one consumer it named could not use it."""
+    banner = Banner("Audit passed", severity=Severity.SUCCESS)
+    qtbot.addWidget(banner)
+
+    assert banner.severity is Severity.SUCCESS
+    assert "success" in banner._message_label.styleSheet()
