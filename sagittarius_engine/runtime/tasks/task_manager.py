@@ -64,7 +64,15 @@ class TaskManager(ITaskManager):
         except Exception:
             # No IConfig registered (the common case for a minimal app) —
             # keep the built-in default rather than failing task cleanup.
-            pass
+            # Logged rather than swallowed: the common case and a genuinely
+            # broken IConfig look identical from here, and only the log
+            # tells them apart.
+            self._logger.debug(
+                "No usable IConfig for %s; keeping the built-in default of %d.",
+                self._MAX_RETAINED_TASKS_CONFIG_KEY,
+                self._DEFAULT_MAX_RETAINED_TASKS,
+                exc_info=True,
+            )
 
         self._max_retained_tasks = limit
         return limit

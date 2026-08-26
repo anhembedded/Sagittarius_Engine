@@ -22,7 +22,7 @@ from sagittarius_engine.extensions.ui_state.adapters.config_manager_state_store 
 from sagittarius_engine.extensions.ui_state.ports.i_state_store_locator import (
     IStateStoreLocator,
 )
-from sagittarius_engine.extensions.ui_state.state_scope import StateScope
+from sagittarius_engine.extensions.ui_state.state_scope import JsonValue, StateScope
 
 
 class _FixedLocator(IStateStoreLocator):
@@ -118,7 +118,13 @@ def test_writing_one_slice_leaves_every_other_slice_intact(tmp_path: Path):
 
 
 def test_a_nested_slice_round_trips_through_a_restart(tmp_path: Path):
-    data = {"symbol": "BTCUSDT", "enabled_scripts": ["ema_20", "rsi_14"]}
+    # Annotated: inference joins `str` and `list[str]` into `Sequence[str]`,
+    # which is not a `JsonValue` — the nesting this test is about is exactly
+    # what makes the bare literal's inferred type wrong.
+    data: dict[str, JsonValue] = {
+        "symbol": "BTCUSDT",
+        "enabled_scripts": ["ema_20", "rsi_14"],
+    }
     _store(tmp_path).write(StateScope(key="dashboard"), data)
 
     reopened = _store(tmp_path)
@@ -201,7 +207,9 @@ def test_a_non_json_safe_value_raises_at_write_time_not_at_shutdown(tmp_path: Pa
     store = _store(tmp_path)
 
     with pytest.raises(TypeError):
-        store.write(StateScope(key="dashboard"), {"when": object()})
+        # The un-serialisable value is the subject of this test, so the
+        # type error it provokes is deliberate, not an oversight.
+        store.write(StateScope(key="dashboard"), {"when": object()})  # type: ignore[dict-item]
 
 
 # --------------------------------------------------------------------------- #
