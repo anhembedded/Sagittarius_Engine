@@ -27,18 +27,24 @@ from .qml_style import ensure_qml_style
 #:
 #: Written as an explicit path relative to this package's own root, not
 #: derived from any other directory's coincidental depth/position — the
-#: assertion below turns a future "someone moved the QML tree and forgot
-#: this constant" into a loud failure right here, instead of a silent
+#: check below turns a future "someone moved the QML tree and forgot this
+#: constant" into a loud failure right here, instead of a silent
 #: `import Sagittarius.UI 1.0` resolution failure deep inside Qt with no
 #: indication of why.
+#:
+#: `raise`, not `assert`: `python -O` strips assertions, so an assert would
+#: leave exactly the optimised builds that ship to users with no check at
+#: all — the one configuration where a silent Qt-side failure is hardest to
+#: diagnose.
 _PYSIDE_MVC_ROOT = Path(__file__).resolve().parent.parent
 _QML_MODULE_ROOT = _PYSIDE_MVC_ROOT / "Sagittarius" / "UI"
 _QML_IMPORT_PATH = str(_PYSIDE_MVC_ROOT)
-assert (_QML_MODULE_ROOT / "qmldir").is_file(), (
-    f"Expected the Sagittarius.UI QML module at {_QML_MODULE_ROOT}/qmldir — "
-    "not found. qml_host_view.py's location relative to the QML module tree "
-    "has changed without updating _PYSIDE_MVC_ROOT/_QML_MODULE_ROOT above."
-)
+if not (_QML_MODULE_ROOT / "qmldir").is_file():
+    raise RuntimeError(
+        f"Expected the Sagittarius.UI QML module at {_QML_MODULE_ROOT}/qmldir — "
+        "not found. qml_host_view.py's location relative to the QML module tree "
+        "has changed without updating _PYSIDE_MVC_ROOT/_QML_MODULE_ROOT above."
+    )
 
 
 @dataclass(frozen=True)

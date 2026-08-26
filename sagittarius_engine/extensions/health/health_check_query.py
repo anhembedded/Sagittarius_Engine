@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,6 +13,8 @@ from sagittarius_engine.extensions.cqrs import IQuery
 # may not even be configured).
 from sagittarius_engine.extensions.persistence.i_session import ISession
 from sagittarius_engine.interfaces import IContainer, IEventBus
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,7 +80,15 @@ class HealthCheckQuery(IQuery):
                 status["status"] = "unhealthy"
                 db_checked = True
         except Exception:
-            pass
+            # No static `ISession` bound. Not an error — an app may register
+            # a DatabaseManager instead, which the sweep below looks for.
+            # Logged so that a *failing* resolution is still distinguishable
+            # from an absent one, which a bare `pass` made impossible.
+            logger.debug(
+                "No ISession resolved from the container; "
+                "falling back to the dynamic database-manager sweep.",
+                exc_info=True,
+            )
 
         if not db_checked:
             # Check for dynamic database managers or repositories in DI container
@@ -104,7 +115,17 @@ class HealthCheckQuery(IQuery):
                             db_checked = True
                             break
                     except Exception:
-                        pass
+                        # This candidate did not resolve; try the next one.
+                        # A health check must not fail because one optional
+                        # registration is broken, but it must leave a trace
+                        # of which one — that is the whole point of a health
+                        # check.
+                        logger.debug(
+                            "Database-ish registration %s failed to resolve "
+                            "during the health check; trying the next.",
+                            type_name,
+                            exc_info=True,
+                        )
 
         if not db_checked:
             status["components"]["database"] = "not configured"
