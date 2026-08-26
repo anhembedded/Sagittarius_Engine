@@ -43,6 +43,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from typing import Any
 
 from sagittarius_engine.interfaces.i_trace_recorder import ITraceRecorder, Lane
@@ -77,6 +78,7 @@ class TraceRecorder(ITraceRecorder):
         "_epoch_wall_ns",
         "_lock",
         "_next_cid",
+        "_taps",
     )
 
     def __init__(self, capacity: int = DEFAULT_CAPACITY) -> None:
@@ -92,6 +94,59 @@ class TraceRecorder(ITraceRecorder):
         #: `deque.append` is already atomic under the GIL, and a lock there
         #: would put contention into the thing being measured.
         self._lock = threading.Lock()
+        #: Live subscribers (`EPIC-005D`'s `TraceServer`), notified with the
+        #: raw row tuple, not a `TraceRecord` — building the typed object is
+        #: exactly the cost §4.2 keeps off this path. Copy-on-write, same
+        #: pattern and reason as `infrastructure/event_bus/bus_observers.py`:
+        #: reads happen on every capture, writes happen when a client
+        #: (dis)connects.
+        self._taps: tuple[Callable[[tuple[Any, ...]], None], ...] = ()
+
+    def add_tap(self, callback: Callable[[tuple[Any, ...]], None]) -> None:
+        """
+        @brief Subscribes to every row as it is captured, from now on.
+
+        @details Register **before** calling `snapshot()` for a backlog, not
+        after: the two together (tap first, then read the backlog) can very
+        rarely double-deliver a row captured in the gap between them, but
+        never miss one. The other order can miss one. For a diagnostic
+        stream, a duplicate is a shrug; a silent gap is the defect this
+        engine's diagnostics exist to stop shipping.
+        """
+        if callback not in self._taps:
+            self._taps = (*self._taps, callback)
+
+    def remove_tap(self, callback: Callable[[tuple[Any, ...]], None]) -> None:
+        """
+        @brief Unsubscribes. Silent if `callback` was never registered, so a
+        disconnect handler does not have to track whether registration
+        actually succeeded.
+
+        @details Compares with `==`, matching `add_tap()`'s `in` check —
+        deliberately **not** `is`. A bound method (`recorder.add_tap(self._on_row)`
+        ... `recorder.remove_tap(self._on_row)`, the ordinary way to
+        subscribe and unsubscribe) creates a new wrapper object on every
+        attribute access: `self._on_row is self._on_row` is `False`, while
+        `self._on_row == self._on_row` is `True`. An identity comparison here
+        would make that completely normal pattern silently fail to
+        unsubscribe — found by writing a test that used `seen.append` twice
+        and watching `remove_tap` do nothing.
+        """
+        self._taps = tuple(t for t in self._taps if t != callback)
+
+    def _notify_taps(self, row: tuple[Any, ...]) -> None:
+        """@brief Fans a captured row out to live subscribers.
+
+        @details Exceptions are contained, never propagated: a broken tap —
+        a client that disconnected mid-send, a queue that is full — must not
+        take down the application it is only supposed to be observing. The
+        same rule, and the same reason, as `bus_observers.py`'s handling of a
+        broken diagnostic observer."""
+        for tap in self._taps:
+            try:
+                tap(row)
+            except Exception:  # noqa: BLE001 - see docstring
+                pass
 
     # --------------------------------------------------------- the hot path
 
@@ -113,18 +168,19 @@ class TraceRecorder(ITraceRecorder):
         """
         if len(self._buffer) == self._capacity:
             self._dropped += 1
-        self._buffer.append(
-            (
-                time.perf_counter_ns() - self._epoch_ns,
-                RecordKind.INSTANT.value,
-                lane.value,
-                name,
-                cat,
-                cid,
-                0,
-                args,
-            )
+        row = (
+            time.perf_counter_ns() - self._epoch_ns,
+            RecordKind.INSTANT.value,
+            lane.value,
+            name,
+            cat,
+            cid,
+            0,
+            args,
         )
+        self._buffer.append(row)
+        if self._taps:
+            self._notify_taps(row)
 
     def span_begin(
         self,
@@ -147,18 +203,19 @@ class TraceRecorder(ITraceRecorder):
         started = time.perf_counter_ns()
         if len(self._buffer) == self._capacity:
             self._dropped += 1
-        self._buffer.append(
-            (
-                started - self._epoch_ns,
-                RecordKind.SPAN.value,
-                lane.value,
-                name,
-                cat,
-                cid,
-                0,
-                args,
-            )
+        row = (
+            started - self._epoch_ns,
+            RecordKind.SPAN.value,
+            lane.value,
+            name,
+            cat,
+            cid,
+            0,
+            args,
         )
+        self._buffer.append(row)
+        if self._taps:
+            self._notify_taps(row)
         return started
 
     def span_end(
@@ -176,18 +233,19 @@ class TraceRecorder(ITraceRecorder):
         now = time.perf_counter_ns()
         if len(self._buffer) == self._capacity:
             self._dropped += 1
-        self._buffer.append(
-            (
-                now - self._epoch_ns,
-                RecordKind.SPAN.value,
-                lane.value,
-                name,
-                cat,
-                cid,
-                now - started,
-                args,
-            )
+        row = (
+            now - self._epoch_ns,
+            RecordKind.SPAN.value,
+            lane.value,
+            name,
+            cat,
+            cid,
+            now - started,
+            args,
         )
+        self._buffer.append(row)
+        if self._taps:
+            self._notify_taps(row)
 
     def next_cid(self) -> int:
         """@brief A fresh correlation id. Locked, and deliberately **not** part

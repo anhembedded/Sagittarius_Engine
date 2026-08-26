@@ -43,6 +43,12 @@ Documentation = "https://github.com/anhembedded/Sagittarius-Engine/tree/main/.ag
 # `scripts/verify_wheel_importable.py` step 3 now resolves every entry point
 # declared here, so the next one cannot ship broken the way this one did.
 sagittarius-doctor = "sagittarius_engine.extensions.diagnostics.cli:main"
+# `EPIC-005D`: the thin attach CLI for the trace recorder's live transport
+# (`extensions/audit/infra/trace_server.py`). Needs `websockets` at runtime —
+# declared as a real dependency, not an extra, in requirements.txt: EPIC-005A
+# names the transport as a bare requirement, unlike OTel support below, which
+# is explicitly optional.
+sagittarius-trace = "sagittarius_engine.extensions.audit.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["sagittarius_engine*", "tools*"]

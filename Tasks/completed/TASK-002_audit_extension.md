@@ -1,9 +1,46 @@
 # TASK-002: `AuditExtension` Framework Observability & Diagnostics Dashboard
 
-- **Status**: ✅ Completed
-- **Completion Date**: 2026-07-28
+- **Status**: ⛔ **Superseded 2026-08-26** by
+  [`EPIC-005`](../epics/EPIC-005_audit_telemetry_rebuild/README.md) — see §Superseded below.
+  Was marked ✅ Completed 2026-07-28.
+- **Completion Date**: 2026-07-28 *(the claim this note corrects)*
 - **Priority**: P1 - High
 - **Category**: Observability / Diagnostics
+
+---
+
+## ⛔ Superseded
+
+**This task was marked ✅ Completed on 2026-07-28 while both of its clients were 100%
+non-functional**, and that went unnoticed for a month. `EPIC-005` §2 reproduced ten distinct
+defects on a branch rather than inferring them by reading — among them: the CLI client polled
+`http://localhost:9999/` while the engine only ever opened a **WebSocket** there, so it rendered
+a connection error on every refresh forever (`D1`); the GUI client's one line that mattered was
+`str()`-dumping a dict into a read-only text box (`D2`); and the `sagittarius-audit` console
+script could not start for any consumer in three independent ways (`D6`, `D7`).
+
+The description below is left **unedited** as the record of what was intended and claimed. What
+actually shipped is described in `EPIC-005` §2. Nothing in this file describes code that should
+be built on:
+
+| This task's plan | What supersedes it |
+| :--- | :--- |
+| `AuditService` snapshot collection over HTTP | `TraceRecorder` — a bounded ring buffer of timestamped records (`EPIC-005A`) |
+| `AuditTerminalDashboard` TUI client | `sagittarius-trace attach` (`EPIC-005D`) — text stream, no widget |
+| a bespoke dashboard UI | Perfetto and OpenTelemetry exporters (`EPIC-005C`) |
+| `datetime.now().strftime("%H:%M:%S")` timestamps | `time.perf_counter_ns()`, monotonic, ns since a session epoch |
+
+The engine-side modules this task produced (`extensions/audit/audit_extension.py`,
+`audit_service.py`, `ports.py`, `infra/websocket_broadcaster.py`) and the `tools/audit_dashboard/`
+client are scheduled for deletion by `EPIC-005` §3 and still present only until that teardown is
+run. See [`.agents/context/tracing.md`](../../.agents/context/tracing.md) for what to use instead.
+
+**The lesson, recorded because it is worth more than the feature was:** the repo's process
+discipline was good — hundreds of passing tests, a bug-report workflow, doc-code-sync rules, a
+clean mypy baseline — and a completely dead feature still shipped as done, because nobody ran it
+end to end once. `scripts/verify_wheel_importable.py` now builds the wheel, installs it into a
+throwaway venv, imports every shipped module, and resolves every declared console script
+(`TASK-039`). That guard is the direct descendant of this file.
 
 ---
 

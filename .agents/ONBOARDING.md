@@ -145,6 +145,7 @@ Always load: `project.md`, `repository.md`.
 | Adding/upgrading a dependency | `dependencies.md` |
 | Writing a new example, or learning the engine by reading one | `examples.md` |
 | Anything touching events, an event bus, or a presenter's subscriptions | `events.md` |
+| Tracing, `ctx.trace`, `sagittarius-trace`, or exporting to Perfetto/OpenTelemetry | `tracing.md` |
 | Unfamiliar term in a rule or task file | `glossary.md` |
 
 Documentation and Deployment have no `context/` entry — both were pure duplicates of
