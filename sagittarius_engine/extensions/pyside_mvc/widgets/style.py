@@ -137,6 +137,37 @@ class StyleRole(Enum):
     #: choice" — it just acknowledges the pointer.
     STAT_CARD = auto()
 
+    # --- EPIC-007F, second pass ------------------------------------------ #
+    # All three come from measuring the reference app's three table-row
+    # widgets against `DataRow`, which could not carry any of them without
+    # the consumer hand-writing QSS again. The counts below are cells and
+    # buttons actually on screen today, not an estimate of what a table kit
+    # "should" have.
+
+    #: One cell of a data row: full-contrast text at the small step.
+    #: 10 real cells across the 3 row widgets. Distinct from `BODY_LABEL`,
+    #: which is one step larger because it labels a control a user reads
+    #: once — a column of figures is scanned in bulk and is set smaller
+    #: everywhere it appears today. Distinct from `CAPTION`, which is muted:
+    #: a cell that recedes uses `CAPTION` and several deliberately do.
+    TABLE_CELL = auto()
+    #: The same cell emphasised — the column that identifies the row, or the
+    #: figure the row exists to report. 5 real cells. Its own role rather
+    #: than a `WidgetState`, because a cell does not *transition* into being
+    #: the key column; same reasoning that split `SECTION_LABEL_TICKED`.
+    TABLE_CELL_STRONG = auto()
+    #: A small outlined action at the end of a row: transparent body, accent
+    #: text, accent border. 5 real buttons across 2 row widgets, every one
+    #: hand-written as an outline.
+    #:
+    #: The three existing button roles are all *filled*, and that is the
+    #: point of the split rather than an oversight to correct: one filled
+    #: button per row turns a 40-row table into a wall of colour, which is
+    #: why not one of those 5 was written that way. Its colour is
+    #: per-instance where a row needs it (`DataRow.set_action_tone`), the
+    #: same escape hatch `STAT_VALUE` uses.
+    GHOST_BUTTON = auto()
+
 
 class WidgetState(Enum):
     """Structural state `apply_role()` renders differently. Not every role
@@ -435,6 +466,32 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"background-color: {_token('stateHoverBg')};"
             f"border: 1px solid {_token('stateNavBorder')};"
             f"}}"
+        )
+
+    if role in (StyleRole.TABLE_CELL, StyleRole.TABLE_CELL_STRONG):
+        return (
+            f"background-color: transparent;"
+            f"color: {_token('textPrimary')};"
+            f"font-size: {_px('fontSizeSm')};"
+            f"font-weight: "
+            f"{'bold' if role is StyleRole.TABLE_CELL_STRONG else 'normal'};"
+        )
+
+    if role is StyleRole.GHOST_BUTTON:
+        # `spaceSm` horizontally, not `spaceMd` like the filled buttons: a
+        # row fits four of these beside six columns of data, and the filled
+        # roles' padding is sized for a footer where two buttons have the
+        # width to themselves.
+        outline = _token("muted") if disabled else _token("accent")
+        return (
+            f"QPushButton {{"
+            f"background-color: transparent;"
+            f"color: {outline};"
+            f"border: 1px solid {outline};"
+            f"border-radius: {_px('radiusSm')};"
+            f"padding: {_px('spaceXs')} {_px('spaceSm')};"
+            f"}}"
+            f"QPushButton:hover {{background-color: {_token('stateHoverBg')};}}"
         )
 
     if role is StyleRole.TABLE_HEADER:
