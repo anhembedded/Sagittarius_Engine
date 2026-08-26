@@ -101,8 +101,21 @@ class DataRow(QWidget):  # base-exempt: a row inside a table is not a surface
         columns: Sequence[Column],
         *,
         actions: Sequence[RowAction] = (),
+        action_stretch: int = 0,
         parent: QWidget | None = None,
     ) -> None:
+        """
+        @param action_stretch How much of the row's width the action strip
+        claims, on the same scale as `Column.stretch`. `0` — the default —
+        gives the buttons their natural width and lets the cells share
+        everything left over.
+
+        Pass a value when the heading above the row lists actions as a
+        column of its own: two of the reference consumer's three headers do
+        (`ACTIONS` at 26, `Repair` at 18), and with the strip at natural
+        width the cells expand into its slack and stop lining up with the
+        headings that describe them.
+        """
         super().__init__(parent)
         if not columns:
             raise ValueError("DataRow needs at least one column")
@@ -124,13 +137,20 @@ class DataRow(QWidget):  # base-exempt: a row inside a table is not a surface
             self._cells.append(cell)
 
         self.action_buttons: list[StyledButton] = []
+        # At stretch 0 the buttons go straight into the row and take their
+        # natural width. At any other stretch they need a host widget to
+        # claim that share — a stretch factor applies to one layout item,
+        # and four buttons are four items.
+        action_host = QHBoxLayout() if action_stretch else row
         for position, action in enumerate(actions):
             button = StyledButton(action.label, role=action.role)
             button.clicked.connect(
                 lambda _checked=False, i=position: self.action_triggered.emit(i)
             )
-            row.addWidget(button)
+            action_host.addWidget(button)
             self.action_buttons.append(button)
+        if action_stretch and actions:
+            row.addLayout(action_host, action_stretch)
 
     @property
     def columns(self) -> tuple[Column, ...]:

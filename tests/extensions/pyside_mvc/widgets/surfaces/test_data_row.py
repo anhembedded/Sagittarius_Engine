@@ -105,6 +105,35 @@ def test_actions_emit_their_position(qtbot):
     assert blocker.args == [1]
 
 
+def test_actions_take_natural_width_by_default(qtbot):
+    row = DataRow(_COLUMNS, actions=[RowAction("Open")])
+    qtbot.addWidget(row)
+
+    assert row.layout().stretch(row.layout().count() - 1) == 0
+
+
+def test_actions_can_claim_a_share_of_the_width(qtbot):
+    """A header that lists actions as a column of its own needs the strip to
+    occupy that column's share — otherwise the cells expand into its slack
+    and stop lining up with the headings that describe them."""
+    row = DataRow(
+        _COLUMNS, actions=[RowAction("Open"), RowAction("Clear")], action_stretch=26
+    )
+    qtbot.addWidget(row)
+
+    last = row.layout().count() - 1
+    assert row.layout().stretch(last) == 26
+    assert row.layout().itemAt(last).layout() is not None
+    assert len(row.action_buttons) == 2
+
+
+def test_a_stretch_with_no_actions_adds_nothing(qtbot):
+    row = DataRow(_COLUMNS, action_stretch=26)
+    qtbot.addWidget(row)
+
+    assert row.layout().count() == len(_COLUMNS)
+
+
 def test_an_action_can_be_hidden_per_row(qtbot):
     """The consumer's status row hides its "gaps" button on healthy
     records rather than disabling it."""
