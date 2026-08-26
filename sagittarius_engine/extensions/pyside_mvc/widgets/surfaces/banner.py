@@ -7,7 +7,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from ..controls import StyledButton
-from ..style import StyleRole, apply_role
+from ..style import StyleRole, apply_role, banner_accent
 from ..surface import Panel
 
 
@@ -97,6 +97,7 @@ class Banner(Panel):
 
         self.body_layout.addLayout(row)
         apply_role(self, severity)
+        self._sync_text_colour()
 
     @property
     def severity(self) -> StyleRole:
@@ -129,6 +130,22 @@ class Banner(Panel):
             )
         self._severity = severity
         apply_role(self, severity)
+        self._sync_text_colour()
+
+    def _sync_text_colour(self) -> None:
+        """The severity's QSS is scoped to the panel, so it never reaches
+        the text inside it.
+
+        This class shipped without this, and the message rendered at the
+        widget's default colour — dark grey on a dark banner, effectively
+        invisible. All four real banners set the severity colour on their
+        text explicitly, and bold on three of the four; the fourth, a
+        coverage warning, gains bold here, which is the recorded difference.
+        """
+        colour = banner_accent(self._severity)
+        rule = f"background-color: transparent; color: {colour}; font-weight: bold;"
+        self.icon_label.setStyleSheet(f"QLabel {{ {rule} }}")
+        self._message_label.setStyleSheet(f"QLabel {{ {rule} }}")
 
     def set_action_text(self, text: str) -> None:
         """@brief Sets the trailing button's label, hiding it when empty.
