@@ -59,6 +59,13 @@ class _FakeThemeBridge:
     token name — see module docstring for why the real singleton cannot be
     relied on for this."""
 
+    def contains(self, name: str) -> bool:
+        """Every name resolves here — this stand-in exists to make token
+        values distinguishable, not to model which tokens an app defines.
+        A test that needs the real bridge's fail-fast on an unknown name
+        must not take this fixture."""
+        return True
+
     def value(self, name: str) -> str:
         return f"<{name}>"
 
