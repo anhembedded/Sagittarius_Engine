@@ -6,6 +6,7 @@ reads.
 from __future__ import annotations
 
 import sys
+from datetime import date
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -24,12 +25,14 @@ from sagittarius_engine.extensions.pyside_mvc.widgets import (
     Column,
     ConfirmOverlay,
     DataRow,
+    DateRangeOverlay,
     DateTimeField,
     LogPanel,
     Pagination,
     Panel,
     PickerItem,
     PickerOverlay,
+    RangePreset,
     RowAction,
     SectionLabel,
     SelectableCard,
@@ -45,6 +48,9 @@ from sagittarius_engine.extensions.pyside_mvc.widgets import (
     TableCard,
     Tone,
     semantic_colour,
+)
+from sagittarius_engine.extensions.pyside_mvc.widgets.overlays import (
+    DEFAULT_PRESETS,
 )
 
 #: A neutral palette so the gallery renders standalone. Not any consuming
@@ -223,11 +229,21 @@ class ShowcaseWindow(QWidget):  # base-exempt: the gallery shell, not a surface
                 PickerItem("b", "Second"),
             ]
         )
-        for overlay in (confirm, picker):
+        # A fixed pair rather than `date.today()`: the showcase doubles as
+        # the visual baseline, and a gallery whose calendar moves every day
+        # cannot be compared against yesterday's capture.
+        date_range = DateRangeOverlay(
+            "Date range overlay",
+            start=date(2026, 8, 19),
+            end=date(2026, 8, 26),
+            presets=(*DEFAULT_PRESETS, RangePreset("All history")),
+        )
+        date_range.summary = "7 days · 2026-08-19 → 2026-08-26"
+        for overlay in (confirm, picker, date_range):
             overlay.setParent(self)
             overlay.setWindowFlags(Qt.WindowType.Widget)
             overlay.setModal(False)
-        self._add(column, "Overlays", confirm, picker)
+        self._add(column, "Overlays", confirm, picker, date_range)
 
 
 def showcased_types() -> set[str]:
