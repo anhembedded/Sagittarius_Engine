@@ -67,7 +67,12 @@ sagittarius_engine = [
 ]
 
 [project.optional-dependencies]
-audit = ["rich>=13.0.0"]
+# `audit = ["rich>=13.0.0"]` was removed by EPIC-005A's teardown. Its only
+# consumer was `tools/audit_dashboard_cli.py`, deleted in the same change —
+# and that command could never connect in the first place (EPIC-005 §2, D1:
+# it polled HTTP against a socket that only ever spoke WebSocket). Nothing in
+# the engine imports `rich`, so the extra installed a dependency for code
+# that no longer exists.
 # EPIC-005C requirement 4: the core records into its own stdlib ring buffer
 # and knows nothing about OTel. This extra exists only for
 # `extensions/audit/exporters/otel.py`, which guards its own import at use
@@ -138,7 +143,9 @@ files = ["sagittarius_engine", "tests"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = "."
-filterwarnings = [
-    "ignore:.*websockets.legacy is deprecated.*:DeprecationWarning",
-    "ignore:.*websockets.WebSocketClientProtocol is deprecated.*:DeprecationWarning"
-]
+# The two `websockets.legacy` / `WebSocketClientProtocol` DeprecationWarning
+# filters here were removed by EPIC-005A's teardown: they existed for the old
+# `WebsocketBroadcaster`, which used that legacy API. `TraceServer` uses
+# `websockets.asyncio.server` and the CLI uses `websockets.sync.client`, so
+# nothing emits them any more — and a filter for a warning that can no longer
+# fire would silently start hiding a real one if the legacy API ever came back.

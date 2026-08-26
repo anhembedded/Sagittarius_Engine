@@ -206,6 +206,23 @@ def run(cmd: list[str], cwd: Path | None = None) -> None:
 
 
 def build_wheel(outdir: Path) -> Path:
+    # `build/` first, every time. setuptools copies sources into `build/lib/`
+    # and **never removes** what has disappeared from the working tree, so a
+    # stale tree there is silently included in the wheel.
+    #
+    # Found by EPIC-005A's teardown (2026-08-26): with 18 modules deleted from
+    # the source, this guard rebuilt, reported "all 216 shipped modules
+    # imported" and passed — while the wheel still shipped all 18, imported
+    # them successfully, and counted them toward that green number. A guard
+    # that verifies a stale tree is worse than no guard, because its PASS is
+    # believed. `build/` is gitignored, so CI's fresh clone was never affected;
+    # a maintainer cutting a release from their own checkout would have shipped
+    # deleted code.
+    stale = REPO_ROOT / "build"
+    if stale.exists():
+        print(f"$ rm -rf {stale}", flush=True)
+        shutil.rmtree(stale, ignore_errors=True)
+
     run(
         [sys.executable, "-m", "build", "--wheel", "--outdir", str(outdir)],
         cwd=REPO_ROOT,

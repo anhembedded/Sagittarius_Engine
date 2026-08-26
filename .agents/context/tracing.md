@@ -145,11 +145,14 @@ consumer that does not show it is presenting a trace with holes in it as complet
 argument is that two hand-maintained copies of a schema drift until the consumer is reading
 fields the producer stopped sending.
 
-## 7. What is still the old implementation
+## 7. What used to be here
 
-`extensions/audit/audit_extension.py`, `extensions/audit/audit_service.py`,
-`extensions/audit/ports.py`, `extensions/audit/infra/websocket_broadcaster.py` and
-`tools/audit_dashboard/` are the **superseded** snapshot
-dashboard, scheduled for deletion by `EPIC-005` §3 and kept only until that teardown is run.
-Nothing above depends on them. `TASK-002` shipped that dashboard as complete while both of its
-clients were 100% non-functional; do not build on it.
+The snapshot dashboard `TASK-002` shipped — an AuditExtension/AuditService pair, a
+WebsocketBroadcaster, a PySide6 client and a rich-based TUI client — was **deleted** by
+`EPIC-005A` on 2026-08-26, along with the `[audit]` extra and 13 tests. It answered "what is
+the state right now?" and could never answer "what happened?", which is the only question a
+trace tool exists for; both of its clients had also been 100% non-functional since before it
+was marked complete (`EPIC-005` §2 reproduces all ten defects).
+
+Nothing above depends on any of it. If you need to read the deleted code, it is on the
+`archive/pre-epic-005-audit` branch — do not restore it into the tree.

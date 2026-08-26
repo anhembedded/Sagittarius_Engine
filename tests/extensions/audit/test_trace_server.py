@@ -1,11 +1,15 @@
 """`TraceServer` — the live transport (`EPIC-005D`, `EPIC-005A` requirements
 5/6).
 
-Modelled directly on `tests/extensions/test_websocket_broadcaster_auth.py`,
-which `EPIC-005A` names explicitly: its behaviour — an ephemeral port, a
-`_ready_event`-style readiness signal, `?token=` auth rejected with close code
-`4401` before anything is sent — must "come back as tests against the new
-transport". Same shape, same close code, same fixture pattern.
+Modelled directly on the old `test_websocket_broadcaster_auth.py`, which
+`EPIC-005A` names explicitly: its behaviour — an ephemeral port, a readiness
+signal, `?token=` auth rejected with close code `4401` before anything is sent
+— must "come back as tests against the new transport". Same shape, same close
+code, same fixture pattern.
+
+**This file is that restoration.** The original was deleted with the
+broadcaster it covered, by the same teardown; it is recoverable from the
+`archive/pre-epic-005-audit` branch.
 """
 
 from __future__ import annotations
@@ -84,7 +88,7 @@ def test_binding_off_loopback_with_a_token_is_allowed(recorder):
 @pytest.mark.asyncio
 async def test_connection_rejected_without_a_valid_token(running_authed_server):
     """The first half of requirement 4, and the same close code the old
-    broadcaster used -- checked by `tests/extensions/test_websocket_broadcaster_auth.py`."""
+    broadcaster used -- this assertion is what carries that coverage forward."""
     uri = f"ws://{running_authed_server.host}:{running_authed_server.port}"
     async with websockets.asyncio.client.connect(
         uri, open_timeout=CONNECT_TIMEOUT_SECONDS

@@ -2,7 +2,7 @@
 
 * **App / Kernel**: The central entrypoint and orchestrator of the Sagittarius Engine.
 * **`IExtension`**: The real, current plugin interface — every shipped extension
-  (`LoggerExtension`, `DatabaseExtension`, `HealthExtension`, `AuditExtension`,
+  (`LoggerExtension`, `DatabaseExtension`, `HealthExtension`, `DiagnosticsExtension`,
   `ThreadManagerExtension`, `pyside_mvc`) and this repo's own sample app
   (`StudentManagementExtension`, `PySideMvcExtension`) implement it. See `modules.md`.
 * **`IModule`**: Legacy — the engine's own code calls it *"a legacy `IModule`"*

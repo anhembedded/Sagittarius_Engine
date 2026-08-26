@@ -1,11 +1,10 @@
 # EPIC-005: Audit Telemetry — Teardown, and Rebuild as a Trace *Recorder*
 
-- **Status**: 🟡 **In Progress** — `B`, `C`, `D` ✅ done; `EPIC-005A` **partially** done
-  (contracts, ring buffer and — via `D` — the rebuilt transport with auth and readiness all
-  shipped and measured; **only the teardown in §3 is outstanding**, and it is a deletion
-  decision, not engineering)
+- **Status**: ✅ **Complete 2026-08-26** — all four milestones (`A`, `B`, `C`, `D`) done. The
+  teardown in §3 ran last, after its replacements were already green; see `EPIC-005A`'s
+  §Outcome.
 - **Created**: 2026-08-25 · **Revised**: 2026-08-25 (scope cut §5; then deferred §0.1);
-  2026-08-26 (`D` shipped as `sagittarius-trace`)
+  2026-08-26 (`D` shipped as `sagittarius-trace`; `A`'s teardown run, closing the epic)
 - **Priority**: P2 — *behind `EPIC-006`, which answers the more urgent question*
 - **Category**: Observability / Diagnostics
 - **Supersedes**: `TASK-002` (`AuditExtension` & CLI Inspector, marked ✅ Completed 2026-07-28 — see §2)
@@ -14,7 +13,13 @@
 
 ---
 
-## 0.1 Why this is on hold
+## 0.1 Why this was on hold — resolved
+
+> **Closed 2026-08-26.** `EPIC-006` shipped first, exactly as this section argued it should,
+> and this epic was then picked up and completed in the order `A`(measurement) → `B` → `C` →
+> `D` → `A`(teardown). The section is kept because the reasoning it records — wiring
+> correctness and execution cost are different questions, and the cheaper one went first — is
+> the decision, not a status line.
 
 Nothing below is withdrawn — the analysis in §2 stands, the teardown in §3 is still the right
 call, and the scope cut in §5 still holds. What changed is **priority**, once the maintainer
@@ -34,7 +39,8 @@ outside the engine can audit its DI wiring, whereas `py-spy`, `viztracer` and Pe
 cover much of what a tracer would do.
 
 **Resume this epic when the live question becomes "why is it slow" rather than "why is it
-wrong".** The specification is complete and does not need rework to be picked up.
+wrong".** The specification is complete and does not need rework to be picked up. *(It was, and
+it did not.)*
 
 ---
 
@@ -392,9 +398,9 @@ taken seriously.
 
 | ID | Scope | Done when |
 | :-- | :--- | :--- |
-| **[A](incomplete/EPIC-005A_teardown_contracts_ringbuffer.md)** | Teardown + `contracts.py` + protocol v1 + ring-buffer recorder + rebuilt transport | Old tree tagged and deleted; recorder unit-tested including eviction and drop-count; overhead benchmark meets §4.2; auth + readiness tests restored green; a raw `websockets` client receives a schema-valid `hello` + `trace` batch |
-| **[B](incomplete/EPIC-005B_instrumentation_and_trace_api.md)** | Instrumentation of the §4.3 subsystems + app-facing `ctx.trace` API | The demo app produces spans for every listed subsystem; task-run spans reconstruct to the same durations the task manager reports; zero-overhead-when-disabled benchmark passes |
-| **[C](incomplete/EPIC-005C_exporters_perfetto_and_otel.md)** | Exporters: `.sagtrace` save/load, **Perfetto**, **OpenTelemetry** | A recording of the demo app opens in `ui.perfetto.dev` with correct lanes and nested spans; the same run appears as a trace in a local OTLP collector |
+| **[A](completed/EPIC-005A_teardown_contracts_ringbuffer.md)** ✅ | Teardown + `contracts.py` + protocol v1 + ring-buffer recorder + rebuilt transport | Old tree tagged and deleted; recorder unit-tested including eviction and drop-count; overhead benchmark meets §4.2; auth + readiness tests restored green; a raw `websockets` client receives a schema-valid `hello` + `trace` batch |
+| **[B](completed/EPIC-005B_instrumentation_and_trace_api.md)** ✅ | Instrumentation of the §4.3 subsystems + app-facing `ctx.trace` API | The demo app produces spans for every listed subsystem; task-run spans reconstruct to the same durations the task manager reports; zero-overhead-when-disabled benchmark passes |
+| **[C](completed/EPIC-005C_exporters_perfetto_and_otel.md)** ✅ | Exporters: `.sagtrace` save/load, **Perfetto**, **OpenTelemetry** | A recording of the demo app opens in `ui.perfetto.dev` with correct lanes and nested spans; the same run appears as a trace in a local OTLP collector |
 | **[D](completed/EPIC-005D_thin_attach_cli_and_packaging.md)** ✅ | `sagittarius-trace` thin attach CLI + packaging + docs | `pip install dist/*.whl` in a clean venv, the command attaches to a running app, streams the live event log and task stats, and saves a `.sagtrace`; `.agents/context/` updated; `TASK-002` marked superseded |
 
 **The command shipped as `sagittarius-trace`, not `sagittarius-audit`.** The old name is

@@ -10,7 +10,7 @@ instead. See
 ## `IExtension` — the real model
 
 Every extension the engine ships (`LoggerExtension`, `DatabaseExtension`, `HealthExtension`,
-`AuditExtension`, `ThreadManagerExtension`, and this repo's own sample app's
+`DiagnosticsExtension`, `ThreadManagerExtension`, and this repo's own sample app's
 `StudentManagementExtension`/`PySideMvcExtension`) implements `IExtension`, generic over its
 own context Protocol (`IExtension[ILoggerContext]`, etc. — see `rules/architecture.md`'s
 "Prefer a narrow context Protocol" section).

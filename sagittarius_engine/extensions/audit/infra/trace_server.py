@@ -10,13 +10,15 @@ bespoke viewer ever would. Live streaming is the one thing they cannot give
 you, and this exists only for that.
 
 @par Shape borrowed deliberately
-The threaded-server-with-a-`_ready_event` shape below is the same one
-`extensions/audit/infra/websocket_broadcaster.py` used, proven testable by
-`tests/extensions/test_websocket_broadcaster_auth.py` — an ephemeral port
-(`port=0`), a `threading.Event` set once actually bound, `?token=` query-string
-auth rejected with close code `4401` before anything is sent. `EPIC-005A`'s own
-requirement said that test's behaviour must come back "as tests against the
-new transport"; reusing its shape rather than inventing a new one is how.
+The threaded-server-with-a-readiness-event shape below is the same one the old
+`WebsocketBroadcaster` used — an ephemeral port (`port=0`), a
+`threading.Event` set once actually bound, `?token=` query-string auth rejected
+with close code `4401` before anything is sent. `EPIC-005A`'s own requirement
+said that behaviour must come back "as tests against the new transport", so its
+test file was read before this module was written and reproduced against it in
+`tests/extensions/audit/test_trace_server.py`. Both the broadcaster and its
+test have since been deleted by that teardown; recover them from the
+`archive/pre-epic-005-audit` branch if the comparison is ever needed again.
 
 @par How attach-late works
 `add_tap()` is registered **before** `snapshot()` is read for the backlog: a

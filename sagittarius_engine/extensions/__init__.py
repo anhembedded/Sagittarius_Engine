@@ -34,9 +34,6 @@ __all__ = [
     # CQRS
     "ICommand",
     "IQuery",
-    # Audit
-    "AuditExtension",
-    "AuditService",
     # Persistence
     "BaseRepository",
     "ISession",
@@ -64,8 +61,6 @@ __all__ = [
 _LAZY_ATTRS: dict[str, str] = {
     "ICommand": ".cqrs",
     "IQuery": ".cqrs",
-    "AuditExtension": ".audit",
-    "AuditService": ".audit",
     "BaseRepository": ".persistence",
     "ISession": ".persistence",
     "SQLAlchemySessionAdapter": ".persistence",

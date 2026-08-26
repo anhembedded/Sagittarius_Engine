@@ -88,7 +88,7 @@ mismatch is suspected (`scripts/ci-local.ps1` now checks this for you automatica
 sagittarius_engine/  The package itself — 11 top-level sub-packages, see rules/architecture.md
 examples/            Sample apps — currently just student_management/ (rebuilt 2026-08-23)
 tests/               Engine's own test suite
-tools/               Standalone utilities on top of the engine (audit_dashboard/)
+tools/               Standalone utilities on top of the engine (widget_showcase/)
 scripts/             Developer utility scripts, not part of the installable package
 Tasks/               Kanban board — README.md is the index, epics/ holds multi-task programs
                      from here; its relationship to .agents/context/ is an open question,

@@ -22,9 +22,13 @@ Solutions to common issues.
 - **Fix**: Override the author layer (`register`/`boot`/`shutdown`) unless you specifically
   need to wrap orchestration — see `modules.md` and `rules/architecture.md`.
 
-## 3. Tool Dashboard (PySide6) Not Receiving Data
-- **Cause**: The engine's `AuditExtension` websocket might not be running or bound to the correct port.
-- **Fix**: Check that `app.use(AuditExtension(port=8765))` is called in the engine. Ensure the Tool is connecting to `ws://localhost:8765`.
+## 3. `sagittarius-trace attach` shows nothing
+- **Cause**: tracing is off, so there is nothing to stream. It is off by default —
+  `context.recorder` is `None` until something enables it.
+- **Fix**: `app.context.enable_tracing(TraceRecorder())` **before** `app.boot()`, and start a
+  `TraceServer` against that same recorder. See `tracing.md` §1 and §3.
+- **Note**: a version mismatch does *not* look like this — it exits non-zero at connect with a
+  message naming both versions. Silence means no records, not a broken connection.
 
 ## 4. Circular Imports
 - **Cause**: Domain models importing infrastructure details.
