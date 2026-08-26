@@ -191,7 +191,46 @@ still land them inside a handler. That needs option (c) (a session-scoped handle
 null-guard question this file already raises about `RosterScreen.qml`'s bindings — and until one
 of those is done, a green run here still is not strong evidence.
 
-### Requirement 3, deliberately not satisfied as written
+### The teardown half, looked at — it was a real defect (2026-08-26)
+
+This file asked whether the 32 `RosterScreen.qml` teardown `TypeError`s "are themselves a defect
+in `RosterScreen.qml`'s bindings (a null root context guard) rather than only noise — that is
+not this bug, but nobody has looked." Someone has now looked, because option (a) above turned
+`Test (ubuntu)` red on the PR carrying it: adding two test functions shifted teardown timing and
+landed them inside the roster test's handler, exactly the mechanism §"Second contaminant"
+describes.
+
+**They are a real defect.** `viewModel` is a QML *context property*
+(`QmlHostView.set_view_model()` → `rootContext().setContextProperty()`), and `QmlHostView` has
+no teardown path at all — no `closeEvent`, nothing that unloads the QML before the view model
+goes away. So at teardown the component is still loaded, every `viewModel.<x>` binding
+re-evaluates against `null`, and throws.
+
+Fixed by guarding the 12 declarative bindings (`viewModel ? viewModel.x : <default>`). The six
+`on*` signal handlers are deliberately left alone: they fire on user interaction and never
+re-evaluate at teardown.
+
+Measured over a full-suite run, which is what makes this checkable rather than asserted:
+
+| | `RosterScreen.qml` `TypeError`s per run |
+| :--- | ---: |
+| before | 32 |
+| after | 20 |
+| …of which `viewModel.*` (the set that failed CI) | **0**, from 12 |
+
+### What is left, and why it is not fixed here
+
+The remaining 20 are `Theme.*`, not `viewModel.*` — `Cannot read property 'spaceLg' of null`
+and friends. Same defect, different context property: `Theme` is installed by the **engine**
+(`extensions/pyside_mvc/tokens/theme_bridge.py`) and referenced from every QML file in the
+widget kit, so guarding it at the call site would be hundreds of edits across the kit and is
+plainly the wrong shape.
+
+The right fix is the one `QmlHostView` is missing: unload the QML source (`setSource(QUrl())`)
+before the context properties die, in one place, for every application. That is engine teardown
+semantics used by every PySide app here, and it is not something to change inside a PR about
+Windows CI — **it should be its own task.** Until then `Theme.*` teardown warnings can still
+land in a handler and this bug is not closed.
 
 Requirement 3 asks for a test that fails if the ordering sensitivity returns — "the two commands
 must give the same result in both orders". That test is **not** added, because option (a) does

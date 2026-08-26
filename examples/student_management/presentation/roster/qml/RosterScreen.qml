@@ -50,7 +50,7 @@ Rectangle {
                 font.pixelSize: Theme.fontSizeSm
             }
             Switch {
-                checked: viewModel.compactMode
+                checked: viewModel ? viewModel.compactMode : false
                 onToggled: viewModel.compactMode = checked
             }
 
@@ -69,7 +69,7 @@ Rectangle {
                 id: statsCard
                 title: "Roster Stats"
                 icon: "chart-bar"
-                compact: viewModel.compactMode
+                compact: viewModel ? viewModel.compactMode : false
                 Layout.preferredWidth: compact ? compactSize : 260
                 Layout.preferredHeight: compact ? compactSize : 96
 
@@ -79,12 +79,12 @@ Rectangle {
                     spacing: Theme.spaceXs
 
                     Text {
-                        text: "Total: " + viewModel.totalStudents
+                        text: "Total: " + (viewModel ? viewModel.totalStudents : 0)
                         color: Theme.textPrimary
                         font.pixelSize: Theme.fontSizeMd
                     }
                     Text {
-                        text: "Average GPA: " + viewModel.averageGpa.toFixed(2)
+                        text: "Average GPA: " + (viewModel ? viewModel.averageGpa.toFixed(2) : "0.00")
                         color: Theme.muted
                         font.pixelSize: Theme.fontSizeSm
                     }
@@ -97,7 +97,7 @@ Rectangle {
             // two of them internally for its From/To fields.
             TimeRangeCard {
                 id: filterCard
-                compact: viewModel.compactMode
+                compact: viewModel ? viewModel.compactMode : false
                 // Unlike statsCard above, TimeRangeCard declares its own
                 // full-size implicitWidth/implicitHeight (title + toggle +
                 // two DateTimePicker rows need far more than statsCard's
@@ -109,9 +109,9 @@ Rectangle {
                 Layout.preferredWidth: compact ? compactSize : implicitWidth
                 Layout.preferredHeight: compact ? compactSize : implicitHeight
 
-                useCustomTime: viewModel.useCustomTime
-                fromDateTime: viewModel.fromDateTime
-                toDateTime: viewModel.toDateTime
+                useCustomTime: viewModel ? viewModel.useCustomTime : false
+                fromDateTime: viewModel ? viewModel.fromDateTime : ""
+                toDateTime: viewModel ? viewModel.toDateTime : ""
 
                 onCustomTimeToggled: (checked) => viewModel.setUseCustomTime(checked)
                 onFromDateTimeEdited: (text) => viewModel.setFromDateTime(text)
@@ -130,7 +130,7 @@ Rectangle {
                 title: "Roster"
                 icon: "table"
                 columns: rosterColumns
-                model: viewModel.students
+                model: viewModel ? viewModel.students : null
                 emptyText: "No students match the current filter"
             }
 
@@ -148,7 +148,7 @@ Rectangle {
 
                 StyledCheck {
                     text: "Auto-scroll"
-                    checked: viewModel.autoScrollLog
+                    checked: viewModel ? viewModel.autoScrollLog : false
                     onToggled: viewModel.autoScrollLog = checked
                 }
 
@@ -156,8 +156,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     title: "ACTIVITY LOG"
-                    logModel: viewModel.logModel
-                    autoScroll: viewModel.autoScrollLog
+                    logModel: viewModel ? viewModel.logModel : null
+                    autoScroll: viewModel ? viewModel.autoScrollLog : false
                 }
             }
         }
