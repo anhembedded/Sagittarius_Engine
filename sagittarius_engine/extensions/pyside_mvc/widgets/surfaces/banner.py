@@ -24,9 +24,15 @@ class Severity:
     INFO = StyleRole.BANNER_INFO
     WARN = StyleRole.BANNER_WARN
     DANGER = StyleRole.BANNER_DANGER
+    #: The pass half of a check that can also fail. This class was written
+    #: claiming to cover an audit banner that "switches success/danger at
+    #: runtime" and then shipped without a success to switch to.
+    SUCCESS = StyleRole.BANNER_SUCCESS
 
 
-_SEVERITIES = frozenset({Severity.INFO, Severity.WARN, Severity.DANGER})
+_SEVERITIES = frozenset(
+    {Severity.INFO, Severity.WARN, Severity.DANGER, Severity.SUCCESS}
+)
 
 
 class Banner(Panel):
@@ -76,7 +82,8 @@ class Banner(Panel):
         super().__init__(parent)
         if severity not in _SEVERITIES:
             raise ValueError(
-                f"Banner severity must be one of Severity.INFO/WARN/DANGER, "
+                f"Banner severity must be one of "
+                f"Severity.INFO/WARN/DANGER/SUCCESS, "
                 f"got {severity}"
             )
         self._severity = severity
@@ -125,7 +132,8 @@ class Banner(Panel):
         banner needs that its four backtest banners do not."""
         if severity not in _SEVERITIES:
             raise ValueError(
-                f"Banner severity must be one of Severity.INFO/WARN/DANGER, "
+                f"Banner severity must be one of "
+                f"Severity.INFO/WARN/DANGER/SUCCESS, "
                 f"got {severity}"
             )
         self._severity = severity

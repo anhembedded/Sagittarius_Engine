@@ -77,6 +77,11 @@ class StyleRole(Enum):
     BANNER_INFO = auto()
     BANNER_WARN = auto()
     BANNER_DANGER = auto()
+    #: Added late, and only because a consumer needed it: `Banner`'s own
+    #: docstring listed a "success/danger switched at runtime" audit banner
+    #: among the four it covers, while `Severity` offered no success at all.
+    #: The class could not carry the consumer it named.
+    BANNER_SUCCESS = auto()
     #: A small muted heading over a group of content — bold and letter-
     #: spaced, no tick. Two of the reference consumer's three section
     #: headings look exactly like this.
@@ -361,6 +366,7 @@ _BANNER_ACCENTS: dict[StyleRole, str] = {
     StyleRole.BANNER_INFO: "accent",
     StyleRole.BANNER_WARN: "warning",
     StyleRole.BANNER_DANGER: "danger",
+    StyleRole.BANNER_SUCCESS: "success",
 }
 
 
