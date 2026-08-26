@@ -39,8 +39,10 @@ from .guards import (
     InlineStylesheetFinding,
     find_bare_qt_base_widgets,
     find_inline_stylesheets,
+    find_unscoped_container_stylesheets,
     format_bare_qt_base_findings,
     format_inline_stylesheet_findings,
+    format_unscoped_container_findings,
 )
 from .overlay import Overlay
 from .overlays import ConfirmOverlay, PickerItem, PickerOverlay
@@ -105,8 +107,10 @@ __all__ = [
     "apply_role",
     "find_bare_qt_base_widgets",
     "find_inline_stylesheets",
+    "find_unscoped_container_stylesheets",
     "format_bare_qt_base_findings",
     "format_inline_stylesheet_findings",
+    "format_unscoped_container_findings",
     "semantic_colour",
     "tone_colour",
 ]
