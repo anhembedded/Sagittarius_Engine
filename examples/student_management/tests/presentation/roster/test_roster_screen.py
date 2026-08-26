@@ -35,6 +35,23 @@ def test_roster_screen_loads_with_no_qml_errors(qtbot, tmp_path):
     app.stop()
 
 
+def _is_qml_attributable(context, message: str) -> bool:
+    """Is this Qt message attributable to QML? See `BUG-006`.
+
+    @details Duplicated from
+    `tests/extensions/pyside_mvc/test_widget_kit_gallery.py`, which carries the
+    full rationale. Deliberately copied rather than shared: this is a separate
+    application's test tree with no import path to the engine's own tests, and
+    an eight-line predicate is a smaller cost than inventing a shared test
+    package to hold it. If a third copy ever appears, that trade flips.
+
+    Not fixed by this: the 32 `RosterScreen.qml` teardown `TypeError`s
+    `BUG-006` records on Linux *are* `.qml`-attributable and still pass here.
+    """
+    source = getattr(context, "file", None) or ""
+    return source.endswith(".qml") or ".qml:" in message
+
+
 def test_roster_screen_emits_no_qml_runtime_warnings(qtbot, tmp_path):
     """Mirrors test_gallery_emits_no_qml_runtime_warnings's own reasoning:
     QQuickWidget.errors() only reports parse errors, not bindings that
@@ -49,7 +66,7 @@ def test_roster_screen_emits_no_qml_runtime_warnings(qtbot, tmp_path):
             QtMsgType.QtWarningMsg,
             QtMsgType.QtCriticalMsg,
             QtMsgType.QtFatalMsg,
-        ):
+        ) and _is_qml_attributable(context, message):
             messages.append(message)
 
     previous = qInstallMessageHandler(handler)

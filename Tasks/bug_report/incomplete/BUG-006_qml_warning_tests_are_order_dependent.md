@@ -2,7 +2,8 @@
 
 **Reported date:** 2026-08-25
 **Severity:** Medium (a gate test whose result depends on collection order — it can both block a clean change and hide a real regression)
-**Status:** 🔴 Open
+**Status:** 🟠 Partially fixed 2026-08-26 — the platform-warning half is closed (see
+§Decision); the Linux teardown half is **still open**, so this file stays in `incomplete/`.
 **Found by:** `EPIC-008C`, while A/B-verifying that an event-bus change had not broken anything
 
 ---
@@ -161,6 +162,55 @@ But as written, the guard is unreliable in both directions:
 3. Whichever is chosen, add a test that fails if the ordering sensitivity comes back — e.g. the
    two commands above must give the same result in both orders.
 4. `pwsh ./scripts/ci-local.ps1` green — paste the `===CI_LOCAL_RESULT===` block and the log path.
+
+## Decision (2026-08-26) — requirement 2, recorded
+
+**Chosen: option (a), assert only on warnings attributable to QML.** A predicate
+`_is_qml_attributable(context, message)` treats a message as in-scope when `context.file` ends
+in `.qml` or the text carries Qt's `…/Foo.qml:87:` prefix. Applied to both tests named above.
+
+Against requirement 1 — this is narrowing, so it needs a justification beyond "the failing
+string is inconvenient". The justification is the tests' own subject: both are named *no **QML**
+runtime warnings* and exist because `QQuickWidget.errors()` misses bindings that throw at
+runtime. `QFontDatabase: Cannot find font directory …` is a statement about the machine's font
+deployment. It is not a QML binding, cannot be the defect these guard against, and Qt emits it
+once per process — so it lands on whichever test holds the handler at that moment, which
+collection order decides.
+
+Options (b) and (c) were not taken: this file already records that (b) "no longer closes this
+bug", and (c) is the right tool for the teardown half below, which is not what was fixed here.
+
+### What this closes, and what it does not
+
+Closes: the `windows-latest` failure of `test_gallery_emits_no_qml_runtime_warnings`, which is
+the font warning and nothing else.
+
+**Does not close:** the Linux half. The 32 `RosterScreen.qml` teardown `TypeError`s are
+`.qml`-attributable, so they still pass the predicate. Anything that shifts teardown timing can
+still land them inside a handler. That needs option (c) (a session-scoped handler) or the
+null-guard question this file already raises about `RosterScreen.qml`'s bindings — and until one
+of those is done, a green run here still is not strong evidence.
+
+### Requirement 3, deliberately not satisfied as written
+
+Requirement 3 asks for a test that fails if the ordering sensitivity returns — "the two commands
+must give the same result in both orders". That test is **not** added, because option (a) does
+not close the teardown half: an ordering test would be a knowingly flaky test, which is what
+this bug is about in the first place. Adding one would be theatre.
+
+Instead the *mechanism* is locked in deterministically, in
+`tests/extensions/pyside_mvc/test_widget_kit_gallery.py`:
+`test_the_platform_font_warning_is_not_treated_as_a_qml_warning` (the verbatim message from
+§"What is wrong") and `test_a_real_qml_binding_warning_is_still_caught` (narrowing must not
+blind the guard to the `TypeError: Cannot read property 'showIcon' of null` defect it was
+written for). Requirement 3 comes back into force with whoever fixes the teardown half.
+
+### Verification
+
+Both orders from §Reproduction: 21 passed each way. Full suite three consecutive times on the
+same commit, as §"Worse than order-dependent" requires: **1359 passed, 8 skipped** every run.
+
+Requirement 4 (`pwsh ./scripts/ci-local.ps1`) was **not** run — no `pwsh` in this environment.
 
 ## Note on a separate, unrelated intermittent failure
 
