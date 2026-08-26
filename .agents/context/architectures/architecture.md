@@ -48,7 +48,7 @@ replaced the previous example here. Each layer below names something you can ope
 - **Presentation**: presenters over views, never widgets calling use cases directly —
   `examples/student_management/presentation/roster/roster_presenter.py` (`RosterPresenter`).
 
-**Changed 2026-08-26 (`EPIC-005A`).** This section documented `tools/audit_dashboard/`, which
+**Changed 2026-08-26 (`EPIC-005A`).** This section documented tools/audit_dashboard/, which
 has been deleted: all three of its inner layers were scaffolding wired to nothing — the Domain
 entities were constructed nowhere, the use case and event layers were no-op stubs behind
 `try/except ImportError`, and the one line that mattered `str()`-dumped a dict into a text box

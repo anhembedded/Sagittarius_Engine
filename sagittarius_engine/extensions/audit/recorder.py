@@ -78,6 +78,7 @@ class TraceRecorder(ITraceRecorder):
         "_epoch_wall_ns",
         "_lock",
         "_next_cid",
+        "_tap_failures",
         "_taps",
     )
 
@@ -101,6 +102,8 @@ class TraceRecorder(ITraceRecorder):
         #: reads happen on every capture, writes happen when a client
         #: (dis)connects.
         self._taps: tuple[Callable[[tuple[Any, ...]], None], ...] = ()
+        #: Times a tap raised and was contained. See `_notify_taps()`.
+        self._tap_failures = 0
 
     def add_tap(self, callback: Callable[[tuple[Any, ...]], None]) -> None:
         """
@@ -141,12 +144,20 @@ class TraceRecorder(ITraceRecorder):
         a client that disconnected mid-send, a queue that is full — must not
         take down the application it is only supposed to be observing. The
         same rule, and the same reason, as `bus_observers.py`'s handling of a
-        broken diagnostic observer."""
+        broken diagnostic observer.
+
+        **Counted, not swallowed**, for the same reason `EPIC-006F` changed
+        `bus_observers.py` to count (`b7783c3`): a `pass` here means a tap
+        that fails on every single row looks identical to one that is working,
+        and a diagnostic tool that hides its own failures is the defect this
+        engine exists to stop shipping. `tap_failures` is what makes it
+        visible. Logging instead would be worse — this runs on the capture
+        path, and a broken tap would then produce one log line per record."""
         for tap in self._taps:
             try:
                 tap(row)
-            except Exception:  # noqa: BLE001 - see docstring
-                pass
+            except Exception:  # noqa: BLE001 - contained and counted; see above
+                self._tap_failures += 1
 
     # --------------------------------------------------------- the hot path
 
@@ -292,6 +303,14 @@ class TraceRecorder(ITraceRecorder):
         """@brief Records evicted because the buffer was full. A consumer that
         does not show this is presenting a trace with holes as complete."""
         return self._dropped
+
+    @property
+    def tap_failures(self) -> int:
+        """@brief Times a live tap raised and was contained by `_notify_taps()`.
+
+        @details Non-zero means a consumer is missing records it will never be
+        told about — the connection is up, the stream just has holes in it."""
+        return self._tap_failures
 
     @property
     def capacity(self) -> int:

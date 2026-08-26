@@ -383,6 +383,32 @@ def test_a_broken_tap_cannot_break_capture(recorder):
     assert [r.name for r in recorder.snapshot()] == ["marker"]
 
 
+def test_a_broken_tap_is_counted_rather_than_swallowed(recorder):
+    """Containing the exception is right; hiding it is not. A tap that fails
+    on every row would otherwise look exactly like one that is working, and
+    the consumer on the other end would be missing records nothing ever told
+    it about. Same correction `EPIC-006F` made to `bus_observers.py`
+    (`b7783c3`), for the same reason."""
+
+    def broken(row):
+        raise RuntimeError("tap is broken")
+
+    assert recorder.tap_failures == 0
+
+    recorder.add_tap(broken)
+    recorder.instant(Lane.USER, "one")
+    recorder.instant(Lane.USER, "two")
+
+    assert recorder.tap_failures == 2
+
+    # A working tap must not add to the count.
+    recorder.remove_tap(broken)
+    recorder.add_tap(lambda row: None)
+    recorder.instant(Lane.USER, "three")
+
+    assert recorder.tap_failures == 2
+
+
 def test_a_tap_is_notified_with_the_raw_row_not_a_traceRecord(recorder):
     """Building a `TraceRecord` per capture is exactly the cost `EPIC-005`
     §4.2 keeps off this path — the tap gets what the buffer stores."""
