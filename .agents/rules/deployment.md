@@ -24,5 +24,5 @@ their own architecture. Common patterns already used in this repo's own referenc
 
 - **Docker**: containerize the app, run it as the entrypoint.
 - **systemd**: run a long-lived bot or API server as a daemon process.
-- **PyInstaller**: package a desktop UI tool (e.g. `tools/audit_dashboard`) as a standalone
+- **PyInstaller**: package a desktop UI tool (e.g. `tools/widget_showcase`) as a standalone
   executable.

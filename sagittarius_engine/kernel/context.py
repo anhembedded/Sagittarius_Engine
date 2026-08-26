@@ -9,6 +9,7 @@ from sagittarius_engine.interfaces import (
     ILogger,
     ITaskManager,
 )
+from sagittarius_engine.interfaces.i_trace_recorder import ITraceRecorder
 from sagittarius_engine.kernel.bootstrap import Bootstrap
 from sagittarius_engine.kernel.dispatcher import Dispatcher
 from sagittarius_engine.kernel.extension_manager import ExtensionManager
@@ -16,6 +17,7 @@ from sagittarius_engine.kernel.i_kernel_context import IKernelContext
 from sagittarius_engine.kernel.lifecycle import EngineLifecycle
 from sagittarius_engine.kernel.middleware_pipeline import MiddlewarePipeline
 from sagittarius_engine.kernel.module_loader import ModuleLoader
+from sagittarius_engine.kernel.tracing import TraceApi
 
 
 class EngineContext(IKernelContext):
@@ -31,6 +33,17 @@ class EngineContext(IKernelContext):
         self._event_bus = event_bus
         self.middleware_pipeline = MiddlewarePipeline()
         self.extension_manager = ExtensionManager(self)
+
+        # EPIC-005B. `None` when tracing is off, and every instrumentation site
+        # in the engine guards on that — measured in EPIC-005A as ~3 ns over an
+        # empty call site, against ~27 ns for a call through a no-op object.
+        # The type is the interface, not the concrete recorder: `kernel/` is
+        # forbidden from importing `extensions/` (tests/test_architecture.py),
+        # which is also why `Lane` lives in `interfaces/`.
+        self.recorder: ITraceRecorder | None = None
+        #: Always present, even when disabled — see `kernel/tracing.py` for why
+        #: applications get a different mechanism from the engine's own sites.
+        self.trace = TraceApi(self)
 
         # Instantiating subsystems with shared EngineContext
         self.lifecycle = EngineLifecycle(self)
@@ -61,6 +74,33 @@ class EngineContext(IKernelContext):
         from sagittarius_engine.interfaces.i_dispatcher import IDispatcher
 
         self._container.singleton(IDispatcher, self.dispatcher)
+
+    def enable_tracing(self, recorder: ITraceRecorder) -> ITraceRecorder:
+        """
+        @brief Turns tracing on for this application.
+
+        @details Takes the recorder rather than building one, because `kernel/`
+        may not import `extensions/` — and because it lets a test pass a fake.
+
+        Call it **before `boot()`** to get boot profiling: the extension spans
+        are the answer to "why does startup take four seconds", and they are
+        only recorded if the recorder exists before the extensions start.
+
+        @code
+        from sagittarius_engine.extensions.audit.recorder import TraceRecorder
+
+        app = App(container, event_bus)
+        app.context.enable_tracing(TraceRecorder())
+        app.boot()
+        @endcode
+        """
+        self.recorder = recorder
+        return recorder
+
+    def disable_tracing(self) -> None:
+        """@brief Turns tracing off. What was already recorded stays in the
+        recorder — that is usually when it is read."""
+        self.recorder = None
 
     @property
     def container(self) -> IContainer:

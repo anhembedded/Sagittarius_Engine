@@ -252,6 +252,14 @@ jobs:
       - name: Trace recorder overhead budget (EPIC-005A)
         run: pytest tests/extensions/audit/test_trace_recorder.py -q
 
+      # EPIC-005B requirement 3, same reasoning as the step above: these are
+      # timing assertions, and the `test` job's `--cov` trace hook makes them
+      # meaningless, so they skip themselves there. Without this step the
+      # disabled-path budget would be checked nowhere -- and it is the one that
+      # matters most, because it is paid by applications that never trace.
+      - name: Tracing disabled-path budget (EPIC-005B)
+        run: pytest tests/kernel/test_tracing_instrumentation.py -q
+
   # ──────────────────────────────────────────────────────────────
   # Job 6: Security Audit (Bandit & Pip-Audit)
   # ──────────────────────────────────────────────────────────────

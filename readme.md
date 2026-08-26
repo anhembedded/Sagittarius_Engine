@@ -48,18 +48,17 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
 - **Unified dispatcher** — route commands and queries through a single `app.dispatch()` call.
 - **Multiple Event Bus strategies** — synchronous, thread-pool, and asyncio variants.
 - **Wiring diagnostics** — `sagittarius-doctor` reports mis-wiring (typo'd event names, unbound dependencies, dependency cycles, extensions that never initialised) as a build failure instead of a runtime surprise. See below.
-A **Remote Audit Dashboard (TUI)** was listed here until 2026-08-25 — "inspect live engine
-telemetry from a separate terminal via the built-in HTTP telemetry server". Every part of that
-sentence was wrong, so the bullet is gone rather than reworded:
+- **Trace recording** — `app.context.enable_tracing(TraceRecorder())` records what ran and for
+  how long into a bounded ring buffer (~157 ns per record, monotonic clock). `sagittarius-trace
+  attach ws://…` streams it live from outside the process — including what happened *before* you
+  attached — and saves a `.sagtrace` that opens in Perfetto or replays into OpenTelemetry.
 
-- There is no HTTP telemetry server. Telemetry moved to WebSocket in `f0247bd` and the CLI was
-  never updated, so it polls `http://localhost:9999` against a socket that speaks WebSocket and
-  reports a connection error on every refresh.
-- Neither client works at all. The GUI connects but renders `str(payload)` into a text box; the
-  `sagittarius-audit` command has never started for any consumer (`TASK-039`) and is no longer
-  advertised.
-
-`EPIC-005` covers the rebuild. This line comes back when there is something behind it.
+> A **Remote Audit Dashboard (TUI)** was listed here until 2026-08-25 — "inspect live engine
+> telemetry from a separate terminal via the built-in HTTP telemetry server". Every part of that
+> sentence was wrong: there was no HTTP telemetry server (telemetry moved to WebSocket in
+> `f0247bd` and the CLI was never updated, so it polled `http://localhost:9999` against a socket
+> that speaks WebSocket), and neither client worked at all. `EPIC-005` rebuilt it as the trace
+> recorder above; the dashboard and both its clients were deleted on 2026-08-26.
 
 ---
 

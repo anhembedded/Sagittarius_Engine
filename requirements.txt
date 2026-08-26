@@ -3,6 +3,11 @@ requests
 aiohttp
 python-binance
 python-dotenv
+# extensions/audit/infra/trace_server.py and the `sagittarius-trace` CLI
+# (EPIC-005D) are the live trace transport. Previously present only
+# transitively via python-binance; declared directly now that the engine
+# itself depends on it, not just a third party that happens to.
+websockets
 loguru
 pytest>=7.0
 pytest-cov>=4.0

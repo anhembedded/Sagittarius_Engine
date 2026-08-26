@@ -43,9 +43,12 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from typing import Any
 
-from .contracts import Hello, Lane, RecordKind, TraceRecord
+from sagittarius_engine.interfaces.i_trace_recorder import ITraceRecorder, Lane
+
+from .contracts import Hello, RecordKind, TraceRecord
 
 #: Retained-mode default. 100k 8-tuples is a few tens of MB at worst and covers
 #: minutes of a busy application — long enough that "attach when it goes wrong"
@@ -53,7 +56,7 @@ from .contracts import Hello, Lane, RecordKind, TraceRecord
 DEFAULT_CAPACITY = 100_000
 
 
-class TraceRecorder:
+class TraceRecorder(ITraceRecorder):
     """
     @brief Captures records into a bounded ring buffer.
 
@@ -75,6 +78,8 @@ class TraceRecorder:
         "_epoch_wall_ns",
         "_lock",
         "_next_cid",
+        "_tap_failures",
+        "_taps",
     )
 
     def __init__(self, capacity: int = DEFAULT_CAPACITY) -> None:
@@ -90,6 +95,69 @@ class TraceRecorder:
         #: `deque.append` is already atomic under the GIL, and a lock there
         #: would put contention into the thing being measured.
         self._lock = threading.Lock()
+        #: Live subscribers (`EPIC-005D`'s `TraceServer`), notified with the
+        #: raw row tuple, not a `TraceRecord` — building the typed object is
+        #: exactly the cost §4.2 keeps off this path. Copy-on-write, same
+        #: pattern and reason as `infrastructure/event_bus/bus_observers.py`:
+        #: reads happen on every capture, writes happen when a client
+        #: (dis)connects.
+        self._taps: tuple[Callable[[tuple[Any, ...]], None], ...] = ()
+        #: Times a tap raised and was contained. See `_notify_taps()`.
+        self._tap_failures = 0
+
+    def add_tap(self, callback: Callable[[tuple[Any, ...]], None]) -> None:
+        """
+        @brief Subscribes to every row as it is captured, from now on.
+
+        @details Register **before** calling `snapshot()` for a backlog, not
+        after: the two together (tap first, then read the backlog) can very
+        rarely double-deliver a row captured in the gap between them, but
+        never miss one. The other order can miss one. For a diagnostic
+        stream, a duplicate is a shrug; a silent gap is the defect this
+        engine's diagnostics exist to stop shipping.
+        """
+        if callback not in self._taps:
+            self._taps = (*self._taps, callback)
+
+    def remove_tap(self, callback: Callable[[tuple[Any, ...]], None]) -> None:
+        """
+        @brief Unsubscribes. Silent if `callback` was never registered, so a
+        disconnect handler does not have to track whether registration
+        actually succeeded.
+
+        @details Compares with `==`, matching `add_tap()`'s `in` check —
+        deliberately **not** `is`. A bound method (`recorder.add_tap(self._on_row)`
+        ... `recorder.remove_tap(self._on_row)`, the ordinary way to
+        subscribe and unsubscribe) creates a new wrapper object on every
+        attribute access: `self._on_row is self._on_row` is `False`, while
+        `self._on_row == self._on_row` is `True`. An identity comparison here
+        would make that completely normal pattern silently fail to
+        unsubscribe — found by writing a test that used `seen.append` twice
+        and watching `remove_tap` do nothing.
+        """
+        self._taps = tuple(t for t in self._taps if t != callback)
+
+    def _notify_taps(self, row: tuple[Any, ...]) -> None:
+        """@brief Fans a captured row out to live subscribers.
+
+        @details Exceptions are contained, never propagated: a broken tap —
+        a client that disconnected mid-send, a queue that is full — must not
+        take down the application it is only supposed to be observing. The
+        same rule, and the same reason, as `bus_observers.py`'s handling of a
+        broken diagnostic observer.
+
+        **Counted, not swallowed**, for the same reason `EPIC-006F` changed
+        `bus_observers.py` to count (`b7783c3`): a `pass` here means a tap
+        that fails on every single row looks identical to one that is working,
+        and a diagnostic tool that hides its own failures is the defect this
+        engine exists to stop shipping. `tap_failures` is what makes it
+        visible. Logging instead would be worse — this runs on the capture
+        path, and a broken tap would then produce one log line per record."""
+        for tap in self._taps:
+            try:
+                tap(row)
+            except Exception:  # noqa: BLE001 - contained and counted; see above
+                self._tap_failures += 1
 
     # --------------------------------------------------------- the hot path
 
@@ -111,18 +179,19 @@ class TraceRecorder:
         """
         if len(self._buffer) == self._capacity:
             self._dropped += 1
-        self._buffer.append(
-            (
-                time.perf_counter_ns() - self._epoch_ns,
-                RecordKind.INSTANT.value,
-                lane.value,
-                name,
-                cat,
-                cid,
-                0,
-                args,
-            )
+        row = (
+            time.perf_counter_ns() - self._epoch_ns,
+            RecordKind.INSTANT.value,
+            lane.value,
+            name,
+            cat,
+            cid,
+            0,
+            args,
         )
+        self._buffer.append(row)
+        if self._taps:
+            self._notify_taps(row)
 
     def span_begin(
         self,
@@ -145,18 +214,19 @@ class TraceRecorder:
         started = time.perf_counter_ns()
         if len(self._buffer) == self._capacity:
             self._dropped += 1
-        self._buffer.append(
-            (
-                started - self._epoch_ns,
-                RecordKind.SPAN.value,
-                lane.value,
-                name,
-                cat,
-                cid,
-                0,
-                args,
-            )
+        row = (
+            started - self._epoch_ns,
+            RecordKind.SPAN.value,
+            lane.value,
+            name,
+            cat,
+            cid,
+            0,
+            args,
         )
+        self._buffer.append(row)
+        if self._taps:
+            self._notify_taps(row)
         return started
 
     def span_end(
@@ -174,18 +244,19 @@ class TraceRecorder:
         now = time.perf_counter_ns()
         if len(self._buffer) == self._capacity:
             self._dropped += 1
-        self._buffer.append(
-            (
-                now - self._epoch_ns,
-                RecordKind.SPAN.value,
-                lane.value,
-                name,
-                cat,
-                cid,
-                now - started,
-                args,
-            )
+        row = (
+            now - self._epoch_ns,
+            RecordKind.SPAN.value,
+            lane.value,
+            name,
+            cat,
+            cid,
+            now - started,
+            args,
         )
+        self._buffer.append(row)
+        if self._taps:
+            self._notify_taps(row)
 
     def next_cid(self) -> int:
         """@brief A fresh correlation id. Locked, and deliberately **not** part
@@ -232,6 +303,14 @@ class TraceRecorder:
         """@brief Records evicted because the buffer was full. A consumer that
         does not show this is presenting a trace with holes as complete."""
         return self._dropped
+
+    @property
+    def tap_failures(self) -> int:
+        """@brief Times a live tap raised and was contained by `_notify_taps()`.
+
+        @details Non-zero means a consumer is missing records it will never be
+        told about — the connection is up, the stream just has holes in it."""
+        return self._tap_failures
 
     @property
     def capacity(self) -> int:

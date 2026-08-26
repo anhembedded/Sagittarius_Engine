@@ -318,3 +318,125 @@ def test_the_disabled_path_is_a_guard_not_a_null_object():
         f"disabled {disabled:.0f} ns vs enabled {enabled:.0f} ns — the guard is "
         "not short-circuiting, so a disabled build is paying for capture"
     )
+
+
+# ------------------------------------------------------ live taps (EPIC-005D)
+
+
+def test_a_tap_receives_every_captured_row(recorder):
+    seen = []
+    recorder.add_tap(seen.append)
+
+    recorder.instant(Lane.USER, "marker")
+    started = recorder.span_begin(Lane.TASK, "run")
+    recorder.span_end(Lane.TASK, "run", started)
+
+    assert len(seen) == 3
+    assert seen[0][3] == "marker"  # row[3] is name, per contracts.TraceRecord.from_row
+
+
+def test_removing_a_tap_stops_delivery(recorder):
+    """Two separate `seen.append` accesses, deliberately -- that is the
+    ordinary way a real caller subscribes and unsubscribes a bound method
+    (`recorder.add_tap(self._on_row)` ... `recorder.remove_tap(self._on_row)`),
+    and each access creates a distinct wrapper object with its own identity.
+    `remove_tap()` compares with `==`, not `is`, precisely so this works --
+    caught by this exact test failing against an `is`-based first version."""
+    seen = []
+    recorder.add_tap(seen.append)
+    recorder.remove_tap(seen.append)
+
+    recorder.instant(Lane.USER, "marker")
+
+    assert seen == []
+
+
+def test_removing_an_unregistered_tap_is_silent(recorder):
+    recorder.remove_tap(lambda row: None)  # must not raise
+
+
+def test_adding_the_same_tap_twice_delivers_once():
+    """Matches `bus_observers.add_bus_observer()`'s idempotence, and for the
+    same reason: registering twice must not double-count."""
+    rec = TraceRecorder(capacity=16)
+    seen = []
+    rec.add_tap(seen.append)
+    rec.add_tap(seen.append)
+
+    rec.instant(Lane.USER, "marker")
+
+    assert len(seen) == 1
+
+
+def test_a_broken_tap_cannot_break_capture(recorder):
+    """The one place containing an exception is right: a diagnostic tap that
+    could raise into the capture path would break the application it only
+    observes — the same rule `bus_observers.py` applies to a broken
+    diagnostic observer, for the same reason."""
+
+    def broken(row):
+        raise RuntimeError("tap is broken")
+
+    recorder.add_tap(broken)
+    recorder.instant(Lane.USER, "marker")  # must not raise
+
+    assert [r.name for r in recorder.snapshot()] == ["marker"]
+
+
+def test_a_broken_tap_is_counted_rather_than_swallowed(recorder):
+    """Containing the exception is right; hiding it is not. A tap that fails
+    on every row would otherwise look exactly like one that is working, and
+    the consumer on the other end would be missing records nothing ever told
+    it about. Same correction `EPIC-006F` made to `bus_observers.py`
+    (`b7783c3`), for the same reason."""
+
+    def broken(row):
+        raise RuntimeError("tap is broken")
+
+    assert recorder.tap_failures == 0
+
+    recorder.add_tap(broken)
+    recorder.instant(Lane.USER, "one")
+    recorder.instant(Lane.USER, "two")
+
+    assert recorder.tap_failures == 2
+
+    # A working tap must not add to the count.
+    recorder.remove_tap(broken)
+    recorder.add_tap(lambda row: None)
+    recorder.instant(Lane.USER, "three")
+
+    assert recorder.tap_failures == 2
+
+
+def test_a_tap_is_notified_with_the_raw_row_not_a_traceRecord(recorder):
+    """Building a `TraceRecord` per capture is exactly the cost `EPIC-005`
+    §4.2 keeps off this path — the tap gets what the buffer stores."""
+    seen = []
+    recorder.add_tap(lambda row: seen.append(type(row)))
+
+    recorder.instant(Lane.USER, "marker")
+
+    assert seen == [tuple]
+
+
+@_needs_a_quiet_process
+def test_registering_a_tap_does_not_meaningfully_change_the_enabled_budget():
+    """Ratio, not an absolute figure — the same reason
+    `test_the_disabled_path_is_a_guard_not_a_null_object` uses one: an
+    absolute nanosecond count is a property of the machine running the test,
+    not of the code. `EPIC-005D` adds one attribute read and one truthiness
+    check on the capture path when no tap is registered; that must stay a
+    small fraction of the cost, not a new tax approaching the kind
+    `EPIC-006F` rejected for its observer hook."""
+    no_tap = TraceRecorder(capacity=100_000)
+    baseline = _ns_per_call(lambda: no_tap.instant(Lane.TASK, "task.run", cid=1))
+
+    with_tap = TraceRecorder(capacity=100_000)
+    with_tap.add_tap(lambda row: None)
+    tapped = _ns_per_call(lambda: with_tap.instant(Lane.TASK, "task.run", cid=1))
+
+    assert tapped < baseline * 3, (
+        f"one tap costs {tapped:.0f} ns against a no-tap baseline of "
+        f"{baseline:.0f} ns — disproportionate for one function call per record"
+    )

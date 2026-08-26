@@ -1,7 +1,10 @@
 # EPIC-005: Audit Telemetry — Teardown, and Rebuild as a Trace *Recorder*
 
-- **Status**: ⏸️ **On hold — spec complete and approved in principle; deferred behind `EPIC-006`**
-- **Created**: 2026-08-25 · **Revised**: 2026-08-25 (scope cut §5; then deferred §0.1)
+- **Status**: ✅ **Complete 2026-08-26** — all four milestones (`A`, `B`, `C`, `D`) done. The
+  teardown in §3 ran last, after its replacements were already green; see `EPIC-005A`'s
+  §Outcome.
+- **Created**: 2026-08-25 · **Revised**: 2026-08-25 (scope cut §5; then deferred §0.1);
+  2026-08-26 (`D` shipped as `sagittarius-trace`; `A`'s teardown run, closing the epic)
 - **Priority**: P2 — *behind `EPIC-006`, which answers the more urgent question*
 - **Category**: Observability / Diagnostics
 - **Supersedes**: `TASK-002` (`AuditExtension` & CLI Inspector, marked ✅ Completed 2026-07-28 — see §2)
@@ -10,7 +13,13 @@
 
 ---
 
-## 0.1 Why this is on hold
+## 0.1 Why this was on hold — resolved
+
+> **Closed 2026-08-26.** `EPIC-006` shipped first, exactly as this section argued it should,
+> and this epic was then picked up and completed in the order `A`(measurement) → `B` → `C` →
+> `D` → `A`(teardown). The section is kept because the reasoning it records — wiring
+> correctness and execution cost are different questions, and the cheaper one went first — is
+> the decision, not a status line.
 
 Nothing below is withdrawn — the analysis in §2 stands, the teardown in §3 is still the right
 call, and the scope cut in §5 still holds. What changed is **priority**, once the maintainer
@@ -30,7 +39,8 @@ outside the engine can audit its DI wiring, whereas `py-spy`, `viztracer` and Pe
 cover much of what a tracer would do.
 
 **Resume this epic when the live question becomes "why is it slow" rather than "why is it
-wrong".** The specification is complete and does not need rework to be picked up.
+wrong".** The specification is complete and does not need rework to be picked up. *(It was, and
+it did not.)*
 
 ---
 
@@ -90,7 +100,7 @@ re-collection (§2, D9). A recorder appends a fixed-size tuple and returns.
 ```
 engine process                                      consumers
 ┌───────────────────────────────────┐          ┌──────────────────────────────┐
-│ App                               │          │ sagittarius-audit  (live CLI)│
+│ App                               │          │ sagittarius-trace  (live CLI)│
 │   ├─ instrumentation (spans)      │─ws://───▶│ Perfetto UI        (timeline)│
 │   ├─ ring buffer  ← O(1) append   │  trace   │ Jaeger / Tempo / Datadog     │
 │   └─ publisher thread (drains)    │  stream  │                    (via OTel)│
@@ -155,7 +165,7 @@ end-to-end check — see §9.
 | `tools/audit_dashboard_cli.py` | TUI client (D1 — never worked) |
 | `sagittarius_engine/extensions/audit/` | `audit_extension.py`, `audit_service.py`, `ports.py`, `infra/websocket_broadcaster.py` |
 | `tests/extensions/test_audit_extension.py`<br>`tests/extensions/test_audit_integration.py`<br>`tests/extensions/test_websocket_broadcaster_auth.py` | 13 currently-passing tests |
-| `[project.scripts] sagittarius-audit` | Re-added in Milestone D at the correct target |
+| `[project.scripts] sagittarius-audit` | ✅ Already removed by `TASK-039`. Milestone D added `sagittarius-trace` instead — see §6 for why not the same name |
 
 **Cost.** 13 green tests go, and `WebsocketBroadcaster` — the one piece that genuinely works,
 including `TASK-017`'s token auth and the ephemeral-port/`_ready_event` handling that makes it
@@ -314,7 +324,7 @@ not `"12.3%"`.
 | :--- | :--- | :--- |
 | **Perfetto** (`ui.perfetto.dev`) | The timeline. Zoom, pan, span search, SQL analysis, flow arrows. | ~100-line encoder |
 | **OpenTelemetry** (optional extra) | Production observability — Jaeger, Grafana Tempo, Honeycomb, Datadog | A bridging exporter |
-| **`sagittarius-audit`** (thin CLI) | Attach live: streaming event log, task stats, state panel, `--save trace.sagtrace` | Small — no timeline widget |
+| **`sagittarius-trace`** (thin CLI) | Attach live: streaming event log, `--save trace.sagtrace` | Small — no timeline widget |
 
 There is deliberately **no custom timeline UI**. See §5.
 
@@ -388,10 +398,16 @@ taken seriously.
 
 | ID | Scope | Done when |
 | :-- | :--- | :--- |
-| **[A](incomplete/EPIC-005A_teardown_contracts_ringbuffer.md)** | Teardown + `contracts.py` + protocol v1 + ring-buffer recorder + rebuilt transport | Old tree tagged and deleted; recorder unit-tested including eviction and drop-count; overhead benchmark meets §4.2; auth + readiness tests restored green; a raw `websockets` client receives a schema-valid `hello` + `trace` batch |
-| **[B](incomplete/EPIC-005B_instrumentation_and_trace_api.md)** | Instrumentation of the §4.3 subsystems + app-facing `ctx.trace` API | The demo app produces spans for every listed subsystem; task-run spans reconstruct to the same durations the task manager reports; zero-overhead-when-disabled benchmark passes |
-| **[C](incomplete/EPIC-005C_exporters_perfetto_and_otel.md)** | Exporters: `.sagtrace` save/load, **Perfetto**, **OpenTelemetry** | A recording of the demo app opens in `ui.perfetto.dev` with correct lanes and nested spans; the same run appears as a trace in a local OTLP collector |
-| **[D](incomplete/EPIC-005D_thin_attach_cli_and_packaging.md)** | `sagittarius-audit` thin attach CLI + packaging + docs | `pip install dist/*.whl` in a clean venv, the command attaches to a running app, streams the live event log and task stats, and saves a `.sagtrace`; `.agents/context/` updated; `TASK-002` marked superseded |
+| **[A](completed/EPIC-005A_teardown_contracts_ringbuffer.md)** ✅ | Teardown + `contracts.py` + protocol v1 + ring-buffer recorder + rebuilt transport | Old tree tagged and deleted; recorder unit-tested including eviction and drop-count; overhead benchmark meets §4.2; auth + readiness tests restored green; a raw `websockets` client receives a schema-valid `hello` + `trace` batch |
+| **[B](completed/EPIC-005B_instrumentation_and_trace_api.md)** ✅ | Instrumentation of the §4.3 subsystems + app-facing `ctx.trace` API | The demo app produces spans for every listed subsystem; task-run spans reconstruct to the same durations the task manager reports; zero-overhead-when-disabled benchmark passes |
+| **[C](completed/EPIC-005C_exporters_perfetto_and_otel.md)** ✅ | Exporters: `.sagtrace` save/load, **Perfetto**, **OpenTelemetry** | A recording of the demo app opens in `ui.perfetto.dev` with correct lanes and nested spans; the same run appears as a trace in a local OTLP collector |
+| **[D](completed/EPIC-005D_thin_attach_cli_and_packaging.md)** ✅ | `sagittarius-trace` thin attach CLI + packaging + docs | `pip install dist/*.whl` in a clean venv, the command attaches to a running app, streams the live event log and task stats, and saves a `.sagtrace`; `.agents/context/` updated; `TASK-002` marked superseded |
+
+**The command shipped as `sagittarius-trace`, not `sagittarius-audit`.** The old name is
+attached to the dead snapshot dashboard everywhere a user would search — the entry point removed
+by `TASK-039`, `tools/audit_dashboard_cli.py`, `TASK-002` — and reusing it would make "the
+command that never worked" and "the command that replaces it" the same string in every issue
+report. It also describes the wrong thing: this streams a trace, it does not audit anything.
 
 **Order matters.** C before D: Perfetto validates the trace model against a viewer we did not
 write — the cheapest possible way to discover the model is wrong. And within A/B the round-trip
@@ -404,8 +420,9 @@ job.
 
 ## 7. Acceptance criteria
 
-1. **Installs and attaches.** From a built wheel in a clean venv, `sagittarius-audit` attaches
+1. ✅ **Installs and attaches.** From a built wheel in a clean venv, `sagittarius-trace` attaches
    to a running engine, streams the live event log, and writes a `.sagtrace`. *(D1, D6, D7)*
+   Transcript of the actual run in `EPIC-005D`'s §Outcome.
 2. **No `str(dict)` anywhere.** Every output is structured. *(D2)*
 3. **Round-trip test.** A real engine's frames decode into the expected contract objects;
    renaming a contract field breaks the test. *(D3, D4)*

@@ -7,8 +7,6 @@ directly when an event is added, removed, or renamed.
 
 | Event name | Class | Module | Payload fields |
 | :--- | :--- | :--- | :--- |
-| `SystemStateChangedEvent` | `SystemStateChangedEvent` | `sagittarius_engine.extensions.audit.events` | — |
-| `TaskCompletedEvent` | `TaskCompletedEvent` | `sagittarius_engine.extensions.audit.events` | — |
 | `app.booted` | `—` | `sagittarius_engine.kernel.bootstrap` | — |
 | `app.ready` | `—` | `sagittarius_engine.kernel.lifecycle` | — |
 | `extension.disposed` | `ExtensionDisposed` | `sagittarius_engine.kernel.events` | extension_name |

@@ -63,6 +63,19 @@ IGNORE_TOKENS: frozenset[str] = frozenset(
         # Third-party/stdlib names referenced by their own name, not a
         # repo-local package this checker resolves against.
         "asyncio",
+        # A git branch name, not a path — the archive ref EPIC-005A's teardown
+        # left the deleted audit dashboard on, cited by the docs that used to
+        # describe it.
+        "archive/pre-epic-005-audit",
+        # Python builtins and a stdlib function quoted in context/tracing.md
+        # while explaining the disabled-recorder path (`context.recorder` is
+        # `None`, never a no-op object) and what is deliberately NOT called at
+        # capture time.
+        "None",
+        "strftime",
+        # py-spy's sibling — a third-party profiler context/tracing.md §3 names
+        # as what the retained buffer can do and it cannot. Not a repo package.
+        "viztracer",
         # sqlalchemy.Engine, referenced bare in configuration.md's
         # database.url vs database.shards section (EPIC-003).
         "Engine",

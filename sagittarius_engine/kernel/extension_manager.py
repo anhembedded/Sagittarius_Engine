@@ -9,6 +9,7 @@ from sagittarius_engine.exceptions import (
 )
 from sagittarius_engine.interfaces.i_extension import ExtensionDescriptor, IExtension
 from sagittarius_engine.interfaces.i_module import IModule
+from sagittarius_engine.interfaces.i_trace_recorder import Lane
 from sagittarius_engine.kernel.events import (
     ExtensionDisposed,
     ExtensionInitializing,
@@ -245,6 +246,16 @@ class ExtensionManager:
                 self._emit(
                     ExtensionInitializing.event_name, ExtensionInitializing(name)
                 )
+                # EPIC-005B. Per-extension spans are what turn "why does
+                # startup take four seconds?" into a bar chart. Guarded rather
+                # than routed through a no-op object: EPIC-005A measured the
+                # guard at ~3 ns over an empty call site, the object at ~27 ns.
+                recorder = self.context.recorder
+                started = (
+                    recorder.span_begin(Lane.EXTENSION, name, cat="initialize")
+                    if recorder is not None
+                    else 0
+                )
                 try:
                     ext.initialize(self.context)
                     self.initialized_extensions.append(ext)
@@ -254,12 +265,29 @@ class ExtensionManager:
                     )
                     self._rollback()
                     raise e
+                finally:
+                    # In `finally`, so an extension that failed to initialise
+                    # still appears in the trace. A span that vanished when its
+                    # body raised would hide the slow-then-failing extension
+                    # someone opened a tracer to find.
+                    if recorder is not None:
+                        recorder.span_end(
+                            Lane.EXTENSION, name, started, cat="initialize"
+                        )
 
         # 2. Start stage
         for ext in self.sorted_extensions:
             name = ext.descriptor.name
             self.context.logger.info(f"Starting extension '{name}'...")
-            ext.start(self.context)
+            recorder = self.context.recorder
+            if recorder is None:
+                ext.start(self.context)
+            else:
+                started = recorder.span_begin(Lane.EXTENSION, name, cat="start")
+                try:
+                    ext.start(self.context)
+                finally:
+                    recorder.span_end(Lane.EXTENSION, name, started, cat="start")
             self._emit(ExtensionStarted.event_name, ExtensionStarted(name))
             # 3. Schedule async boot hook if AsyncRuntime is available
             self._schedule_boot_async(ext)
