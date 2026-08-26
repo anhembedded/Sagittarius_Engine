@@ -41,26 +41,36 @@ from sagittarius_engine.extensions.audit.sagtrace import (
 )
 from sagittarius_engine.infrastructure.container.std_container import StdLibContainer
 from sagittarius_engine.infrastructure.event_bus.memory_event_bus import MemoryEventBus
+from sagittarius_engine.interfaces.i_dispatchable import IDispatchable
 from sagittarius_engine.kernel.app import App
 
 DEFAULT_PORT = 9999
 
 
-def build_app() -> App:
-    """@brief Boots an app with tracing on.
+def build_app() -> tuple[App, TraceRecorder]:
+    """@brief Boots an app with tracing on, returning both.
 
     @details `enable_tracing()` goes **before** `boot()` on purpose: extension
     register/boot spans are only recorded if the recorder already exists when
     the extensions start, and those spans are the answer to "why does startup
     take four seconds".
+
+    The concrete recorder is returned rather than read back off
+    `context.recorder` later, because that attribute is typed
+    `ITraceRecorder | None` — the narrow interface `kernel/` is allowed to know
+    about, which has `instant`/`span_begin`/`span_end`/`next_cid` and
+    deliberately **not** `snapshot()` or `dropped`. Reading a recording back
+    out is tooling, not something an instrumentation site ever needs. So hold
+    the concrete object if you want to read it; do not widen the interface.
     """
+    recorder = TraceRecorder()
     app = App(StdLibContainer(), MemoryEventBus())
-    app.context.enable_tracing(TraceRecorder())
+    app.context.enable_tracing(recorder)
     app.boot()
-    return app
+    return app, recorder
 
 
-class GreetQuery:
+class GreetQuery(IDispatchable):
     """A minimal handler, only so there is a real `dispatch()` to trace."""
 
     def execute(self, dto: object = None) -> str:
@@ -98,10 +108,7 @@ def do_some_work(app: App) -> None:
     ctx.trace.mark("warmup-complete")
 
 
-def report(app: App) -> None:
-    recorder = app.context.recorder
-    assert recorder is not None, "tracing was not enabled"
-
+def report(recorder: TraceRecorder) -> None:
     records = recorder.snapshot()
     spans = [r for r in records if r.dur]
     print(f"\n  captured         : {len(records)} records")
@@ -123,12 +130,12 @@ def report(app: App) -> None:
         print(f"    [{r.t / 1e6:9.3f} ms] {r.lane.value:<10} {r.name}{cid}")
 
 
-def save_and_convert(app: App, out_dir: Path) -> None:
+def save_and_convert(recorder: TraceRecorder, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     sagtrace = out_dir / "demo.sagtrace"
     perfetto = out_dir / "demo.perfetto.json"
 
-    save_sagtrace_from_recorder(sagtrace, app.context.recorder)
+    save_sagtrace_from_recorder(sagtrace, recorder)
 
     # Read it back rather than reusing the in-memory records: this is the
     # round trip a consumer actually performs, so a format that only works
@@ -142,11 +149,11 @@ def save_and_convert(app: App, out_dir: Path) -> None:
     print(f"\n  Open {perfetto.name} at https://ui.perfetto.dev (drag the file in).")
 
 
-def serve(app: App, port: int) -> None:
+def serve(app: App, recorder: TraceRecorder, port: int) -> None:
     """@brief Holds a live trace server open until Ctrl+C."""
     from sagittarius_engine.extensions.audit.infra.trace_server import TraceServer
 
-    server = TraceServer(app.context.recorder, host="127.0.0.1", port=port)
+    server = TraceServer(recorder, host="127.0.0.1", port=port)
     server.start()
     if not server.ready_event.wait(timeout=5.0):
         print("server failed to bind", file=sys.stderr)
@@ -193,14 +200,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     print("booting with tracing enabled…")
-    app = build_app()
+    app, recorder = build_app()
     do_some_work(app)
 
-    report(app)
-    save_and_convert(app, Path(args.out))
+    report(recorder)
+    save_and_convert(recorder, Path(args.out))
 
     if args.serve:
-        serve(app, args.port)
+        serve(app, recorder, args.port)
 
     app.stop()
     return 0
