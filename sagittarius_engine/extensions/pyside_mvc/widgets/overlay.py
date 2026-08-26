@@ -38,10 +38,19 @@ class Overlay(QDialog):
 
         outer = QVBoxLayout(self)
 
+        # Both labels shipped with no role at all, so a dialog header
+        # rendered at the widget default while the body around it was
+        # token-styled. Measured against the QML modal these replaced
+        # (`ModalDialogCard.qml`, 11 consumers): title bold with 0.8px
+        # letter-spacing, subtitle muted and one step down — which is
+        # `SECTION_LABEL` and `CAPTION`. The recorded difference is the
+        # title's colour, muted here where the QML used full contrast.
         self._title_label = QLabel(title)
+        apply_role(self._title_label, StyleRole.SECTION_LABEL)
         outer.addWidget(self._title_label)
 
         self._subtitle_label = QLabel(subtitle)
+        apply_role(self._subtitle_label, StyleRole.CAPTION)
         self._subtitle_label.setVisible(bool(subtitle))
         outer.addWidget(self._subtitle_label)
 
@@ -49,6 +58,20 @@ class Overlay(QDialog):
         outer.addLayout(self.body_layout, 1)
 
         outer.addLayout(self._build_buttons())
+
+    @property
+    def title_label(self) -> QLabel:
+        """
+        @brief The header label itself, for a dialog whose title is meant to
+        be louder than the default.
+
+        @details An app can carry more than one dialog treatment — the
+        reference consumer's destructive confirms and its data inspectors
+        use an accent heading, while its eleven parameter modals use the
+        quieter label this class applies. Re-roling one label is the
+        difference; rebuilding the header to change it is not.
+        """
+        return self._title_label
 
     @property
     def title(self) -> str:
