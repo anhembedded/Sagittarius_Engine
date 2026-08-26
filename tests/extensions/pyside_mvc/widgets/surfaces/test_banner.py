@@ -100,3 +100,33 @@ def test_message_and_icon_are_settable(qtbot):
 
     assert banner.message == "second"
     assert banner.icon_label.isVisibleTo(banner) is True
+
+
+def test_the_message_carries_the_severity_colour(qtbot, fake_theme_bridge):
+    """The severity's QSS is scoped to the panel, so it never reaches the
+    text inside it. Without this the message rendered at the widget default
+    — dark grey on a dark banner, effectively invisible."""
+    banner = Banner("Coverage is only 82%", severity=Severity.WARN)
+    qtbot.addWidget(banner)
+
+    assert "warning" in banner._message_label.styleSheet()
+
+
+def test_recolouring_the_banner_recolours_its_message(qtbot, fake_theme_bridge):
+    """The audit banner switches severity on every sync; a border that moves
+    while the text stays the old colour is worse than either alone."""
+    banner = Banner("Audit passed", severity=Severity.INFO)
+    qtbot.addWidget(banner)
+    before = banner._message_label.styleSheet()
+
+    banner.set_severity(Severity.DANGER)
+
+    assert banner._message_label.styleSheet() != before
+    assert "danger" in banner._message_label.styleSheet()
+
+
+def test_the_icon_is_coloured_with_the_message(qtbot, fake_theme_bridge):
+    banner = Banner("Stale", severity=Severity.WARN, icon="!")
+    qtbot.addWidget(banner)
+
+    assert banner.icon_label.styleSheet() == banner._message_label.styleSheet()

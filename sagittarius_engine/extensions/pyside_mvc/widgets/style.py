@@ -296,6 +296,20 @@ def tone_colour(tone: Tone) -> str:
     return _token(TONE_TOKENS[tone])
 
 
+def banner_accent(severity: StyleRole) -> str:
+    """
+    @brief The live colour of one banner severity.
+
+    @details `Banner` needs it for its message label: the severity's QSS is
+    scoped to the panel, so it does not reach the text inside — the text has
+    to be told the same colour explicitly. Reads the one mapping the QSS
+    itself reads, rather than a second copy that could drift from it.
+
+    @raise KeyError If `severity` is not one of the three banner roles.
+    """
+    return _token(_BANNER_ACCENTS[severity])
+
+
 def semantic_colour(name: str) -> str:
     """
     @brief Reads one semantic colour token by name.
