@@ -13,4 +13,12 @@ bandit>=1.7.0
 pip-audit>=2.7.0
 build>=1.0.0
 twine>=5.0.0
+# EPIC-005C's OTel exporter (extensions/audit/exporters/otel.py) is behind the
+# optional `[otel]` extra in pyproject.toml -- not a core dependency. It is
+# listed here, in dev tooling, for the same reason pytest-qt is above: without
+# it, a fresh `pip install -r requirements-dev.txt` could not actually run
+# tests/extensions/audit/exporters/test_otel.py, which would then pass
+# vacuously by skipping everywhere, including in CI.
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-otlp-proto-http>=1.20.0
 

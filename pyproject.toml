@@ -62,6 +62,15 @@ sagittarius_engine = [
 
 [project.optional-dependencies]
 audit = ["rich>=13.0.0"]
+# EPIC-005C requirement 4: the core records into its own stdlib ring buffer
+# and knows nothing about OTel. This extra exists only for
+# `extensions/audit/exporters/otel.py`, which guards its own import at use
+# time — uninstalling this extra leaves the recorder, the .sagtrace format,
+# and the Perfetto exporter (all stdlib-only) working.
+otel = [
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0",
+]
 
 [tool.black]
 line-length = 88
