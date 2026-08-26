@@ -60,7 +60,12 @@ def test_gate_reports_failure_when_a_required_tool_is_missing(tmp_path):
     env.pop("VIRTUAL_ENV", None)
 
     result = subprocess.run(
-        [_PWSH, "-NoProfile", str(sandbox_gate), "-SkipTests"],
+        # `-File` explicitly. Without it pwsh decides between -File and
+        # -Command by inspecting the first argument, and the two modes differ
+        # in how they propagate exit codes and where a startup error goes.
+        # This is the form ONBOARDING.md documents for running the gate, so
+        # the test now exercises the same invocation the humans do.
+        [_PWSH, "-NoProfile", "-File", str(sandbox_gate), "-SkipTests"],
         cwd=tmp_path,
         env=env,
         capture_output=True,
@@ -90,5 +95,9 @@ def test_gate_reports_failure_when_a_required_tool_is_missing(tmp_path):
         "Gate exited 0 with required tools missing from PATH -- the exact "
         f"false-positive TASK-028 describes.\n{detail}\n--- output ---\n{output}"
     )
-    assert "RESULT: FAIL" in output, f"Expected RESULT: FAIL in output.\n{output}"
-    assert "RESULT: PASS" not in output, f"Gate falsely reported PASS.\n{output}"
+    assert "RESULT: FAIL" in output, (
+        f"Expected RESULT: FAIL in output.\n{detail}\n--- output ---\n{output}"
+    )
+    assert "RESULT: PASS" not in output, (
+        f"Gate falsely reported PASS.\n{detail}\n--- output ---\n{output}"
+    )
