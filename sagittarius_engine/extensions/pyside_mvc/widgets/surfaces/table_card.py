@@ -117,6 +117,7 @@ class TableCard(Card):
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
+        apply_role(self._scroll, StyleRole.LIST_SURFACE)
         self._scroll.setWidget(self._rows_host)
         self.body_layout.addWidget(self._scroll, 1)
 

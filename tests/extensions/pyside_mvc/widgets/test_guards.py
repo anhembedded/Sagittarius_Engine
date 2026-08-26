@@ -8,6 +8,8 @@ from pathlib import Path
 from sagittarius_engine.extensions.pyside_mvc.widgets.guards import (
     find_bare_qt_base_widgets,
     find_inline_stylesheets,
+    find_unscoped_container_stylesheets,
+    format_unscoped_container_findings,
 )
 
 
@@ -216,3 +218,210 @@ def test_style_py_is_still_skipped_without_being_named(tmp_path: Path):
     _write(tmp_path / "style.py", 'QSS = "color: #ffffff;"\n')
 
     assert find_inline_stylesheets(tmp_path) == []
+
+
+# --------------------------------------------------------------------------- #
+# find_unscoped_container_stylesheets — BUG-008's guard
+# --------------------------------------------------------------------------- #
+
+
+def _screen(tmp_path, body: str):
+    (tmp_path / "screen.py").write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+def test_a_container_styled_without_a_selector_is_reported(tmp_path):
+    """The exact shape of `BUG-008`: a bare property list is Qt's universal
+    selector, so this tile hands its border to all three labels inside it."""
+    root = _screen(
+        tmp_path,
+        """
+tile = QFrame()
+tile.setStyleSheet("background-color: #111318; border: 1px solid #282c3f;")
+layout = QVBoxLayout(tile)
+""",
+    )
+
+    findings = find_unscoped_container_stylesheets(root)
+
+    assert len(findings) == 1
+    assert findings[0].target == "tile"
+    assert findings[0].properties == ("border", "background")
+
+
+def test_a_leaf_styled_the_same_way_is_not_reported(tmp_path):
+    """Styling one widget that has no children is the ordinary way to style
+    a widget. Reporting those would bury the real findings — in the
+    reference app 63 unscoped sheets narrow to 16 containers."""
+    root = _screen(
+        tmp_path,
+        """
+label = QLabel("Stored KLines Records")
+label.setStyleSheet("background: transparent; border: none;")
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []
+
+
+def test_a_scoped_container_is_not_reported(tmp_path):
+    root = _screen(
+        tmp_path,
+        """
+tile = QFrame()
+tile.setStyleSheet("QFrame { background-color: #111318; border: 1px solid #282c3f; }")
+layout = QVBoxLayout(tile)
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []
+
+
+def test_set_layout_also_makes_a_widget_a_container(tmp_path):
+    """The other way a widget acquires children."""
+    root = _screen(
+        tmp_path,
+        """
+host = QWidget()
+host.setStyleSheet("border: 1px solid #282c3f;")
+host.setLayout(row)
+""",
+    )
+
+    assert len(find_unscoped_container_stylesheets(root)) == 1
+
+
+def test_colour_alone_is_not_a_leak(tmp_path):
+    """Text colour inherits in Qt regardless of selectors — a container
+    setting it once for its labels is idiomatic, not a mistake."""
+    root = _screen(
+        tmp_path,
+        """
+card = QFrame()
+card.setStyleSheet("color: #e8e9ec;")
+layout = QVBoxLayout(card)
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []
+
+
+def test_an_f_string_is_read_through_its_literal_parts(tmp_path):
+    """Every real call builds its sheet from tokens. Interpolated values are
+    skipped rather than guessed at — a token is a colour, never a selector,
+    so dropping it cannot flip the verdict either way."""
+    root = _screen(
+        tmp_path,
+        """
+card = QFrame()
+card.setStyleSheet(f"background-color: {Palette.BG_CARD}; border: 1px solid {Palette.BORDER};")
+layout = QVBoxLayout(card)
+""",
+    )
+
+    assert len(find_unscoped_container_stylesheets(root)) == 1
+
+
+def test_a_reasoned_exemption_is_honoured(tmp_path):
+    root = _screen(
+        tmp_path,
+        """
+card = QFrame()
+card.setStyleSheet("border: 1px solid #282c3f;")  # cascade-exempt: on purpose
+layout = QVBoxLayout(card)
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []
+
+
+def test_findings_format_with_file_line_and_what_leaks(tmp_path):
+    root = _screen(
+        tmp_path,
+        """
+tile = QFrame()
+tile.setStyleSheet("border: 1px solid #282c3f;")
+layout = QVBoxLayout(tile)
+""",
+    )
+
+    text = format_unscoped_container_findings(find_unscoped_container_stylesheets(root))
+
+    assert "screen.py:3" in text
+    assert "tile leaks border" in text
+
+
+def test_self_is_resolved_per_class_not_per_file(tmp_path):
+    """A class that lays itself out must not vouch for its neighbours.
+
+    Resolved module-wide, `LeafWidget` below was reported because
+    `CardWidget` in the same file happens to call `QVBoxLayout(self)` — and
+    that is a real leaf in the reference app, styled correctly. A guard's
+    first false positive is how it gets switched off.
+    """
+    root = _screen(
+        tmp_path,
+        """
+class CardWidget(QFrame):
+    def __init__(self):
+        layout = QVBoxLayout(self)
+
+class LeafWidget(QFrame):
+    def __init__(self):
+        self.setStyleSheet("background-color: #ff000080;")
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []
+
+
+def test_a_class_that_lays_itself_out_is_still_reported(tmp_path):
+    root = _screen(
+        tmp_path,
+        """
+class CardWidget(QFrame):
+    def __init__(self):
+        self.setStyleSheet("border: 1px solid #282c3f;")
+        layout = QVBoxLayout(self)
+""",
+    )
+
+    findings = find_unscoped_container_stylesheets(root)
+
+    assert len(findings) == 1
+    assert findings[0].target == "self"
+
+
+def test_a_widget_that_holds_children_without_a_layout_is_a_container(tmp_path):
+    """`QStackedWidget` and friends hold children directly, so the
+    layout-owner check never sees them.
+
+    Not hypothetical: the reference app styled the stack holding **every
+    screen** with a bare property list, and the guard walked past the
+    largest cascade in the whole application — a dark rectangle behind
+    every label on every screen that had no background rule of its own.
+    """
+    root = _screen(
+        tmp_path,
+        """
+stacked = QStackedWidget()
+stacked.setStyleSheet("background-color: #0a0a0c; color: #e8e9ec;")
+""",
+    )
+
+    findings = find_unscoped_container_stylesheets(root)
+
+    assert len(findings) == 1
+    assert findings[0].target == "stacked"
+
+
+def test_a_scoped_stack_is_not_reported(tmp_path):
+    root = _screen(
+        tmp_path,
+        """
+stacked = QStackedWidget()
+stacked.setStyleSheet("QStackedWidget { background-color: #0a0a0c; }")
+""",
+    )
+
+    assert find_unscoped_container_stylesheets(root) == []

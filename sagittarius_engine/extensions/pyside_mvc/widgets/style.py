@@ -178,6 +178,15 @@ class StyleRole(Enum):
     #: deliberately smaller than the data beside it, and all 5 measured
     #: originals set a size by hand to get that.
     GHOST_BUTTON = auto()
+    #: A scrolling body sitting inside a surface — a log's list, a table's
+    #: scroll area, a picker's item column. Contributes no chrome of its
+    #: own: transparent, no frame, text at full contrast.
+    #:
+    #: Three of these shipped with **no styling at all** and looked right
+    #: only because the card around them was leaking its background down
+    #: (`BUG-008`). Scoping that leak correctly turned them white — which is
+    #: how a missing rule shows up once the accidental one is gone.
+    LIST_SURFACE = auto()
 
 
 class WidgetState(Enum):
@@ -234,34 +243,43 @@ def apply_role(
 
 def _scope_qss(widget: QWidget, qss: str) -> str:
     """
-    @brief Confines `qss` to `widget` itself — the `BUG-008` fix.
+    @brief Confines `qss` to `widget` itself — the `BUG-008` fix, corrected.
 
-    @details Qt applies a stylesheet set via `setStyleSheet()` to the
-    widget it was set on **and** to every descendant with no stylesheet of
-    its own. A bare property list — no selector at all — is the universal
-    selector, so a `Card`'s own background/border/colour used to repaint
-    its entire subtree, including children (e.g. a toolbar's buttons) that
-    never asked to be restyled. Roles that already write their own type
-    selector (`SELECTABLE_CARD`, `PROGRESS`, the three button roles) are
-    left untouched — wrapping them again would nest a second, redundant
-    selector around one that is already scoped.
+    @details Qt applies a stylesheet set via `setStyleSheet()` to the widget
+    it was set on **and** to every descendant with no stylesheet of its own.
+    A bare property list — no selector at all — is the universal selector,
+    so a `Card`'s background and border used to repaint its whole subtree.
 
-    Scoped to `widget`'s own runtime class, not a hardcoded name, because
-    `apply_role()` is always called with the real instance (`self`), so
-    `type(widget).__name__` already resolves to the most derived class
-    (`ChartCard`, not `Card`, when `ChartCard(Card)` calls it). The
-    selector is deliberately left bare rather than dot-prefixed
-    (`.ChartCard`): Qt matches a bare type selector against subclasses of
-    it too, but since the selector is already built from the exact
-    runtime type, that only ever reaches a *further* subclass of this same
-    widget — never an unrelated sibling elsewhere in the tree — so the
-    subclass-matching a dotted selector would suppress is never actually in
-    play here, and bare stays consistent with how every already-scoped
-    role in this module writes its own selector.
+    Scoping to the widget's own runtime class fixed that, and was still not
+    enough. **A Qt type selector matches subclasses**, and `QLabel` is a
+    `QFrame` subclass — so on a consumer's plain `QFrame()` container, the
+    resulting `QFrame { border: ... }` still drew a box around every label
+    inside it. The original fix reasoned that subclass matching "only ever
+    reaches a further subclass of this same widget — never an unrelated
+    sibling elsewhere in the tree". That holds for `Card` or `Panel`; it is
+    false for the bare Qt classes a consumer is free to pass, where
+    "a further subclass" is every `QLabel` on the screen. Measured, not
+    argued: with a red border and a `QFrame` selector, a child `QLabel`
+    paints the border and a `QLineEdit` and `QPushButton` do not — exactly
+    the subclass relation.
+
+    So the selector is the **exact-class** form, `.ClassName`. Safe for
+    every widget here because `apply_role()` is always called with the real
+    instance, so the name is already the most derived class (`.ChartCard`,
+    not `.Card`, when `ChartCard(Card)` calls it) — the subclass matching
+    the dot suppresses is matching this package never relied on.
+
+    A role needing a pseudo-state or sub-control writes its own selector as
+    `_SELF`, filled in here rather than hardcoded: a literal `QFrame` in
+    `SELECTABLE_CARD` and `STAT_CARD` was the same defect in a second
+    place, where scoping could not reach it.
     """
+    name = type(widget).__name__
+    if _SELF in qss:
+        return qss.replace(_SELF, f".{name}")
     if "{" in qss:
         return qss
-    return f"{type(widget).__name__} {{ {qss} }}"
+    return f".{name} {{ {qss} }}"
 
 
 class Tone(Enum):
@@ -370,6 +388,14 @@ _BANNER_ACCENTS: dict[StyleRole, str] = {
 }
 
 
+#: Stands in for the widget's own selector inside a role's QSS. `apply_role`
+#: substitutes it with the exact-class form once it knows the instance.
+#: Roles that need a pseudo-state or a sub-control (`:hover`,
+#: `::chunk`) have to write their own selector, and a literal one is what
+#: made `QFrame { ... }` reach every `QLabel` inside a card.
+_SELF = "__SELF__"
+
+
 def _build_qss(role: StyleRole, state: WidgetState) -> str:
     disabled = state is WidgetState.DISABLED
 
@@ -386,12 +412,12 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
         border_color = _token("accent") if selected else _token("border")
         background = _token("stateActiveTint") if selected else "transparent"
         return (
-            f"QFrame {{"
+            f"{_SELF} {{"
             f"background-color: {background};"
             f"border: 1px solid {border_color};"
             f"border-radius: {_px('radiusMd')};"
             f"}}"
-            f"QFrame:hover {{background-color: {_token('stateHoverBg')};}}"
+            f"{_SELF}:hover {{background-color: {_token('stateHoverBg')};}}"
         )
 
     if role is StyleRole.CHECKBOX:
@@ -492,13 +518,13 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
 
     if role is StyleRole.STAT_CARD:
         return (
-            f"QFrame {{"
+            f"{_SELF} {{"
             f"background-color: {_token('bgCard')};"
             f"border: 1px solid {_token('border')};"
             f"border-radius: {_px('radiusMd')};"
             f"color: {_token('textPrimary')};"
             f"}}"
-            f"QFrame:hover {{"
+            f"{_SELF}:hover {{"
             f"background-color: {_token('stateHoverBg')};"
             f"border: 1px solid {_token('stateNavBorder')};"
             f"}}"
@@ -520,7 +546,7 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
         # width to themselves.
         outline = _token("muted") if disabled else _token("accent")
         return (
-            f"QPushButton {{"
+            f"{_SELF} {{"
             f"background-color: transparent;"
             f"color: {outline};"
             f"border: 1px solid {outline};"
@@ -528,7 +554,14 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"font-size: {_px('fontSizeSm')};"
             f"padding: {_px('spaceXs')} {_px('spaceSm')};"
             f"}}"
-            f"QPushButton:hover {{background-color: {_token('stateHoverBg')};}}"
+            f"{_SELF}:hover {{background-color: {_token('stateHoverBg')};}}"
+        )
+
+    if role is StyleRole.LIST_SURFACE:
+        return (
+            f"background-color: transparent;"
+            f"border: none;"
+            f"color: {_token('textPrimary')};"
         )
 
     if role is StyleRole.TABLE_HEADER:
@@ -540,14 +573,14 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
 
     if role is StyleRole.PROGRESS:
         return (
-            f"QProgressBar {{"
+            f"{_SELF} {{"
             f"background-color: {_token('stateIdleBg')};"
             f"border: 1px solid {_token('border')};"
             f"border-radius: {_px('radiusSm')};"
             f"color: {_token('textPrimary')};"
             f"text-align: center;"
             f"}}"
-            f"QProgressBar::chunk {{"
+            f"{_SELF}::chunk {{"
             f"background-color: {_token('muted') if disabled else _token('accent')};"
             f"border-radius: {_px('radiusSm')};"
             f"}}"
@@ -566,12 +599,12 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
         _token("stateHoverBg") if role is StyleRole.SECONDARY_BUTTON else background
     )
     return (
-        f"QPushButton {{"
+        f"{_SELF} {{"
         f"background-color: {background};"
         f"color: {text_color};"
         f"border: 1px solid {accent};"
         f"border-radius: {_px('radiusSm')};"
         f"padding: {_px('spaceXs')} {_px('spaceMd')};"
         f"}}"
-        f"QPushButton:hover {{background-color: {hover_background};}}"
+        f"{_SELF}:hover {{background-color: {hover_background};}}"
     )

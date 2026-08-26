@@ -1,6 +1,6 @@
 import functools
 
-from PySide6.QtCore import QChildEvent, QEvent, QObject
+from PySide6.QtCore import QChildEvent, QEvent, QObject, Qt
 from PySide6.QtWidgets import QPushButton, QWidget
 
 # Config key any app built on this framework can set (e.g. via
@@ -18,7 +18,21 @@ class BaseView(QWidget):  # base-exempt: an MVC view root, not a styled surface
     for free. Today that behavior is opt-in dev-mode click logging, activated
     automatically by BasePresenter (see base_presenter.py) when the app's
     `dev.mode` config flag is on — a View never has to call anything itself.
+
+    Every view sets `WA_StyledBackground`, because a plain `QWidget`
+    subclass **silently ignores a stylesheet background once it is nested
+    inside another widget**. Standalone it paints, which is why no test
+    caught it: a view under test is the top-level window, and Qt fills that
+    itself. In a real window the consuming app's sidebar asked for its own
+    darker background for as long as it has existed and never got it — the
+    colour on screen came from its unscoped stylesheet leaking onto every
+    child, each of which did paint. Fixing that leak is what made the
+    missing background visible.
     """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
     def log_dev_action(self, message: str) -> None:
         """

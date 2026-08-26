@@ -5,11 +5,19 @@ to the QML kit's `tokens.qml_literal_guard`/`kit.raw_primitive_guard`
 DECISION_2026-08-24_widget_architecture.md` §6).
 
 @details
-Two guards, matching the two QML ones each has a direct counterpart for:
+Three guards. Two match a QML one each has a direct counterpart for:
 
 - `find_inline_stylesheets` — no hardcoded colour literal outside
   `widgets/style.py` (the one file `apply_role()`/`_build_qss()` live in).
   Counterpart to `tokens.qml_literal_guard.find_literal_colors`.
+- `find_unscoped_container_stylesheets` — no `setStyleSheet()` written as a
+  bare property list on a widget that owns a layout. A list with no selector
+  is Qt's **universal selector**: it repaints every descendant that has no
+  rule of its own, handing the container's border and background to each
+  child inside it. Harmless on a leaf, which is why the check only reports
+  widgets that actually have children. This is `BUG-008`, and it has since
+  recurred four more times in the consuming app — a guard, not a fix, is
+  what stops the fifth.
 - `find_bare_qt_base_widgets` — no `class X(QFrame)`/`class X(QDialog)`/
   `class X(QWidget)` outside `widgets/surface.py`/`widgets/overlay.py`
   themselves, barring a `# base-exempt: <reason>` line. Counterpart to
@@ -24,7 +32,7 @@ this module deliberately does not. It lives in
 `tools.widget_showcase.showcased_types()`, and fails when a type in
 `widgets.__all__` is never built by the showcase.
 
-Both guards here scan text, so neither needs Qt. Within *this* repo they are
+All three scan source without importing it, so none needs Qt. Within *this* repo they are
 still exercised only through `tmp_path` fixtures — pointing them at
 `sagittarius_engine/` itself remains outstanding.
 
@@ -38,6 +46,7 @@ containing the very tokens it defines, which put zero out of reach.
 
 from __future__ import annotations
 
+import ast
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -104,6 +113,45 @@ _BASE_DEFINITION_FILES = frozenset({"surface.py", "overlay.py"})
 #: a guard quietly stops meaning anything.
 _BASE_EXEMPT_RE = re.compile(r"#\s*base-exempt\s*:\s*\S")
 
+#: Same exemption convention again, for a container that genuinely means to
+#: paint its descendants.
+_CASCADE_EXEMPT_MARKER = "cascade-exempt"
+
+#: The QSS properties that actually show when they leak downward. `color`
+#: is left out on purpose: text colour inherits in Qt anyway, and a
+#: container setting it for its labels is the normal way to do that.
+_CASCADING_PROPERTIES = ("border", "background")
+
+#: Qt widgets that hold children **without** a layout, so the layout-owner
+#: check below never sees them. Missing this class of container is not
+#: hypothetical: the reference app styled its `QStackedWidget` — the widget
+#: holding *every screen* — with a bare property list, and the guard walked
+#: straight past the largest cascade in the whole application.
+_IMPLICIT_CONTAINERS = frozenset(
+    {
+        "QStackedWidget",
+        "QTabWidget",
+        "QSplitter",
+        "QScrollArea",
+        "QMainWindow",
+        "QDockWidget",
+        "QToolBar",
+        "QMdiArea",
+    }
+)
+
+#: Layout constructors that adopt their argument as the widget they lay out.
+#: `QWidget.setLayout()` is the other way in and is matched separately.
+_LAYOUT_CONSTRUCTORS = frozenset(
+    {
+        "QVBoxLayout",
+        "QHBoxLayout",
+        "QGridLayout",
+        "QFormLayout",
+        "QStackedLayout",
+    }
+)
+
 
 @dataclass(frozen=True)
 class InlineStylesheetFinding:
@@ -113,6 +161,19 @@ class InlineStylesheetFinding:
     line_number: int
     line_text: str
     matched: str
+
+
+@dataclass(frozen=True)
+class UnscopedContainerFinding:
+    """One `setStyleSheet()` written as a bare property list on a widget that
+    owns a layout — Qt's universal selector, applied to a widget with
+    children to apply it to."""
+
+    file: Path
+    line_number: int
+    line_text: str
+    target: str
+    properties: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -222,6 +283,181 @@ def find_bare_qt_base_widgets(
     return findings
 
 
+def find_unscoped_container_stylesheets(
+    root: Path,
+    exempt_dirs: Iterable[Path] = (),
+) -> list[UnscopedContainerFinding]:
+    """
+    @brief Finds `setStyleSheet()` calls written as a bare property list on a
+    widget that owns a layout.
+
+    @details A QSS string with no selector is Qt's **universal selector**. It
+    repaints every descendant that does not carry its own rule for the same
+    property — so a container styled this way hands its border, its
+    background and its radius to every label, field and button inside it.
+
+    Only widgets that own a layout are reported. The same string on a leaf is
+    the ordinary way to style one widget, and flagging those would bury the
+    real findings under a hundred harmless ones — in the reference app, 63
+    unscoped stylesheets narrow to 16 containers.
+
+    `color` is deliberately not among the properties watched: text colour
+    inherits in Qt regardless of selectors, and a container setting it once
+    for its labels is idiomatic rather than a mistake.
+
+    **Static, and therefore conservative.** Widget ownership is read from the
+    source: a name passed to a layout constructor, one that gets
+    `.setLayout()`, or one constructed from a Qt class that holds children
+    without a layout at all (`QStackedWidget`, `QTabWidget`, `QSplitter`,
+    ...). A container assembled through a helper this cannot follow
+    is missed. A miss is the acceptable failure here — a guard that cries
+    wolf on leaves gets switched off, and then it guards nothing.
+
+    Mark a deliberate exception with `# cascade-exempt: <reason>` on the same
+    line, same convention as the other two guards.
+    """
+    exempt = [directory.resolve() for directory in exempt_dirs]
+    findings: list[UnscopedContainerFinding] = []
+
+    for path in sorted(root.rglob("*.py")):
+        if any(_is_within(path.resolve(), directory) for directory in exempt):
+            continue
+        source = path.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:  # pragma: no cover — a file that cannot compile
+            continue
+        lines = source.splitlines()
+
+        for scope in _scopes(tree):
+            containers = _layout_owners(scope)
+            findings.extend(_findings_in(scope, containers, path, lines))
+    return findings
+
+
+def _walk_within_scope(scope: ast.AST):
+    """`ast.walk`, but it does not descend into a nested class body — that
+    body is its own scope and gets visited on its own."""
+    queue = list(ast.iter_child_nodes(scope))
+    while queue:
+        node = queue.pop()
+        yield node
+        if isinstance(node, ast.ClassDef):
+            continue
+        queue.extend(ast.iter_child_nodes(node))
+
+
+def _findings_in(
+    scope: ast.AST,
+    containers: set[str],
+    path: Path,
+    lines: list[str],
+) -> list[UnscopedContainerFinding]:
+    findings: list[UnscopedContainerFinding] = []
+    for node in _walk_within_scope(scope):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        call_target = node.func
+        if (
+            not isinstance(call_target, ast.Attribute)
+            or call_target.attr != "setStyleSheet"
+        ):
+            continue
+        text = "".join(_static_str_parts(node.args[0]))
+        # No static text at all means the sheet is built elsewhere; a
+        # `{` means it carries a selector block and scopes itself.
+        if not text or "{" in text:
+            continue
+        properties = tuple(name for name in _CASCADING_PROPERTIES if name in text)
+        if not properties:
+            continue
+        target = _target_name(call_target.value)
+        if target not in containers:
+            continue
+        line_text = lines[node.lineno - 1].strip()
+        if _CASCADE_EXEMPT_MARKER in line_text:
+            continue
+        findings.append(
+            UnscopedContainerFinding(
+                file=path,
+                line_number=node.lineno,
+                line_text=line_text,
+                target=target,
+                properties=properties,
+            )
+        )
+    return findings
+
+
+def _scopes(tree: ast.AST) -> list[ast.AST]:
+    """Each class body, plus the module with its classes removed.
+
+    `self` has to be resolved per class, not per file. Resolving it
+    module-wide made one class that lays itself out vouch for every other
+    class in the same module — which reported a leaf widget in the
+    reference app that owns no layout at all. A guard's first false
+    positive is how it gets switched off.
+    """
+    classes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
+    module_only = ast.Module(
+        body=[n for n in getattr(tree, "body", []) if not isinstance(n, ast.ClassDef)],
+        type_ignores=[],
+    )
+    return [module_only, *classes]
+
+
+def _layout_owners(scope: ast.AST) -> set[str]:
+    """Every name in one scope handed to a layout constructor or given one
+    via `setLayout()` — i.e. every widget with children to cascade onto."""
+    owners: set[str] = set()
+    for node in _walk_within_scope(scope):
+        # `x = QStackedWidget()` — holds children with no layout involved.
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            called = node.value.func
+            if isinstance(called, ast.Name) and called.id in _IMPLICIT_CONTAINERS:
+                owners.update(_target_name(t) for t in node.targets)
+        if not isinstance(node, ast.Call):
+            continue
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id in _LAYOUT_CONSTRUCTORS
+            and node.args
+        ):
+            owners.add(_target_name(node.args[0]))
+        elif isinstance(node.func, ast.Attribute) and node.func.attr == "setLayout":
+            owners.add(_target_name(node.func.value))
+    owners.discard("")
+    return owners
+
+
+def _target_name(node: ast.AST) -> str:
+    """A stable name for the widget an expression refers to. Only the two
+    forms that actually appear — a local `tile`, and `self._card`."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        if isinstance(node.value, ast.Name) and node.value.id == "self":
+            return f"self.{node.attr}"
+        return node.attr
+    return ""
+
+
+def _static_str_parts(node: ast.AST) -> list[str]:
+    """The literal text of a string, f-string or `+` concatenation of them.
+
+    Interpolated values are skipped rather than guessed at — a token value
+    is a colour, never a selector, so dropping it cannot turn a scoped sheet
+    into an unscoped one or the reverse.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, ast.JoinedStr):
+        return [part for value in node.values for part in _static_str_parts(value)]
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return _static_str_parts(node.left) + _static_str_parts(node.right)
+    return []
+
+
 def _is_within(path: Path, directory: Path) -> bool:
     return directory in path.parents or path == directory
 
@@ -247,5 +483,21 @@ def format_bare_qt_base_findings(findings: list[BareQtBaseFinding]) -> str:
         lines.append(
             f"  {finding.file}:{finding.line_number}: extends {finding.qt_base} directly"
             f"    | {finding.line_text}"
+        )
+    return "\n".join(lines)
+
+
+def format_unscoped_container_findings(
+    findings: list[UnscopedContainerFinding],
+) -> str:
+    lines = [
+        f"{len(findings)} unscoped stylesheet(s) on a widget that owns a "
+        "layout — Qt reads a property list with no selector as the universal "
+        "selector and repaints every child:"
+    ]
+    for finding in findings:
+        lines.append(
+            f"  {finding.file}:{finding.line_number}: {finding.target} leaks "
+            f"{', '.join(finding.properties)}    | {finding.line_text}"
         )
     return "\n".join(lines)
