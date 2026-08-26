@@ -117,3 +117,24 @@ def test_the_active_tab_renders_differently(qtbot, fake_theme_bridge):
     qtbot.addWidget(bar)
 
     assert bar._buttons[0].styleSheet() != bar._buttons[1].styleSheet()
+
+
+def test_a_tab_is_wide_enough_for_its_own_label(qtbot, fake_theme_bridge):
+    """BUG-012 regression.
+
+    `QPushButton` sizes itself from its own text and icon. A `_TabButton`
+    has neither -- its content is a label and a badge in a child layout,
+    which the base class never looks at. It therefore asked for 59x24 while
+    its content needed 195x34, and every tab rendered with its label
+    clipped to about two characters.
+
+    Asserted against the layout rather than a fixed number, so the check
+    still means something when the font or the padding changes.
+    """
+    bar = TabBar([Tab("trades", "DANH SÁCH LỆNH", "12 LỆNH")])
+    qtbot.addWidget(bar)
+    button = bar._buttons[0]
+
+    content = button.layout().sizeHint()
+    assert button.sizeHint().width() >= content.width()
+    assert button.sizeHint().height() >= content.height()

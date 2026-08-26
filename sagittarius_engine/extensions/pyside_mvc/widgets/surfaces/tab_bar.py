@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from ..controls import Badge
@@ -62,6 +62,17 @@ class _TabButton(QPushButton):  # base-exempt: a tab is a button, not a surface
             state=WidgetState.NORMAL if active else WidgetState.DISABLED,
         )
         self._badge.set_emphasised(active)
+
+    # `QPushButton` sizes itself from its own text and icon. This one has
+    # neither — its content is the label and badge in the layout below it,
+    # which the base class does not look at. Without these two overrides the
+    # button asks for 59x24 while its content needs 195x34, and every tab
+    # renders with its label clipped to the first two characters (`BUG-012`).
+    def sizeHint(self) -> QSize:
+        return self.layout().sizeHint()
+
+    def minimumSizeHint(self) -> QSize:
+        return self.layout().minimumSize()
 
 
 class TabBar(QWidget):  # base-exempt: a row of tabs is chrome, not a surface
