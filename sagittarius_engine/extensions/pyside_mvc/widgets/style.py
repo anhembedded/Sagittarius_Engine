@@ -320,9 +320,19 @@ def semantic_colour(name: str) -> str:
 def _token(name: str) -> str:
     """Reads one token value from the shared theme bridge as a string —
     every token this module reads is either a colour (already `str`) or a
-    spacing/radius pixel value (`float`, needs `px` appended for QSS)."""
-    value = get_theme_bridge().value(name)
-    return str(value)
+    spacing/radius pixel value (`float`, needs `px` appended for QSS).
+
+    Raises on an unknown name. `QQmlPropertyMap.value()` answers a missing
+    key with an invalid variant, which `str()` turns into the text `"None"`
+    — so a typo rendered `color: None;`, a declaration Qt drops in silence,
+    leaving the widget uncoloured with nothing reported anywhere.
+    `semantic_colour()` has promised this `KeyError` in its docstring since
+    it was written; this is where it starts being true.
+    """
+    bridge = get_theme_bridge()
+    if not bridge.contains(name):
+        raise KeyError(f"no theme token named {name!r}")
+    return str(bridge.value(name))
 
 
 def _px(name: str) -> str:

@@ -192,6 +192,35 @@ def test_a_cell_tone_keeps_the_role_it_was_given(qtbot, fake_theme_bridge):
     assert after.rstrip().endswith("}")
 
 
+def test_a_cell_colour_names_a_token_not_a_literal(qtbot, fake_theme_bridge):
+    """The last resort under `set_cell_tone`: a gap row's duration is accent
+    purely to mark it as the notable field, which is not a judgement about
+    the value and so not a `Tone`."""
+    row = DataRow(_COLUMNS)
+    qtbot.addWidget(row)
+    before = row.cell(0).styleSheet()
+
+    row.set_cell_colour(0, "accent")
+    after = row.cell(0).styleSheet()
+
+    assert after.startswith(before)
+    assert after.rstrip().endswith("}")
+
+
+def test_an_unknown_cell_colour_fails_fast(qtbot):
+    """Deliberately not on `fake_theme_bridge`, which answers every name.
+
+    Against the real bridge a missing key used to come back as the *string*
+    `"None"`, so a typo rendered `color: None;` — a declaration Qt drops in
+    silence, leaving the cell uncoloured and nothing reported anywhere.
+    """
+    row = DataRow(_COLUMNS)
+    qtbot.addWidget(row)
+
+    with pytest.raises(KeyError):
+        row.set_cell_colour(0, "notAToken")
+
+
 def test_an_action_tone_keeps_the_role_it_was_given(qtbot, fake_theme_bridge):
     row = DataRow(_COLUMNS, actions=[RowAction("Sync")])
     qtbot.addWidget(row)

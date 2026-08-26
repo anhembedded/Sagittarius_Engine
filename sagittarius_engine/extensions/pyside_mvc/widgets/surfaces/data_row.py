@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from ..controls import StyledButton
-from ..style import StyleRole, Tone, apply_role, tone_colour
+from ..style import StyleRole, Tone, apply_role, semantic_colour, tone_colour
 
 
 @dataclass(frozen=True)
@@ -228,6 +228,29 @@ class DataRow(QWidget):  # base-exempt: a row inside a table is not a surface
         cell = self._cells[position]
         cell.setStyleSheet(
             f"{cell.styleSheet()}QLabel {{ color: {tone_colour(tone)}; }}"
+        )
+
+    def set_cell_colour(self, position: int, token: str) -> None:
+        """
+        @brief Colours one cell by naming a palette token.
+
+        @details The last resort under `set_cell_tone`, for the cell whose
+        colour is neither a property of what it is nor a good/bad/neutral
+        reading — the reference consumer's gap row prints its duration in
+        the accent colour purely to mark it as the notable field, and
+        `Tone` has no entry for "notable" because that is not a judgement
+        about the value.
+
+        Reach for a role first, then a tone, then this. It takes a token
+        name and never a literal, so `guards.find_inline_stylesheets` stays
+        satisfied and a palette change still reaches the cell.
+
+        @raise KeyError If no such token exists — the same fail-fast as an
+        unknown role, rather than a cell rendered with an empty colour.
+        """
+        cell = self._cells[position]
+        cell.setStyleSheet(
+            f"{cell.styleSheet()}QLabel {{ color: {semantic_colour(token)}; }}"
         )
 
     def set_action_tone(self, position: int, tone: Tone) -> None:
