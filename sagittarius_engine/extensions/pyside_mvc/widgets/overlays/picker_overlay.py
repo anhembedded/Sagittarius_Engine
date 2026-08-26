@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QGridLayout, QLabel, QScrollArea, QWidget
 
 from ..controls import StyledField
 from ..overlay import Overlay
+from ..style import StyleRole, apply_role
 from ..surface import SelectableCard
 
 #: `columns=1` renders the list shape (stacked label over subtitle), any
@@ -108,6 +109,7 @@ class PickerOverlay(Overlay):
         self._grid_host = QWidget()
         self._grid = QGridLayout(self._grid_host)
         self._scroll = QScrollArea()
+        apply_role(self._scroll, StyleRole.LIST_SURFACE)
         self._scroll.setWidgetResizable(True)
         self._scroll.setWidget(self._grid_host)
         self.body_layout.addWidget(self._scroll, 1)

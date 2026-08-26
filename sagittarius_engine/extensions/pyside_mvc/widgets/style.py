@@ -178,6 +178,15 @@ class StyleRole(Enum):
     #: deliberately smaller than the data beside it, and all 5 measured
     #: originals set a size by hand to get that.
     GHOST_BUTTON = auto()
+    #: A scrolling body sitting inside a surface — a log's list, a table's
+    #: scroll area, a picker's item column. Contributes no chrome of its
+    #: own: transparent, no frame, text at full contrast.
+    #:
+    #: Three of these shipped with **no styling at all** and looked right
+    #: only because the card around them was leaking its background down
+    #: (`BUG-008`). Scoping that leak correctly turned them white — which is
+    #: how a missing rule shows up once the accidental one is gone.
+    LIST_SURFACE = auto()
 
 
 class WidgetState(Enum):
@@ -546,6 +555,13 @@ def _build_qss(role: StyleRole, state: WidgetState) -> str:
             f"padding: {_px('spaceXs')} {_px('spaceSm')};"
             f"}}"
             f"{_SELF}:hover {{background-color: {_token('stateHoverBg')};}}"
+        )
+
+    if role is StyleRole.LIST_SURFACE:
+        return (
+            f"background-color: transparent;"
+            f"border: none;"
+            f"color: {_token('textPrimary')};"
         )
 
     if role is StyleRole.TABLE_HEADER:

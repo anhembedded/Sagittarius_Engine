@@ -11,7 +11,7 @@ from PySide6.QtCore import QModelIndex
 from PySide6.QtWidgets import QAbstractItemView, QListView, QWidget
 
 from ..controls import Badge, StyledButton
-from ..style import StyleRole
+from ..style import StyleRole, apply_role
 from ..surface import Card
 
 #: Fallback action labels — English, for the same reason `ConfirmOverlay`'s
@@ -96,6 +96,7 @@ class LogPanel(Card):
 
         self.list_view = QListView()
         self.list_view.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        apply_role(self.list_view, StyleRole.LIST_SURFACE)
         self.body_layout.addWidget(self.list_view, 1)
 
     @property
