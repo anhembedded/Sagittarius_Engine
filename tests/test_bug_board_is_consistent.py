@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from pathlib import Path
+from pathlib import Path, PurePath, PureWindowsPath
 
 _BOARD_DIR = Path(__file__).resolve().parents[1] / "Tasks" / "bug_report"
 _README = _BOARD_DIR / "README.md"
@@ -31,6 +31,20 @@ _FILENAME_RE = re.compile(r"^(BUG-\d+)_.+\.md$")
 
 #: A board row links its id: `[BUG-012](incomplete/BUG-012_....md)`
 _ROW_RE = re.compile(r"\[\*{0,2}(BUG-\d+)\*{0,2}\]\((incomplete|completed)/([^)]+)\)")
+
+
+def _board_link(path: PurePath, board_dir: PurePath) -> str:
+    """`path` as the board would write it: relative to the board directory,
+    **forward slashes on every platform**.
+
+    `str(Path)` is the platform's separator, so on Windows this produced
+    `incomplete\\BUG-006_x.md` while `_board_rows()` builds
+    `incomplete/BUG-006_x.md` from the README's markdown link. Every row then
+    compared unequal and the board looked entirely broken — on Windows only.
+    A separator is a property of the local filesystem; a link in a markdown
+    file is not, so the comparison has to happen in the link's own form.
+    """
+    return path.relative_to(board_dir).as_posix()
 
 
 def _bug_files() -> dict[str, list[Path]]:
@@ -60,10 +74,39 @@ def test_the_board_directories_are_where_we_think_they_are() -> None:
     assert len(_bug_files()) >= 5, "quét ra quá ít bug — nhiều khả năng sai đường dẫn"
 
 
+def test_a_windows_path_is_compared_in_the_form_the_board_writes() -> None:
+    """The board's links are markdown, so they use `/` on every platform. This
+    checks the comparison normalises to that — with an explicitly Windows-
+    flavoured path, so the guard runs on Linux CI too rather than only on the
+    platform that broke.
+
+    Before `_board_link()` this whole file was red on `windows-latest` and
+    green everywhere else: `str(Path)` gave `incomplete\\BUG-006_x.md`, the
+    board gave `incomplete/BUG-006_x.md`, so *every* row read as broken. A
+    guard that reports the entire board as a lie, on one platform, for a
+    reason that has nothing to do with the board, is worse than no guard.
+    """
+    board = PureWindowsPath(r"C:\repo\Tasks\bug_report")
+    path = PureWindowsPath(r"C:\repo\Tasks\bug_report\incomplete\BUG-006_x.md")
+
+    assert _board_link(path, board) == "incomplete/BUG-006_x.md"
+    assert "\\" not in _board_link(path, board)
+
+
+def test_every_on_disk_link_is_in_the_boards_own_form() -> None:
+    """The same rule against the real tree: whatever platform this runs on,
+    nothing handed to the row comparison may carry a native separator."""
+    links = [_board_link(p[0], _BOARD_DIR) for p in _bug_files().values()]
+
+    assert links, "no bug files found — the path is wrong, not the board"
+    assert all("\\" not in link for link in links)
+    assert all(link.startswith(("incomplete/", "completed/")) for link in links)
+
+
 def test_no_bug_number_is_used_twice() -> None:
     """The collision this file was written for."""
     duplicates = {
-        bug_id: [str(p.relative_to(_BOARD_DIR)) for p in paths]
+        bug_id: [_board_link(p, _BOARD_DIR) for p in paths]
         for bug_id, paths in _bug_files().items()
         if len(paths) > 1
     }
@@ -90,7 +133,7 @@ def test_every_bug_file_has_a_row_on_the_board() -> None:
 def test_every_board_row_points_at_a_file_that_exists() -> None:
     """The other direction: a row whose link 404s is a board that lies."""
     on_disk = {
-        bug_id: str(paths[0].relative_to(_BOARD_DIR))
+        bug_id: _board_link(paths[0], _BOARD_DIR)
         for bug_id, paths in _bug_files().items()
     }
 
