@@ -52,6 +52,7 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
   how long into a bounded ring buffer (~157 ns per record, monotonic clock). `sagittarius-trace
   attach ws://…` streams it live from outside the process — including what happened *before* you
   attached — and saves a `.sagtrace` that opens in Perfetto or replays into OpenTelemetry.
+  See below.
 
 > A **Remote Audit Dashboard (TUI)** was listed here until 2026-08-25 — "inspect live engine
 > telemetry from a separate terminal via the built-in HTTP telemetry server". Every part of that
@@ -200,6 +201,131 @@ CI, and every way it refuses to run:
 
 Full reference, including every check and its severity:
 [`.agents/context/diagnostics.md`](.agents/context/diagnostics.md).
+
+---
+
+## Recording what your application did — `sagittarius-trace`
+
+`sagittarius-doctor` above answers *"is this wired correctly?"* — a structural question, asked
+once. This answers a different one: **"what actually happened, and how long did it take?"**
+
+The model is [SEGGER SystemView](https://www.segger.com/products/development-tools/systemview/),
+the RTOS trace viewer, which is really two things: a **recorder** that captures timestamped
+events off the target at near-zero cost, and a **viewer** that draws them. This engine builds
+the recorder and deliberately does **not** build the viewer — Perfetto and OpenTelemetry render
+timelines better than a bespoke UI would, and the half only a framework can supply is knowing
+the meaning of its own lifecycle.
+
+### Turn it on — before `boot()`
+
+```python
+from sagittarius_engine.extensions.audit.recorder import TraceRecorder
+
+app = App(container, event_bus)
+app.context.enable_tracing(TraceRecorder())   # ← before boot()
+app.boot()
+```
+
+Off by default. The ordering is not a style preference: extension `register`/`boot` spans only
+exist if the recorder does before the extensions start, and those spans are the answer to *"why
+does startup take four seconds"*.
+
+### Two kinds of record, and the difference is the point
+
+```console
+$ python examples/trace_demo.py
+  captured         : 24 records
+  closed spans     : 10
+  dropped (evicted): 0
+  by lane          : {'user': 12, 'dispatch': 12}
+  slowest span     : startup-warmup @ 10.13 ms
+```
+
+**The engine instruments itself.** One `app.dispatch()` produces four records sharing one
+correlation id, the handler's interval nesting inside the dispatch total's:
+
+```
+[   11.915 ms] dispatch   GreetQuery cid=1     ← dispatch total opens
+[   11.921 ms] dispatch   GreetQuery cid=1     ← handler opens
+[   14.025 ms] dispatch   GreetQuery cid=1     ← handler closes,  dur 2132847 ns
+[   14.033 ms] dispatch   GreetQuery cid=1     ← dispatch closes, dur 2156468 ns
+```
+
+That is the half a generic profiler cannot produce: `py-spy` sees `_dispatch_inner()`, not
+*"query `GreetQuery`, through middleware, into its handler"*.
+
+**Your application marks its own work**, and the framework knows about none of it:
+
+```python
+ctx.trace.mark("order-filled", price=101.5)          # instant
+with ctx.trace.span("strategy-eval", symbol="BTC"):  # span
+    ...
+```
+
+### Attach to a process that is already running
+
+```python
+from sagittarius_engine.extensions.audit.infra.trace_server import TraceServer
+
+server = TraceServer(app.context.recorder, host="127.0.0.1", port=9999)
+server.start()
+```
+
+```console
+$ sagittarius-trace attach ws://127.0.0.1:9999 --save session.sagtrace
+attached to ws://127.0.0.1:9999 — protocol v1, capacity=100000, dropped_before_connect=0
+[    0.012442] user     startup-warmup dur=10241788ns args={'cache': 'cold'}
+[    0.012595] dispatch GreetQuery cat=query cid=1
+[    0.014778] user     order-filled args={'price': 101.5}
+```
+
+**Those lines describe work that finished before the client connected.** The recorder retains
+~100k records whether or not anyone is watching, so you attach *when it goes wrong* and still
+see what went wrong. `py-spy` and `viztracer` attach to *now*; this attaches to *then*, and it
+is the one property they cannot offer. If records were evicted before you arrived,
+`dropped_before_connect` says so rather than presenting a trace with holes as complete.
+
+Binding off-loopback without a token is refused at construction, not warned about in a log
+nobody reads — a trace stream is everything your application records.
+
+### Then open it somewhere real
+
+```python
+save_sagtrace_from_recorder("demo.sagtrace", app.context.recorder)
+hello, records = load_sagtrace("demo.sagtrace")
+write_perfetto_trace("demo.perfetto.json", records)
+```
+
+Drag `demo.perfetto.json` onto <https://ui.perfetto.dev> — it parses in the browser, nothing is
+uploaded. For Jaeger / Tempo / Grafana / Datadog there is an OpenTelemetry exporter behind the
+`[otel]` extra; the recorder, `.sagtrace` and Perfetto are stdlib-only and work without it.
+
+### What it costs
+
+| | |
+| :--- | ---: |
+| one record, tracing on | ~157 ns |
+| the budget it was measured against | 2000 ns |
+| a call site with tracing off | ~3 ns over an empty call |
+| for scale, one `MemoryEventBus` emit | ~490 ns |
+
+About a third of one event-bus emit. That is what makes leaving it on in production reasonable,
+which is what makes attaching late possible at all.
+
+### Try it without writing anything
+
+`examples/trace_demo.py` is a runnable tour — record, save, convert, and optionally serve:
+
+```bash
+python examples/trace_demo.py            # record → .sagtrace → Perfetto file
+python examples/trace_demo.py --serve    # …and hold a live server open
+```
+
+Step-by-step guide, including every way it can look broken when it is not:
+[`.agents/context/tracing_usage.md`](.agents/context/tracing_usage.md).
+
+Full reference — the design, the wire protocol, the overhead measurements:
+[`.agents/context/tracing.md`](.agents/context/tracing.md).
 
 ---
 
