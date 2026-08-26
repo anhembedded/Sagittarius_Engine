@@ -81,16 +81,48 @@ def test_setenabled_cascades_to_body_layout_children(qtbot):
     assert button.isEnabled() is False
 
 
-def test_card_qss_is_scoped_to_its_own_type_not_bare(qtbot):
-    """BUG-008 regression. `SURFACE`'s QSS used to be a bare property
-    list — Qt's universal selector — so setting it on a `Card` repainted
-    every unstyled descendant too (e.g. a toolbar's buttons lost their
-    chrome the moment the toolbar sat inside a `Card`). The fix wraps it
-    in a type selector built from the widget's own runtime class."""
+def test_card_qss_is_scoped_to_its_exact_class(qtbot):
+    """BUG-008 regression, in its corrected form.
+
+    `SURFACE`'s QSS was first a bare property list — Qt's universal
+    selector — so setting it on a `Card` repainted every unstyled
+    descendant. Scoping it to the widget's runtime class fixed that and was
+    still not enough: **a Qt type selector matches subclasses**, and
+    `QLabel` is a `QFrame` subclass, so `QFrame { border: ... }` on a plain
+    container still boxed every label inside it.
+
+    The exact-class form is what the assertion pins. A leading dot is one
+    character and the whole difference.
+    """
     card = Card("X")
     qtbot.addWidget(card)
 
-    assert card.styleSheet().startswith("Card {")
+    assert card.styleSheet().startswith(".Card {")
+
+
+def test_a_label_inside_a_frame_scoped_card_keeps_its_own_look(qtbot):
+    """The symptom a user reported: three labels in a stat tile each drew
+    their own box, and their stylesheets declared only colour and size.
+
+    `QFrame` is the case that matters, because `QLabel` inherits it — a
+    `QLineEdit` or `QPushButton` child never showed the bug, which is
+    exactly the subclass relation and how the cause was pinned down.
+    """
+    from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
+
+    from sagittarius_engine.extensions.pyside_mvc.widgets import (
+        StyleRole,
+        apply_role,
+    )
+
+    tile = QFrame()
+    qtbot.addWidget(tile)
+    apply_role(tile, StyleRole.SURFACE)
+    layout = QVBoxLayout(tile)
+    layout.addWidget(QLabel("Stored KLines Records"))
+
+    assert tile.styleSheet().startswith(".QFrame {")
+    assert not tile.styleSheet().startswith("QFrame {")
 
 
 def test_unstyled_child_of_a_card_is_not_touched(qtbot):

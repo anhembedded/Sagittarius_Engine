@@ -144,7 +144,7 @@ def test_the_card_lifts_under_the_pointer(qtbot, fake_theme_bridge):
     card = StatCard("Net profit")
     qtbot.addWidget(card)
 
-    assert "QFrame:hover" in card.styleSheet()
+    assert ".StatCard:hover" in card.styleSheet()
     assert "<stateHoverBg>" in card.styleSheet()
 
 
