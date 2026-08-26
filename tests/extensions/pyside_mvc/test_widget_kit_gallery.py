@@ -66,6 +66,42 @@ def configure_qml() -> None:
     configure_app_qml(_PLACEHOLDER_PALETTE, _TestIconLoader(), {})
 
 
+def _is_qml_attributable(context, message: str) -> bool:
+    """Is this Qt message attributable to QML — the only thing this test is for?
+
+    @details Qt hands the handler a `QMessageLogContext`; a QML warning carries
+    its `.qml` source in `context.file`, and Qt also prefixes the text with
+    `file://…/Foo.qml:87:`. Either identifies it, and the text check matters
+    because `context.file` is empty for messages Qt emits outside a logging
+    category.
+
+    @par Why this narrowing is legitimate (`BUG-006` requirement 1)
+    That requirement forbids fixing this by ignoring "warnings we don't like",
+    and demands the narrowing be justified by what the test is *for*. It is:
+    the test is named *no **QML** runtime warnings* and exists because
+    `QQuickWidget.errors()` misses bindings that throw at runtime. The message
+    that made it fail —
+
+        QFontDatabase: Cannot find font directory …/PySide6/lib/fonts.
+        Note that Qt no longer ships fonts.
+
+    — is a platform warning about the machine's font deployment. It is not a
+    QML binding, cannot be the defect this guards against, and Qt emits it
+    **once per process**, so it landed on whichever of the two
+    `no_qml_runtime_warnings` tests happened to hold the handler at that
+    moment. That is decided by collection order, not by any QML under test.
+
+    @par What this does not fix
+    `BUG-006` stays open. Its Linux half is 32 `TypeError`s from
+    `RosterScreen.qml` at process teardown — those *are* `.qml`-attributable,
+    so they still pass this predicate. Filtering by source addresses the
+    platform-warning contaminant only; the teardown one needs either a
+    session-scoped handler or a null-guard fix in that QML.
+    """
+    source = getattr(context, "file", None) or ""
+    return source.endswith(".qml") or ".qml:" in message
+
+
 def test_gallery_emits_no_qml_runtime_warnings(qtbot):
     """`QQuickWidget.errors()` reports *parse* errors only — a binding that
     throws while evaluating still leaves `errors()` empty and the component
@@ -84,7 +120,7 @@ def test_gallery_emits_no_qml_runtime_warnings(qtbot):
             QtMsgType.QtWarningMsg,
             QtMsgType.QtCriticalMsg,
             QtMsgType.QtFatalMsg,
-        ):
+        ) and _is_qml_attributable(context, message):
             messages.append(message)
 
     previous = qInstallMessageHandler(handler)
@@ -101,6 +137,42 @@ def test_gallery_emits_no_qml_runtime_warnings(qtbot):
         qInstallMessageHandler(previous)
 
     assert messages == [], "QML runtime warnings:\n" + "\n".join(messages)
+
+
+class _Context:
+    """Stands in for `QMessageLogContext`, which cannot be constructed from
+    Python — only handed to a handler by Qt."""
+
+    def __init__(self, file: str = "") -> None:
+        self.file = file
+
+
+def test_the_platform_font_warning_is_not_treated_as_a_qml_warning():
+    """`BUG-006`, verbatim: this exact message is what turned
+    `windows-latest` red, on whichever test happened to be holding the
+    handler when Qt emitted it once per process."""
+    font_warning = (
+        "QFontDatabase: Cannot find font directory "
+        "C:/x/.venv/Lib/site-packages/PySide6/lib/fonts. Note that Qt no "
+        "longer ships fonts. Deploy some (from https://dejavu-fonts.github.io/ "
+        "for example) or switch to fontconfig."
+    )
+
+    assert not _is_qml_attributable(_Context(), font_warning)
+    assert not _is_qml_attributable(_Context(file="qfontdatabase.cpp"), font_warning)
+
+
+def test_a_real_qml_binding_warning_is_still_caught():
+    """The other half, and the one that matters: narrowing must not blind the
+    guard to the defect it was written for — a binding that throws at runtime
+    while `QQuickWidget.errors()` stays empty."""
+    binding_error = (
+        "file:///x/Gallery/Card.qml:42: TypeError: Cannot read property "
+        "'showIcon' of null"
+    )
+
+    assert _is_qml_attributable(_Context(), binding_error)
+    assert _is_qml_attributable(_Context(file="/x/Gallery/Card.qml"), binding_error)
 
 
 def test_gallery_loads_with_no_qml_errors(qtbot):
