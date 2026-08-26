@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton
 
-from sagittarius_engine.extensions.pyside_mvc.widgets import Overlay
+from sagittarius_engine.extensions.pyside_mvc.widgets import (
+    Overlay,
+    StyleRole,
+    apply_role,
+)
 
 
 class _ConfirmOverlay(Overlay):
@@ -115,3 +119,28 @@ def test_default_build_buttons_is_an_empty_row(qtbot):
     qtbot.addWidget(overlay)
     # Constructs without error, matching the "not @abstractmethod" call in
     # Overlay._build_buttons()'s own docstring.
+
+
+def test_the_header_labels_carry_roles(qtbot, fake_theme_bridge):
+    """Both shipped unstyled, so a dialog header rendered at the widget
+    default while the body around it was token-styled."""
+    overlay = _ConfirmOverlay("Title", "Subtitle")
+    qtbot.addWidget(overlay)
+
+    assert overlay._title_label.styleSheet() != ""
+    assert overlay._subtitle_label.styleSheet() != ""
+    assert overlay._title_label.styleSheet() != overlay._subtitle_label.styleSheet()
+
+
+def test_the_title_label_is_reachable_for_a_louder_treatment(qtbot, fake_theme_bridge):
+    """An app can carry more than one dialog treatment — a destructive
+    confirm reads louder than a parameter modal. Re-roling one label is the
+    difference; rebuilding the header to change it is not."""
+    overlay = _ConfirmOverlay("Title")
+    qtbot.addWidget(overlay)
+    before = overlay.title_label.styleSheet()
+
+    apply_role(overlay.title_label, StyleRole.HEADING)
+
+    assert overlay.title_label is overlay._title_label
+    assert overlay.title_label.styleSheet() != before
