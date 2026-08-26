@@ -8,21 +8,27 @@ from PySide6.QtWidgets import QPushButton, QWidget
 
 from ..style import StyleRole, WidgetState, apply_role
 
-#: Roles `StyledButton` accepts — the subset of `StyleRole` with a button
-#: QSS block (`style._build_qss`'s accent-lookup dict). Passing a
-#: non-button role raises `KeyError` from that lookup — fails fast rather
-#: than silently rendering unstyled.
+#: Roles `StyledButton` accepts — every `StyleRole` whose QSS block styles
+#: a `QPushButton`. Passing anything else raises here rather than rendering
+#: a button with a label's stylesheet.
+#:
+#: `GHOST_BUTTON` is the outline flavour and lives outside the accent-lookup
+#: dict at the end of `_build_qss` (it has its own branch), so it has to be
+#: named here explicitly — a role added to that branch and forgotten in this
+#: tuple is refused at construction, which is the intended direction to fail.
 _BUTTON_ROLES = (
     StyleRole.PRIMARY_BUTTON,
     StyleRole.SECONDARY_BUTTON,
     StyleRole.DANGER_BUTTON,
+    StyleRole.GHOST_BUTTON,
 )
 
 
 class StyledButton(QPushButton):
     """A `QPushButton` styled by role (`PRIMARY_BUTTON`/`SECONDARY_BUTTON`/
-    `DANGER_BUTTON`) — which flavour is tier-2 knowledge (varies per use,
-    passed as a parameter), not something this class hardcodes."""
+    `DANGER_BUTTON`/`GHOST_BUTTON`) — which flavour is tier-2 knowledge
+    (varies per use, passed as a parameter), not something this class
+    hardcodes."""
 
     def __init__(
         self,

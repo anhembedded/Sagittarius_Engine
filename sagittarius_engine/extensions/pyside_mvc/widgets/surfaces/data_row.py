@@ -11,8 +11,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from ..controls import StyledButton
-from ..style import StyleRole, apply_role
-from ..surface import Panel
+from ..style import StyleRole, Tone, apply_role, tone_colour
 
 
 @dataclass(frozen=True)
@@ -42,15 +41,33 @@ class RowAction:
     label: str
     #: Which button role it renders as — a destructive row action should
     #: not look like an ordinary one.
-    role: StyleRole = StyleRole.SECONDARY_BUTTON
+    #:
+    #: Defaults to `GHOST_BUTTON`, not to one of the filled roles: every
+    #: row action measured in the reference consumer is an outline, because
+    #: a filled button repeated down forty rows reads as the loudest thing
+    #: on the screen.
+    role: StyleRole = StyleRole.GHOST_BUTTON
 
 
-class DataRow(Panel):
+class DataRow(QWidget):  # base-exempt: a row inside a table is not a surface
     """
-    @brief A `Panel` holding one label per column, optionally followed by a
-    row of action buttons.
+    @brief One label per column, optionally followed by a row of action
+    buttons.
 
     @details
+    **Not a `Surface`.** It was written as a `Panel`, which gave every row a
+    card background, a border and a radius — so a forty-row table rendered
+    as forty stacked cards. All three of the reference consumer's row
+    widgets are transparent or zebra-striped and not one has a border; the
+    surface in a table is the *table*, and a row is content sitting on it.
+
+    That is the same call `TabBar` needed for the same reason, and the
+    asymmetry is what decides it: a consumer that wants each row framed can
+    put the row in a `Panel`, while a consumer that does not want a frame
+    has no way to take a `Panel`'s away. Both widgets shipped as `Surface`
+    subclasses before either had a real consumer to check against — the
+    defect is the missing consumer, not the choice.
+
     Built from three of the reference consumer's four row widgets — its
     status row (6 cells + 4 action buttons), its candle row (8 cells, one
     of which is already written as exactly this loop over a column spec),
@@ -93,10 +110,16 @@ class DataRow(Panel):
         self._columns = tuple(columns)
         self._cells: list[QLabel] = []
 
-        row = QHBoxLayout()
+        row = QHBoxLayout(self)
         for column in self._columns:
             cell = QLabel()
             cell.setAlignment(column.alignment | Qt.AlignmentFlag.AlignVCenter)
+            # Every cell starts as `TABLE_CELL`, so a row reads as table
+            # text without the consumer styling anything. A cell that should
+            # recede or emphasise is moved with `set_cell_role`; leaving
+            # them unstyled meant each consumer set a font size by hand, and
+            # all three picked the same one.
+            apply_role(cell, StyleRole.TABLE_CELL)
             row.addWidget(cell, column.stretch)
             self._cells.append(cell)
 
@@ -108,8 +131,6 @@ class DataRow(Panel):
             )
             row.addWidget(button)
             self.action_buttons.append(button)
-
-        self.body_layout.addLayout(row)
 
     @property
     def columns(self) -> tuple[Column, ...]:
@@ -147,3 +168,54 @@ class DataRow(Panel):
         badge, or a value that should carry a section label's muted
         treatment."""
         apply_role(self._cells[position], role)
+
+    def cell(self, position: int) -> QLabel:
+        """
+        @brief The label behind one cell, for the properties a role cannot
+        carry — a monospace font on a column of figures, a tooltip.
+
+        @details Public for the same reason `action_buttons` is: the
+        alternative is a setter per property, and the consumer that needed
+        this first wanted `setFont`, which is a widget API call and not a
+        styling decision. Reach for `set_cell_role` first — anything
+        expressible as *what the cell is* belongs in a role, where every
+        consumer gets it.
+        """
+        return self._cells[position]
+
+    def set_cell_tone(self, position: int, tone: Tone) -> None:
+        """
+        @brief Colours one cell positive / negative / neutral.
+
+        @details The per-instance case `apply_role()` cannot express, and
+        the one `Tone`'s own docstring names as its third consumer: whether
+        a row's status reads as good or bad is decided per record at
+        runtime, so it cannot be a role. Appends a scoped rule rather than
+        replacing the sheet, so the cell keeps the size and weight its role
+        gave it.
+
+        Scoped, and appended after the role's own closing brace — a bare
+        `color:` written after a block is discarded by Qt, which is how the
+        same shortcut broke `StatCard`'s badge (`BUG-009`).
+        """
+        cell = self._cells[position]
+        cell.setStyleSheet(
+            f"{cell.styleSheet()}QLabel {{ color: {tone_colour(tone)}; }}"
+        )
+
+    def set_action_tone(self, position: int, tone: Tone) -> None:
+        """
+        @brief Recolours one action button's text and outline.
+
+        @details `GHOST_BUTTON` is accent-coloured, which is right for the
+        neutral row actions and wrong for the two that are not: a "Sync"
+        reads as positive and a "Clear" as destructive. Same per-instance
+        argument as `set_cell_tone` — and the same appended scoped rule, so
+        the button keeps the role's chrome and only its colour moves.
+        """
+        button = self.action_buttons[position]
+        colour = tone_colour(tone)
+        button.setStyleSheet(
+            f"{button.styleSheet()}"
+            f"QPushButton {{ color: {colour}; border: 1px solid {colour}; }}"
+        )

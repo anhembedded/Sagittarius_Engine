@@ -50,8 +50,15 @@ def test_no_literal_colours_in_the_surfaces_package():
 
 def test_no_bare_qt_bases_in_the_surfaces_package():
     """The guard EPIC-007A widened, pointed at the code written right after
-    it. Every class here derives `Card` or `Panel`; the one `QPushButton`
-    lineage (`_TabButton`) carries a reasoned `base-exempt` marker."""
+    it. Everything that is a surface derives `Card` or `Panel`; the three
+    things that are not carry a reasoned `base-exempt` marker — `_TabButton`
+    (a tab is a button), `TabBar` (a row of those buttons is chrome), and
+    `DataRow` (a row inside a table is content sitting on the table).
+
+    The last two were `Panel` subclasses until `EPIC-007F` put a real
+    consumer in front of them and both drew a card frame nothing wanted.
+    Passing this guard has never meant "everything inherits a surface"; it
+    means every non-surface says why."""
     findings = find_bare_qt_base_widgets(_PACKAGE_ROOT)
 
     assert findings == [], format_bare_qt_base_findings(findings)

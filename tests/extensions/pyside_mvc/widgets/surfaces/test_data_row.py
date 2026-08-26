@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
 
 from sagittarius_engine.extensions.pyside_mvc.widgets import (
     Column,
     DataRow,
-    Panel,
     RowAction,
     StyleRole,
+    Surface,
+    Tone,
 )
 
 _COLUMNS = (
@@ -20,13 +22,27 @@ _COLUMNS = (
 )
 
 
-def test_is_a_panel_with_one_cell_per_column(qtbot):
+def test_has_one_cell_per_column(qtbot):
     row = DataRow(_COLUMNS)
     qtbot.addWidget(row)
 
-    assert isinstance(row, Panel)
     assert row.columns == _COLUMNS
     assert row.cell_texts() == ["", "", ""]
+
+
+def test_is_not_a_surface(qtbot):
+    """A row is content sitting on a table, not a surface of its own.
+
+    It was a `Panel` first, which drew a card background, a border and a
+    radius per row — forty stacked cards for one table. Wrapping a row in a
+    `Panel` is available to a consumer that wants the frame; removing a
+    `Panel`'s frame is not, which is what settles the direction.
+    """
+    row = DataRow(_COLUMNS)
+    qtbot.addWidget(row)
+
+    assert isinstance(row, QWidget)
+    assert not isinstance(row, Surface)
 
 
 def test_rejects_an_empty_column_spec(qtbot):
@@ -108,6 +124,68 @@ def test_a_destructive_action_renders_differently(qtbot, fake_theme_bridge):
     qtbot.addWidget(row)
 
     assert row.action_buttons[0].styleSheet() != row.action_buttons[1].styleSheet()
+
+
+def test_actions_default_to_the_outline_flavour(qtbot, fake_theme_bridge):
+    """Not one row action measured in a real consumer is a filled button —
+    repeated down a long table, filled reads as the loudest thing on the
+    screen."""
+    assert RowAction("Open").role is StyleRole.GHOST_BUTTON
+
+
+def test_cells_start_as_table_text(qtbot, fake_theme_bridge):
+    """Every consumer that left cells unstyled then set the same font size
+    by hand; the role carries it instead."""
+    row = DataRow(_COLUMNS)
+    qtbot.addWidget(row)
+
+    assert row.cell(0).styleSheet() != ""
+
+
+def test_a_cell_tone_keeps_the_role_it_was_given(qtbot, fake_theme_bridge):
+    """Whether a status reads as good or bad is decided per record, so it
+    cannot be a role — but the size and weight the role gave the cell must
+    survive the recolour.
+
+    The rule is appended after the role's closing brace and scoped. A bare
+    `color:` written after a block is discarded by Qt outright, which is
+    exactly how `BUG-009` broke `StatCard`'s badge.
+    """
+    row = DataRow(_COLUMNS)
+    qtbot.addWidget(row)
+    row.set_cell_role(2, StyleRole.TABLE_CELL_STRONG)
+    before = row.cell(2).styleSheet()
+
+    row.set_cell_tone(2, Tone.NEGATIVE)
+    after = row.cell(2).styleSheet()
+
+    assert after.startswith(before)
+    assert after.rstrip().endswith("}")
+
+
+def test_an_action_tone_keeps_the_role_it_was_given(qtbot, fake_theme_bridge):
+    row = DataRow(_COLUMNS, actions=[RowAction("Sync")])
+    qtbot.addWidget(row)
+    before = row.action_buttons[0].styleSheet()
+
+    row.set_action_tone(0, Tone.POSITIVE)
+    after = row.action_buttons[0].styleSheet()
+
+    assert after.startswith(before)
+    assert after.rstrip().endswith("}")
+
+
+def test_a_cell_is_reachable_for_what_a_role_cannot_carry(qtbot):
+    """A column of figures wants a monospace font — a widget API call, not
+    a styling decision, and the reason `cell()` is public at all."""
+    row = DataRow(_COLUMNS)
+    qtbot.addWidget(row)
+
+    font = row.cell(1).font()
+    font.setFamily("monospace")
+    row.cell(1).setFont(font)
+
+    assert row.cell(1).font().family() == "monospace"
 
 
 def test_a_cell_can_be_restyled(qtbot, fake_theme_bridge):
