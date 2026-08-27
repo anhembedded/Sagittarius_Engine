@@ -85,6 +85,7 @@ link is kept here; content is not duplicated.
 | **[EPIC-004](epics/EPIC-004_sqlite_shard_manager_and_elite_migration/README.md)** | Sharded-SQLite Manager & Elite Migration — absorb the consuming app's generic sharding layer into the engine, then migrate it onto it | ✅ Completed 2026-08-23 (3/3 subtasks done) |
 | **[EPIC-005](epics/EPIC-005_audit_telemetry_rebuild/README.md)** | Audit Telemetry Teardown & Trace Recorder — both dashboard clients are 100% non-functional; delete them and the server, rebuild the recorder half of SystemView, export to Perfetto/OpenTelemetry rather than building a timeline UI. Supersedes `TASK-002` | ✅ Complete 2026-08-26 — all four milestones; `sagittarius-trace` ships, the dashboard is deleted |
 | **[EPIC-006](epics/EPIC-006_wiring_and_readiness_diagnostics/README.md)** | Wiring & Readiness Diagnostics — join `EventRegistry` (declared) against `IEventBus` (subscribed) to catch mis-wiring at boot, plus an explicit `app.ready` milestone. Catches the silent-typo class nothing else can | 🟡 In Progress (5/6 subtasks done) |
+| **[EPIC-007](epics/EPIC-007_runtime_state_dashboard/README.md)** | Runtime State Introspection & the Dashboard Question — the missing third of observability: a cheap, serialisable whole-engine *state* snapshot plus a 13-row red-flag detector catalogue. Structure (`EPIC-006`) and stream (`EPIC-005`) already ship; state does not | 📋 Proposed (design only — 0/5 milestones authorised) |
 
 ---
 
