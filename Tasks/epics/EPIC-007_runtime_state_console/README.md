@@ -1,7 +1,7 @@
 # EPIC-007: Runtime State Console
 
-- **Status**: 🟡 **In Progress** — 4/6 subtasks done (`A`, `B`, `C`, `D` shipped 2026-08-27); `E` partially
-  shipped the same day — infrastructure and one screen of six, see its own §Progress so far
+- **Status**: 🟡 **In Progress** — 5/6 subtasks done (`A`, `B`, `C`, `D`, `E` shipped 2026-08-27);
+  `F` (dead-letter queue and state machines) remains
 - **Created**: 2026-08-27
 - **Priority**: P2
 - **Category**: Observability / Diagnostics / Tooling
@@ -82,7 +82,7 @@ to a live process.
 | **[B](completed/EPIC-007B_public_read_apis.md)** ✅ | `ITaskManager.snapshot()`/`pool_stats()`, `IThreadManager.stats()`, `IConfig.sources()`, `IContainer.open_scope_count()`, `ExclusiveAction.held_slot()` | `pytest tests/runtime/tasks/test_task_manager.py -k "snapshot or pool_stats"` | ✅ **Done 2026-08-27** — found and fixed a real deadlock in the process: `.cancel()` on a queued future firing its done-callback synchronously while the caller still held the same lock the callback needed |
 | **[C](completed/EPIC-007C_collector_extension_and_snapshot_message.md)** ✅ | `StateConsoleExtension` + `SNAPSHOT` over the existing `TraceServer` | `sagittarius-trace snapshot ws://127.0.0.1:8781` | ✅ **Done 2026-08-27** — found and fixed a real readiness race (`app.stop()` 2.0044s → 0.0031s); one full snapshot measured p50=0.107ms/p95≤0.65ms against a 5ms budget |
 | **[D](completed/EPIC-007D_student_management_demo_wiring.md)** ✅ | Demo wiring in `examples/student_management`, incl. seeded faults | `.\examples\student_management\run.ps1 -Console -DemoFaults` | ✅ **Done 2026-08-27** — found and fixed 3 bugs along the way: `WiringInspector`'s D3 check named the wrong attribute, it crashed on any postponed-annotations constructor, and `Scheduler._run()` crashed its own thread on a `next_run=None` job |
-| **[E](incomplete/EPIC-007E_qml_client_and_pwsh_runner.md)** 🟡 | `tools/state_console/` QML client + `scripts/run-console.ps1` | `.\scripts\run-console.ps1 -Demo` | 🟡 **Partial 2026-08-27** — `ConsoleConnectionExtension`, packaging, and the Overview screen are real and tested; 4 of 6 screens remain |
+| **[E](completed/EPIC-007E_qml_client_and_pwsh_runner.md)** ✅ | `tools/state_console/` QML client + `scripts/run-console.ps1` | `.\scripts\run-console.ps1 -Demo` | ✅ **Done 2026-08-27** — all five screens (Overview folds in "Not attached"), a `PresenterManager`-driven navigation shell, smoke-tested against a live server; found and filed `BUG-013` (`AppDataTable` fuses an adjacent right/left-aligned column pair), worked around locally |
 | **[F](incomplete/EPIC-007F_signals_dlq_and_state_machines.md)** | Dead-letter queue and state-machine panels | `.\scripts\run-console.ps1 -Demo` | A dead-lettered event and a rejected transition are both visible; neither is visible anywhere today |
 
 **Order: A → B → C → D → E → F.** C is the first milestone that attaches to a live process

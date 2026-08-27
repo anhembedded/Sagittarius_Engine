@@ -37,9 +37,9 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 4 |
+| 🔴 **Open** | 5 |
 | ✅ **Fixed** | 8 |
-| 📈 **Total** | **12** |
+| 📈 **Total** | **13** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -77,6 +77,7 @@ deliberately independent (see the top of this file).
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-013](incomplete/BUG-013_appdatatable_adjacent_alignment_has_no_column_gutter.md)** | `AppDataTable` renders a right-aligned column and the left-aligned column after it with zero visual gap | Low | 2026-08-27 | Two adjacent values fuse into one string (`"FailuresRegistered"`, `"0yes"`) when `align: Text.AlignRight` is immediately followed by the default left alignment — no per-cell padding anywhere in the header or data `Row`s. Reproduced against the new Events & wiring screen (`EPIC-007E`) and against the already-shipped `RosterScreen.qml` (`gpa`→`enrolledAt`), so it predates this epic. Worked around locally in both new screens; the shared kit component itself is unfixed. |
 | **[BUG-011](incomplete/BUG-011_ci_local_gate_test_crashes_on_windows_stdout_none.md)** | `test_ci_local_gate_missing_tool` crashes on Windows: `result.stdout` is `None` despite `capture_output=True` | Medium | 2026-08-25 | A `TASK-028` regression guard that cannot report on the one platform it guards. Filed by `TASK-040`, once the `test` job actually started running again. **Renumbered from `BUG-009` on 2026-08-25** — see the numbering note below. |
 | **[BUG-010](incomplete/BUG-010_post_boot_registration_strands_an_extension_silently.md)** | Registering an extension after boot strands it silently, and the engine still reports `ready` | Medium | 2026-08-25 | `ExtensionManager.register()` defers an extension whose dependencies are unmet and never raises, so a plugin added to a running engine sits uninitialised while lifecycle still reads `ready`. Found by `EPIC-006C`. **Renumbered from `BUG-008` on 2026-08-25** — see the numbering note below. |
 | **[BUG-007](incomplete/BUG-007_resilient_bus_drops_a_subscription_on_name_collision.md)** | `ResilientEventBus.on()` silently drops a subscription when two event classes share a `__name__` | Medium | 2026-08-25 | Keys `_wrapper_map` by `__name__` while the rest of the package keys by `event_name`/`__qualname__`; the colliding second `on()` early-returns and the handler never fires. Reproduced. Found while fixing `EPIC-008C`, filed separately rather than fixed inline. |

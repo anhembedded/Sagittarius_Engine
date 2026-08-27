@@ -27,30 +27,28 @@ def main(argv: list[str] | None = None) -> int:
     from tools.state_console.infrastructure.console_mvc_extension import (
         ConsoleMvcExtension,
     )
-    from tools.state_console.presentation.overview.overview_presenter import (
-        OverviewPresenter,
+    from tools.state_console.presentation.shell.console_shell_view import (
+        ConsoleShellView,
     )
-    from tools.state_console.presentation.overview.overview_view import OverviewView
 
     qt_app = QApplication(sys.argv[:1])
 
     app = build_console_app(args.uri, extra_extensions=[ConsoleMvcExtension()])
 
-    view = OverviewView()
-    presenter = OverviewPresenter(view, app.container)  # noqa: F841
-    view.setWindowTitle(f"Runtime State Console — {args.uri}")
-    view.resize(900, 600)
-    view.show()
+    shell = ConsoleShellView(app.container)
+    shell.setWindowTitle(f"Runtime State Console — {args.uri}")
+    shell.resize(1100, 700)
+    shell.show()
 
     exit_code = qt_app.exec()
+    shell.manager.shutdown()
     app.stop()
 
     # Same QML/Theme teardown-race precedent as gui.py: give any in-flight
     # QML render-thread binding a chance to finish tearing down before the
     # view (and the Theme it references) is actually destroyed.
-    view.close()
-    del presenter
-    del view
+    shell.close()
+    del shell
     for _ in range(10):
         qt_app.processEvents()
 

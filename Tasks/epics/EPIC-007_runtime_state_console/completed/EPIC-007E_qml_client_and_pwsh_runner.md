@@ -1,7 +1,7 @@
 # EPIC-007E — The QML client, and `scripts/run-console.ps1`
 
 **Epic:** [EPIC-007 — Runtime State Console](../README.md)
-**Status:** 🟠 Not started
+**Status:** ✅ Completed 2026-08-27
 **Category:** Tooling / UI
 **Priority:** P2
 **Depends on:** EPIC-007C, EPIC-007D
@@ -223,15 +223,30 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/tools/state_console -
 
 ---
 
-# Progress so far (2026-08-27) — infrastructure and one screen, not six
+# Outcome (2026-08-27)
 
-**Not moved to `completed/`.** Everything below is real, tested, and run against a live
-`TraceServer` — but only the **Overview** screen exists; Events & wiring, Container,
-Tasks & threads, and Signals do not. This section records what shipped honestly rather than
-claiming the milestone closed, per this repository's own standard against silent scope
-shrinkage.
+All five screens exist (Overview folds in "Not attached" per §4's own reasoning — the
+not-attached banner must always be visible regardless of which detail screen sits below it —
+so the epic's six-row table maps onto five view/presenter/view-model triads), wired behind a
+real navigation shell, verified against a live `TraceServer` end to end, screenshotted, and
+regression-tested. This section keeps the build history from the in-progress write-up rather
+than discarding it, then records what closed the milestone.
 
 ## What shipped
+
+| Piece | What it is |
+| :--- | :--- |
+| `tools/state_console/presentation/events/` | `EventsView`/`EventsPresenter`/`EventsViewModel` + `EventsScreen.qml` — the declared ⋈ subscribed join `EventCollector` already computes |
+| `tools/state_console/presentation/container/` | `ContainerView`/`ContainerPresenter`/`ContainerViewModel` + `ContainerScreen.qml` — registrations, lifetimes, open scopes |
+| `tools/state_console/presentation/tasks/` | `TasksView`/`TasksPresenter`/`TasksViewModel` + `TasksScreen.qml` — task table, thread-pool occupancy, bounded-structures strip |
+| `tools/state_console/presentation/signals/` | `SignalsView`/`SignalsPresenter`/`SignalsViewModel` + `SignalsScreen.qml` — an honest placeholder: `StateSnapshot` carries no DLQ/FSM field yet (`EPIC-007F`'s own work), so this screen says so rather than rendering an empty table, the same D1 discipline applied to a missing data source instead of a missing connection |
+| `tools/state_console/presentation/shell/console_shell_view.py` | `ConsoleShellView` — the navigation shell. Plain `QWidget`/`QPushButton` sidebar (not QML — `raw_primitive_guard` only scans `.qml`, and nothing here needs a themed component) driving `PresenterManager` (`sagittarius_engine/extensions/pyside_mvc/mvc/presenter_manager.py`), an existing, previously-unused lazy-loading router discovered while building this — no bespoke router was written |
+| `tools/state_console/main.py` | Updated to construct `ConsoleShellView` and call `shell.manager.shutdown()` before `app.stop()`, replacing the single-screen `OverviewView` wiring from the in-progress version |
+| `Tasks/bug_report/incomplete/BUG-013_appdatatable_adjacent_alignment_has_no_column_gutter.md` | New — found smoke-testing Events & wiring against a real server: `AppDataTable` renders a right-aligned column immediately followed by a left-aligned one with zero gap, fusing two values into one string. Reproduced against the already-shipped `RosterScreen.qml` too (pre-existing, not introduced here). Worked around locally in both new screens (reordered/realigned columns); the shared kit component itself is filed, not fixed, per this repo's "don't drive-by a higher-blast-radius fix inside an unrelated epic" convention |
+
+### Earlier in the same milestone
+
+## What shipped (infrastructure and the first screen)
 
 | Piece | What it is |
 | :--- | :--- |
@@ -271,7 +286,7 @@ shrinkage.
 | # | Status |
 | :--- | :--- |
 | 1 | Underlying command sequence (start child, poll port, connect, `try`/`finally` stop) verified directly in Python against a real running app — not literally run as `.ps1` in this environment (no `pwsh` available); no automated PowerShell-level test exists for `run.ps1`/`show-gallery.ps1` either, so this is consistent with existing precedent, not a new gap |
-| 2 | **Met for Overview only.** Zero QML warnings/errors during construction, real test (`test_overview_screen_constructs_with_no_qml_runtime_warnings`). Not evaluated for the 5 screens that do not exist |
+| 2 | **Met for all five screens.** Zero QML warnings/errors during construction, one real test per screen (`test_<screen>_screen_constructs_with_no_qml_runtime_warnings`) |
 | 3 | Met — `test_not_attached_is_distinguishable_from_the_other_two_states`, including that a stale snapshot's age keeps showing after detaching |
 | 4 | Met — `find_literal_colors`/`find_raw_primitives` both pass over the real `tools/state_console/` tree |
 | 5 | Met, with `presentation/` exempt (`exempt_dirs`, the same mechanism `find_deep_imports()` itself uses) — a `Property`/`Signal`-decorated `QObject` subclass needs `PySide6.QtCore` at class-definition time; the property this criterion actually protects (`main.py`'s own module scope importing nothing that needs PySide6) is asserted with no exemption at all |
@@ -282,7 +297,7 @@ shrinkage.
 | 10 | Met — `test_the_receive_loop_is_a_task_manager_task_visible_while_connected` / `test_stopping_the_app_leaves_nothing_running` |
 | 11 | Met — `test_events_are_real_baseevent_subclasses_registered_in_event_registry`, `test_the_consoles_own_app_reports_zero_errors` |
 
-## Verified
+## Verified (infrastructure + Overview, mid-milestone)
 
 | Gate | Result |
 | :--- | :--- |
@@ -293,13 +308,32 @@ shrinkage.
 | `scripts/verify_wheel_importable.py` | PASS — wheel builds, installs, imports, all 3 console scripts resolve |
 | `console.py --demo-faults` + `sagittarius-trace snapshot`, and the full `main.py` GUI, each against a real running server | manually run; `OverviewScreen` showed real lifecycle/thread-pool data and the demo's seeded typo event |
 
-## What is left
+## Final verification (all five screens + shell)
 
-Four screens (Events & wiring, Container, Tasks & threads, Signals) and the runtime-region
-navigation between more than one screen (`EPIC-001D`, itself still in progress) — everything
-in §3's table except Overview and Not-attached. `ConsoleConnectionExtension` and the packaging
-work do not change when those are added; each new screen is an addition in the same shape as
-`presentation/overview/`, subscribing to `SnapshotReceived` through `self.subscribe()`.
+| Gate | Result |
+| :--- | :--- |
+| `pytest tests/tools/state_console/` | 32 passed — construction-warning, connection-state, and data-population tests for all five screens plus three navigation-shell tests (`test_console_shell_view.py`: default screen, lazy instantiation on navigate, `shutdown()` disposes every instantiated presenter exactly once) |
+| `find_literal_colors` / `find_raw_primitives` / `find_module_scope_pyside6_imports` against the full (now five-screen) `tools/state_console/` tree | clean, via `test_ui_architecture_guards.py` / `test_pyside6_import_guard.py` |
+| `pytest tests/ examples/student_management/tests/ tools/` (fork/Qt test excluded, run separately at 4/4) | **1336 passed**, 22 skipped — one pre-existing, unrelated failure ruled out (`test_agents_docs_resolve.py::test_staleness_check_actually_catches_the_original_bug`, a hardcoded `git show <commit>` against a commit this shallow clone does not have; reproduced identically on a clean stash of this milestone's changes) |
+| `ruff check` / `ruff format --check` | clean |
+| `mypy sagittarius_engine tests examples tools` | clean, 482 source files |
+| `scripts/verify_wheel_importable.py` | PASS — all five screens' modules and QML ship in the wheel, all 3 console scripts still resolve |
+| Manual smoke test: `examples/student_management/console.py --demo-faults` (real server, real seeded faults) + a script driving `ConsoleShellView` through all five screens via `QApplication.processEvents()` (not `qt_app.exec()` — this environment has no interactive display loop to drive from a script) | All five screens rendered live data: Overview showed `state: ready`, `extensions: 5/5`, both thread pools; Events & wiring showed all 15 registered event names including the demo's seeded `demo.roster_syncd`/`demo.student_deleted` (correctly `NO` under Registered, the A2 typo-subscription fault); Container showed all 12 real DI registrations including the demo's transient, unbuilt `_ReportService`; Tasks & threads showed pool occupancy and, in a second targeted check with synthetic task data, a legible `Task/State/Progress/Age/Error` row; Signals showed its honest "coming in `EPIC-007F`" placeholder. Screenshots taken via `QWidget.grab()` at each navigation step |
+| **Found while smoke-testing**: `BUG-013` — `AppDataTable` fuses a right-aligned column's value into the left-aligned column immediately after it (no gutter). First seen on Events & wiring's `Failures`/`Registered` columns and on Tasks & threads' `Age`/`Error` columns; reproduced against the already-shipped `RosterScreen.qml` too, confirming it predates this epic. Filed, and both new screens' column lists reordered/realigned locally to avoid it (re-verified with real data after the change) | Fixed locally; kit component itself tracked in `BUG-013`, not fixed here |
+
+## What was deliberately not closed here
+
+- **Criterion 1 and 7** (`run-console.ps1 -Demo` under real `pwsh`, and Windows PowerShell 5.1
+  itself) remain unexecuted in this environment — no `pwsh` here, consistent with the
+  pre-existing gap already noted for `run.ps1`/`show-gallery.ps1`. The underlying command
+  sequence (spawn, poll the port, connect, `try`/`finally` stop) is verified directly in
+  Python against a real running app instead.
+- **Signals shows a placeholder, not live data**, because `StateSnapshot` has no DLQ/FSM field
+  yet — that data does not exist anywhere in the engine until `EPIC-007F` adds it. This is not
+  a gap in this milestone: §3's own table already names Signals as depending on `EPIC-007F`,
+  and the "say so rather than render an empty table" placeholder is the same D1 honesty
+  discipline the epic itself is built around, applied to a missing data source instead of a
+  missing connection.
 
 ## Run it
 
