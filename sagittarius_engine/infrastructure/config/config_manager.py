@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Any
 
@@ -101,8 +102,6 @@ class ConfigManager(IConfig):
                 data = source.read()
                 self._cache.update(data)
             except Exception as e:
-                import logging
-
                 logging.getLogger(__name__).error(f"Config read error: {e}")
         self._loaded = True
 

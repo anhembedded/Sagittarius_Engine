@@ -1,4 +1,5 @@
 import threading
+import warnings
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -97,8 +98,6 @@ class App:
         """
         @brief Deprecated. Use dispatch instead.
         """
-        import warnings
-
         warnings.warn(
             "App.execute is deprecated. Use App.dispatch instead.",
             DeprecationWarning,
@@ -110,8 +109,6 @@ class App:
         """
         @brief Deprecated. Use dispatch instead.
         """
-        import warnings
-
         warnings.warn(
             "App.query is deprecated. Use App.dispatch instead.",
             DeprecationWarning,

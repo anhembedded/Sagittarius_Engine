@@ -1,7 +1,7 @@
 import inspect
 import threading
 from collections.abc import Callable, Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, get_type_hints
 
 from sagittarius_engine.exceptions import DependencyResolutionError
 from sagittarius_engine.infrastructure.container.scope_context import ScopeContext
@@ -263,10 +263,8 @@ class StdLibContainer(IContainer):
                         self._resolution_cache[concrete] = {}
                     return cast(T, concrete())
 
-                import typing
-
                 try:
-                    type_hints = typing.get_type_hints(concrete.__init__)
+                    type_hints = get_type_hints(concrete.__init__)
                 except Exception:
                     type_hints = None
 

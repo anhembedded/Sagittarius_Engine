@@ -53,6 +53,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | --- | --- | --- | --- | --- |
 | **TASK-035** | `AppDataTable`'s columns render with no horizontal gap — a right-aligned column touches the next one | UI / Widget Kit (`pyside_mvc`) | P3 | [TASK-035_appdatatable_columns_have_no_horizontal_gap.md](backlog/TASK-035_appdatatable_columns_have_no_horizontal_gap.md) |
 | **TASK-036** | Audit every widget-kit card for missing Windows-Explorer-style utility actions (survey done, decisions/implementation pending) | UI / Widget Kit (`pyside_mvc`) | P2 | [TASK-036_audit_widget_kit_for_missing_windows_style_actions.md](backlog/TASK-036_audit_widget_kit_for_missing_windows_style_actions.md) |
+| **TASK-041** | Re-probe `REF-001`'s 11 cycle-claimed local imports under real import orders, retire what survives | Core Architecture / Tech Debt | P3 | [TASK-041_reprobe_cycle_claimed_local_imports.md](backlog/TASK-041_reprobe_cycle_claimed_local_imports.md) |
 
 ---
 
@@ -86,6 +87,21 @@ link is kept here; content is not duplicated.
 | **[EPIC-005](epics/EPIC-005_audit_telemetry_rebuild/README.md)** | Audit Telemetry Teardown & Trace Recorder — both dashboard clients are 100% non-functional; delete them and the server, rebuild the recorder half of SystemView, export to Perfetto/OpenTelemetry rather than building a timeline UI. Supersedes `TASK-002` | ✅ Complete 2026-08-26 — all four milestones; `sagittarius-trace` ships, the dashboard is deleted |
 | **[EPIC-006](epics/EPIC-006_wiring_and_readiness_diagnostics/README.md)** | Wiring & Readiness Diagnostics — join `EventRegistry` (declared) against `IEventBus` (subscribed) to catch mis-wiring at boot, plus an explicit `app.ready` milestone. Catches the silent-typo class nothing else can | 🟡 In Progress (5/6 subtasks done) |
 | **[EPIC-007](epics/EPIC-007_runtime_state_console/README.md)** | Runtime State Console — attach to a running app and see what is wired, registered and alive. Decided by [ADR-001](decisions/ADR-001_runtime_state_console_scope_and_transport.md)/[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md); every milestone ends in a runnable command, demoed through `examples/student_management` | 🟡 In Progress (1/6 subtasks done) |
+
+---
+
+## ♻️ Refix Board — `REF-XXX`
+
+Reconciles two things in this repository that disagree — a written rule against shipped
+code, a document's links against the filesystem, two schemas or ID pools that collide —
+where fixing one side without deciding about the other would be wrong. Full convention and
+the complete register live in [`Tasks/refix/README.md`](refix/README.md).
+
+| ID | Reconciles | Status |
+| :--- | :--- | :---: |
+| **[REF-001](refix/completed/REF-001_function_local_imports_rule_vs_code.md)** | `code-rule.md` §45 ("never") vs. 32 function-local imports in the engine | ✅ Done |
+| **[REF-002](refix/incomplete/REF-002_stale_backlog_links_after_task_moves.md)** | `Tasks/` documents linking into `backlog/` for tasks that moved to `completed/` | 🟠 Open |
+| **[REF-003](refix/incomplete/REF-003_epic_007_id_collision_across_repos.md)** | `EPIC-007A..F` cited in 8 documents meaning Elite Warrior's epic vs. this repo's own `EPIC-007` | 🟠 Open |
 
 ---
 
@@ -125,6 +141,10 @@ Tasks/
 ├── decisions/                          # 🏛️ Architecture Decision Records — see decisions/README.md
 │   ├── README.md                       #    convention + the ADR register
 │   └── ADR-XXX_short_slug.md
+├── refix/                               # ♻️ Refix Board — see refix/README.md
+│   ├── README.md                       #    convention + the REF register
+│   ├── incomplete/                     #    REF-XXX not yet reconciled
+│   └── completed/                      #    REF-XXX reconciled, with evidence
 ├── issue-report/                       # High-impact Architecture Issue Report
 │   └── issue.md
 ├── in_progress/                        # Actively Worked On Specifications (standalone tasks only)

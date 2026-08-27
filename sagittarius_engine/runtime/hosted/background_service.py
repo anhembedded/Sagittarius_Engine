@@ -1,3 +1,4 @@
+import logging
 from abc import abstractmethod
 
 from sagittarius_engine.interfaces import IEngineContext, ITaskHandle
@@ -55,8 +56,6 @@ class BackgroundService(IHostedService):
             try:
                 self.task.future.result()
             except Exception as e:
-                import logging
-
                 logging.getLogger(__name__).error(
                     f"Error in background service task: {e}"
                 )

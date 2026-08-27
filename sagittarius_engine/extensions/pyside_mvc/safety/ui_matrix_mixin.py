@@ -1,3 +1,6 @@
+import logging
+
+
 class UIMatrixMixin:
     """
     @brief Mixin that provides Data-Driven UI Matrix capabilities to any QWidget.
@@ -44,8 +47,6 @@ class UIMatrixMixin:
             raise RuntimeError(
                 "[UIMatrixMixin] UI Matrix not loaded. Call load_ui_matrix() first."
             )
-
-        import logging
 
         logger = logging.getLogger("App.UI")
 

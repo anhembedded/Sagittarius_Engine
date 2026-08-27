@@ -3,7 +3,7 @@ import logging
 import threading
 from collections import deque
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Any
 
 from sagittarius_engine.interfaces.i_config import IConfig
@@ -306,8 +306,6 @@ class TaskManager(ITaskManager):
             ]
 
         if critical_futures:
-            from concurrent.futures import wait
-
             wait(critical_futures, timeout=timeout)
 
         try:
