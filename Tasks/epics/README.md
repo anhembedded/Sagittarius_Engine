@@ -37,3 +37,4 @@ Tasks/epics/
 | :--- | :--- | :---: |
 | **[EPIC-001](EPIC-001_ui_engine_foundation/README.md)** ([onboarding](EPIC-001_ui_engine_foundation/ONBOARDING.md)) | UI Engine Foundation — tokens, widget kit, composition runtime for `pyside_mvc` | 🟡 In Progress (3/4 subtasks done) |
 | **[EPIC-002](EPIC-002_engine_sample_app_and_doc_rewrite/README.md)** ([onboarding](EPIC-002_engine_sample_app_and_doc_rewrite/ONBOARDING.md)) | Engine Sample App & Doc Rewrite — replace the stale `.agents/context/` snapshot with docs grounded in a real, running sample app | ✅ Completed 2026-08-23 (4/4 subtasks done) |
+| **[EPIC-007](EPIC-007_runtime_state_console/README.md)** | Runtime State Console — attach to a running app and see what is wired, registered and alive; every milestone ends in a command you can run, demoed through `examples/student_management` | 🟠 Proposed (0/6 subtasks) |
