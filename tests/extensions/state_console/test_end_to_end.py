@@ -47,6 +47,7 @@ def _build_app(*, extra_extensions=None, db_url="sqlite:///:memory:"):
 
 
 async def _connect(ext: StateConsoleExtension, *, token: str | None = None):
+    assert ext._server is not None, "StateConsoleExtension did not start a server"
     uri = f"ws://{ext.host}:{ext._server.port}"
     if token is not None:
         uri += f"?token={token}"
