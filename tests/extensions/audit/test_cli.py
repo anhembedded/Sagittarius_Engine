@@ -19,7 +19,10 @@ from sagittarius_engine.extensions.audit.cli import (  # noqa: E402
     build_parser,
     main,
 )
-from sagittarius_engine.extensions.audit.contracts import Lane  # noqa: E402
+from sagittarius_engine.extensions.audit.contracts import (  # noqa: E402
+    PROTOCOL_VERSION,
+    Lane,
+)
 from sagittarius_engine.extensions.audit.infra.trace_server import (  # noqa: E402
     TraceServer,
 )
@@ -180,7 +183,14 @@ def test_a_protocol_mismatch_at_connect_fails_loudly_not_as_a_blank_stream():
 
 def test_a_peer_that_does_not_speak_hello_first_is_refused():
     def handler(websocket) -> None:
-        websocket.send(json.dumps({"v": 1, "type": "trace", "seq": 0, "data": []}))
+        # PROTOCOL_VERSION, not a literal 1. Hardcoding the version meant that
+        # the moment v2 landed this peer was *also* a version mismatch, so the
+        # refusal this test asserts would have come from `check_protocol()`
+        # rather than from the missing `hello` the test is named for — passing
+        # for the wrong reason, which is a detector turned into a rubber stamp.
+        websocket.send(
+            json.dumps({"v": PROTOCOL_VERSION, "type": "trace", "seq": 0, "data": []})
+        )
 
     with websockets.sync.server.serve(handler, "127.0.0.1", 0) as server:
         host, port = server.socket.getsockname()[:2]

@@ -68,6 +68,24 @@ own rule.
   rises is a `with` block that never exits. Add an open-scope counter to `StdLibContainer`,
   incremented in `create_scope()` and decremented in `__exit__`.
 
+### 2.4 `IConfig` cannot say which layer won — found while implementing `EPIC-007A`
+
+`ConfigEntry` carries a `source` field (`json:config.json`, `env:APP_`) because
+*"which layer won"* is the question a config panel is actually opened for. It cannot be
+filled today: `ConfigManager.get_all()` returns a flat merged mapping, and the sources that
+produced it live in `self._sources`, a private.
+
+`EPIC-007A` shipped the field anyway, defaulted to `""`, with the gap named on the dataclass
+rather than papered over — a source guessed from a key's shape would be worse than an honest
+blank. Closing it needs a public reader:
+
+```python
+def sources(self) -> Mapping[str, str]:
+    """Which registered source supplied the winning value for each key."""
+```
+
+Until then the console shows the key and its value or mask, and no source column.
+
 ## 3. What is explicitly NOT added
 
 A `stats()` on the event bus. Emit and failure counts per event name are already funnelled
