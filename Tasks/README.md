@@ -97,7 +97,7 @@ decision, and the consequences accepted with it. Convention and the full registe
 | ID | Decision | Status |
 | :--- | :--- | :---: |
 | **[ADR-001](decisions/ADR-001_runtime_state_console_scope_and_transport.md)** | The runtime dashboard is a **state console**, not a second timeline — it rides the trace protocol's unused `SNAPSHOT` message rather than a transport of its own | 🟠 Proposed |
-| **[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md)** | The state console's first client is a **terminal renderer**; the graphical client is **PySide6 + QML**, and it is gated on the terminal one existing | 🟠 Proposed |
+| **[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md)** | The state console's client is **PySide6 + QML** — chosen with the framework field deliberately re-opened, over Textual and a browser client | 🟠 Proposed |
 
 ---
 

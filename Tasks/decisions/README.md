@@ -49,4 +49,4 @@ Tasks/decisions/
 | ID | Decision | Status | Date |
 | :--- | :--- | :--- | :--- |
 | **[ADR-001](ADR-001_runtime_state_console_scope_and_transport.md)** | The runtime dashboard is a **state console**, not a second timeline — and it rides the trace protocol's unused `SNAPSHOT` message rather than a transport of its own | 🟠 Proposed | 2026-08-27 |
-| **[ADR-002](ADR-002_state_console_client_ui_framework.md)** | The state console's first client is a **terminal renderer**; the graphical client is **PySide6 + QML** and it comes second | 🟠 Proposed | 2026-08-27 |
+| **[ADR-002](ADR-002_state_console_client_ui_framework.md)** | The state console's client is **PySide6 + QML** — chosen with the framework field deliberately re-opened, over Textual and a browser client | 🟠 Proposed | 2026-08-27 |
