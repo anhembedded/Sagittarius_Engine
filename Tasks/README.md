@@ -88,6 +88,19 @@ link is kept here; content is not duplicated.
 
 ---
 
+## 🏛️ Decisions — Architecture Decision Records
+
+One decision per record, written *before* the work: the context that forced it, the
+decision, and the consequences accepted with it. Convention and the full register live in
+[`Tasks/decisions/README.md`](decisions/README.md) — only the open ones are listed here.
+
+| ID | Decision | Status |
+| :--- | :--- | :---: |
+| **[ADR-001](decisions/ADR-001_runtime_state_console_scope_and_transport.md)** | The runtime dashboard is a **state console**, not a second timeline — it rides the trace protocol's unused `SNAPSHOT` message rather than a transport of its own | 🟠 Proposed |
+| **[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md)** | The state console's first client is a **terminal renderer**; the graphical client is **PySide6 + QML**, and it is gated on the terminal one existing | 🟠 Proposed |
+
+---
+
 ## 📂 Directory Layout
 
 ```
@@ -108,6 +121,9 @@ Tasks/
 │   ├── README.md                       #    open + fixed tables, BUG-vs-TASK guidance
 │   ├── incomplete/                     #    BUG-XXX not yet fixed (new bugs start here)
 │   └── completed/                      #    BUG-XXX fixed, with evidence
+├── decisions/                          # 🏛️ Architecture Decision Records — see decisions/README.md
+│   ├── README.md                       #    convention + the ADR register
+│   └── ADR-XXX_short_slug.md
 ├── issue-report/                       # High-impact Architecture Issue Report
 │   └── issue.md
 ├── in_progress/                        # Actively Worked On Specifications (standalone tasks only)
