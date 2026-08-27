@@ -4,8 +4,25 @@
     Local CI runner - mirrors the GitHub Actions CI pipeline for Sagittarius Engine.
 
 .DESCRIPTION
-    Runs Ruff lint, Ruff format check, Mypy static type check, Pytest with
-    coverage, and the architecture-boundary tests, in that order.
+    Runs Ruff lint, Ruff format check, Mypy static type check, Bandit +
+    Pip-Audit security scans, Pytest with coverage, and the
+    architecture-boundary tests, in that order — mirroring six of
+    .github/workflows/ci.yml's eight jobs (lint, security, test, architecture,
+    plus test's coverage of examples/student_management).
+
+    The remaining two — `package` (build + `twine check`) and `import-guard`
+    (build a wheel, install it into a throwaway venv, import every shipped
+    module, resolve every console script) — are opt-in via
+    -RunPackagingChecks, not run by default: both build a wheel from scratch,
+    and import-guard installs the full dependency set into a fresh venv,
+    which costs real time in the everyday edit-test loop. They are the two
+    gates this repository has direct evidence matter: TASK-039's broken
+    `sagittarius-audit` console script and EPIC-005 D7's module-scope PySide6
+    import both shipped for two releases because neither gate ran locally
+    before the push that introduced them. Run with -RunPackagingChecks
+    before any change that touches `pyproject.toml`, a console script, or an
+    optional extra — EPIC-007's `dashboard` extra and its own console script
+    are exactly that shape.
 
     Every step runs regardless of earlier failures — failures accumulate and
     are reported together at the end, so one run tells you everything that's
@@ -27,6 +44,24 @@
     Explicit alias for the default behavior: lint + format + mypy + full test
     suite with the coverage gate enforced.
 
+.PARAMETER SkipSecurity
+    Skip the Bandit SAST scan and the Pip-Audit dependency-vulnerability
+    scan. These run by default because, unlike the packaging checks below,
+    neither builds anything — both finish in a few seconds.
+
+.PARAMETER RunPackagingChecks
+    Also run the two checks that mirror ci.yml's `package` and
+    `import-guard` jobs: build a wheel + sdist and validate their metadata
+    with `twine check`, then build a *second*, throwaway wheel, install it
+    into a fresh venv, and verify every shipped module imports and every
+    declared console script resolves
+    (`scripts/verify_wheel_importable.py`). Off by default — both build a
+    wheel from scratch and the import guard installs the full dependency set
+    into a new venv, which is real wall-clock time to pay on every
+    quick-iteration run. Opt in before any change to `pyproject.toml`, a
+    console script, or an optional extra: see .DESCRIPTION for the two
+    releases this pair of gates would have caught before they shipped.
+
 .PARAMETER AllowLogWarnings
     A green exit code is not proof a run was clean — this script scans the
     captured pytest log for WARNING/ERROR/CRITICAL records after the test
@@ -35,15 +70,18 @@
     to get a green build.
 
 .EXAMPLE
-    .\scripts\ci-local.ps1                # Full: lint + mypy + tests (default)
-    .\scripts\ci-local.ps1 -SkipLint       # Tests only
-    .\scripts\ci-local.ps1 -SkipTests      # Lint + mypy only
+    .\scripts\ci-local.ps1                     # Full: lint + security + mypy + tests (default)
+    .\scripts\ci-local.ps1 -SkipLint            # Security + tests only
+    .\scripts\ci-local.ps1 -SkipTests           # Lint + security + mypy only
+    .\scripts\ci-local.ps1 -RunPackagingChecks  # Also build the wheel/sdist and verify the installed artifact
 #>
 [CmdletBinding()]
 param(
     [switch]$SkipLint,
     [switch]$SkipTests,
     [switch]$Full,
+    [switch]$SkipSecurity,
+    [switch]$RunPackagingChecks,
     [switch]$AllowLogWarnings
 )
 
@@ -134,9 +172,13 @@ $tempDir = [System.IO.Path]::GetTempPath().TrimEnd('/', '\')
 
 $venvRoot = if (Test-Path (Join-Path $repoRoot ".venv")) { Join-Path $repoRoot ".venv" } else { $null }
 $venvBinDir = if ($venvRoot) { Join-Path $venvRoot $venvBinSubdir } else { $null }
-$pytestExe = if ($venvBinDir) { Join-Path $venvBinDir "pytest$exeSuffix" } else { "pytest" }
-$ruffExe   = if ($venvBinDir) { Join-Path $venvBinDir "ruff$exeSuffix" } else { "ruff" }
-$mypyExe   = if ($venvBinDir) { Join-Path $venvBinDir "mypy$exeSuffix" } else { "mypy" }
+$pytestExe    = if ($venvBinDir) { Join-Path $venvBinDir "pytest$exeSuffix" } else { "pytest" }
+$ruffExe      = if ($venvBinDir) { Join-Path $venvBinDir "ruff$exeSuffix" } else { "ruff" }
+$mypyExe      = if ($venvBinDir) { Join-Path $venvBinDir "mypy$exeSuffix" } else { "mypy" }
+$pythonExe    = if ($venvBinDir) { Join-Path $venvBinDir "python$exeSuffix" } else { "python" }
+$banditExe    = if ($venvBinDir) { Join-Path $venvBinDir "bandit$exeSuffix" } else { "bandit" }
+$pipAuditExe  = if ($venvBinDir) { Join-Path $venvBinDir "pip-audit$exeSuffix" } else { "pip-audit" }
+$twineExe     = if ($venvBinDir) { Join-Path $venvBinDir "twine$exeSuffix" } else { "twine" }
 
 if (-not $venvRoot) {
     Write-Warning "Virtual environment not found at $repoRoot\.venv. Using system Python/tools."
@@ -231,6 +273,42 @@ if (-not $SkipLint) {
 }
 
 # ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+# Mirrors ci.yml's `security` job, which carries no `needs:` and runs
+# independently of lint/test there — same shape here, gated on its own
+# switch rather than folded under -SkipLint.
+if (-not $SkipSecurity) {
+    Write-Step "Bandit — SAST Security Scan (bandit -r sagittarius_engine)"
+    Push-Location $repoRoot
+    try {
+        & $banditExe -r sagittarius_engine
+        if ($LASTEXITCODE -ne 0) { $failed += "Bandit"; Write-Failure "Bandit" }
+        else { Write-Success "Bandit" }
+    } catch {
+        $failed += "Bandit"; Write-Failure "Bandit"
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+    } finally { Pop-Location }
+
+    Write-Step "Pip-Audit — Dependency Vulnerability Scan"
+    Push-Location $repoRoot
+    try {
+        # ci.yml's own security job upgrades pip before this runs. Skipping
+        # that step here would flag the *venv's own bundled pip* as a
+        # vulnerable dependency on a stale local .venv — a false positive in
+        # the tool that installed everything else, not a finding about this
+        # project. Matched here so a local run reports what CI reports.
+        & $pythonExe -m pip install --quiet --upgrade pip
+        & $pipAuditExe
+        if ($LASTEXITCODE -ne 0) { $failed += "Pip-Audit"; Write-Failure "Pip-Audit" }
+        else { Write-Success "Pip-Audit" }
+    } catch {
+        $failed += "Pip-Audit"; Write-Failure "Pip-Audit"
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+    } finally { Pop-Location }
+}
+
+# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 if (-not $SkipTests) {
@@ -279,6 +357,49 @@ if (-not $SkipTests) {
             $failed += "Log Scan"; Write-Failure "Log Scan"
         }
     }
+}
+
+# ---------------------------------------------------------------------------
+# Packaging checks (opt-in — see .PARAMETER RunPackagingChecks)
+# ---------------------------------------------------------------------------
+# Deliberately its own top-level block, not nested under -SkipTests: a run
+# with `-SkipTests -RunPackagingChecks` should still get the packaging
+# checks it explicitly asked for. Mirrors ci.yml's `package` and
+# `import-guard` jobs, neither of which is gated behind the test job either
+# (import-guard's own comment: "the one class of defect that makes the
+# published artifact worthless is the one a gated job can never report").
+if ($RunPackagingChecks) {
+    $env:QT_QPA_PLATFORM = "offscreen"
+
+    Write-Step "Package — Build Wheel + Sdist, Validate Metadata (twine check)"
+    Push-Location $repoRoot
+    try {
+        if (Test-Path (Join-Path $repoRoot "dist")) {
+            Remove-Item (Join-Path $repoRoot "dist") -Recurse -Force
+        }
+        & $pythonExe -m build
+        if ($LASTEXITCODE -ne 0) {
+            $failed += "Package Build"; Write-Failure "Package Build"
+        } else {
+            & $twineExe check (Join-Path $repoRoot "dist" "*")
+            if ($LASTEXITCODE -ne 0) { $failed += "Twine Check"; Write-Failure "Twine Check" }
+            else { Write-Success "Package Build + Twine Check" }
+        }
+    } catch {
+        $failed += "Package Build"; Write-Failure "Package Build"
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+    } finally { Pop-Location }
+
+    Write-Step "Import Guard — Build, Install Clean, Import Every Module (scripts/verify_wheel_importable.py)"
+    Push-Location $repoRoot
+    try {
+        & $pythonExe scripts/verify_wheel_importable.py
+        if ($LASTEXITCODE -ne 0) { $failed += "Import Guard"; Write-Failure "Import Guard" }
+        else { Write-Success "Import Guard" }
+    } catch {
+        $failed += "Import Guard"; Write-Failure "Import Guard"
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+    } finally { Pop-Location }
 }
 
 $exitCode = if ($failed.Count -eq 0) { 0 } else { 1 }
