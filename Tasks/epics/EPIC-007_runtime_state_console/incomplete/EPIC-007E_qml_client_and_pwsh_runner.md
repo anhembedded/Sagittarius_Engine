@@ -220,3 +220,89 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/tools/state_console -
     subclasses**, registered in `EventRegistry` like any other domain event — so
     `sagittarius-doctor` run against the console's own `build_app()` reports 0 errors,
     the same dogfooding check `EPIC-007D` §3 holds the sample app to.
+
+---
+
+# Progress so far (2026-08-27) — infrastructure and one screen, not six
+
+**Not moved to `completed/`.** Everything below is real, tested, and run against a live
+`TraceServer` — but only the **Overview** screen exists; Events & wiring, Container,
+Tasks & threads, and Signals do not. This section records what shipped honestly rather than
+claiming the milestone closed, per this repository's own standard against silent scope
+shrinkage.
+
+## What shipped
+
+| Piece | What it is |
+| :--- | :--- |
+| `tools/state_console/infrastructure/console_connection_extension.py` | `ConsoleConnectionExtension` — the websocket client, a `TaskManager` task, `ConsoleAttached`/`ConsoleDetached`/`SnapshotReceived` |
+| `tools/state_console/domain/events.py` | The three events, real `BaseEvent` subclasses (`BUG-005`'s dataclass pattern for the payload-carrying one) |
+| `tools/state_console/infrastructure/console_mvc_extension.py` + `presentation/theme/` | The console's own palette (`ADR-002` §2.2 — not inherited from `examples/student_management`), `configure_app_qml()` wiring |
+| `tools/state_console/presentation/overview/` | `OverviewView`/`OverviewPresenter`/`OverviewViewModel` + `OverviewScreen.qml` — combines the epic's own "Overview" and "Not attached" screens into one, since the not-attached banner must always be visible (§4) regardless of which detail screen would eventually sit below it |
+| `tools/state_console/pyside6_import_guard.py` | `find_module_scope_pyside6_imports()`, in the shape of `import_boundary.find_deep_imports()` |
+| `tools/state_console/main.py` | GUI entry point, copying `gui.py`'s shape line for line |
+| `scripts/run-console.ps1` | `-Attach`/`-Demo`/`-Snapshot`, TCP-poll port wait, `try`/`finally` child-process teardown |
+| `pyproject.toml` | `dashboard = ["PySide6>=6.5"]` extra, `sagittarius-console` entry point, `tools` package-data for the new QML |
+
+## Two things found while building this, neither a defect in this milestone's own code
+
+1. **`BUG-006` (open) reproduces here too.** `QmlHostView`'s teardown races a Qt/QML
+   render-thread binding against Python's GC of the `Theme` context object, throwing
+   `TypeError: ... of null` non-deterministically — already documented against
+   `RosterScreen.qml` (32 occurrences), and reproduced identically against `OverviewScreen.qml`
+   while investigating an apparent "Theme is null" failure that first looked like a bug in
+   this milestone's own code. It was not: the errors land strictly after `app.stop()`/window
+   teardown, in the same window `BUG-006` already names as unresolved on Linux. Criterion 2's
+   own test is scoped to construction, deliberately not wrapping teardown, exactly because
+   wrapping it would make this test exhibit the same known flakiness `BUG-006` already
+   describes for the reference app — not a new decision, an existing one applied consistently.
+2. **`os.fork()` inside `tests/infrastructure/event_bus/test_ipc_queue_event_bus.py`
+   segfaults when run in the same pytest process as this milestone's PySide6/Qt tests**,
+   non-deterministically, after enough Qt-owned threads exist at fork time. Passes cleanly
+   in isolation (4/4) both before and after this milestone's changes — confirmed by running it
+   alone repeatedly. Not a regression in the IPC bus itself; forking a multi-threaded process
+   that has initialized Qt is a documented general hazard, and this is the first work in this
+   repository to run PySide6-heavy and `os.fork()`-based tests in the same session. Not fixed
+   here (Qt/fork interaction, not a change to the IPC bus's own logic); worth a follow-up task
+   if CI ever runs both in one process.
+
+## Criterion-by-criterion
+
+| # | Status |
+| :--- | :--- |
+| 1 | Underlying command sequence (start child, poll port, connect, `try`/`finally` stop) verified directly in Python against a real running app — not literally run as `.ps1` in this environment (no `pwsh` available); no automated PowerShell-level test exists for `run.ps1`/`show-gallery.ps1` either, so this is consistent with existing precedent, not a new gap |
+| 2 | **Met for Overview only.** Zero QML warnings/errors during construction, real test (`test_overview_screen_constructs_with_no_qml_runtime_warnings`). Not evaluated for the 5 screens that do not exist |
+| 3 | Met — `test_not_attached_is_distinguishable_from_the_other_two_states`, including that a stale snapshot's age keeps showing after detaching |
+| 4 | Met — `find_literal_colors`/`find_raw_primitives` both pass over the real `tools/state_console/` tree |
+| 5 | Met, with `presentation/` exempt (`exempt_dirs`, the same mechanism `find_deep_imports()` itself uses) — a `Property`/`Signal`-decorated `QObject` subclass needs `PySide6.QtCore` at class-definition time; the property this criterion actually protects (`main.py`'s own module scope importing nothing that needs PySide6) is asserted with no exemption at all |
+| 6 | Met — `scripts/verify_wheel_importable.py` run for real, `sagittarius-console` resolves alongside the two existing commands |
+| 7 | Written to the same conventions (`#Requires -Version 5.1`, two-argument `Join-Path` only, the interpreter-discovery order) but not executed under real Windows PowerShell 5.1 in this environment |
+| 8 | One escape hatch: a plain `Rectangle` status dot inside `OverviewScreen.qml`'s own composition, named and justified inline. Not repeated anywhere — no kit-promotion candidate yet |
+| 9 | Met — `test_a_snapshot_emitted_from_a_real_background_thread_reaches_the_presenter` asserts the handler runs on the Qt thread, not the emitting thread, using only `self.subscribe()` |
+| 10 | Met — `test_the_receive_loop_is_a_task_manager_task_visible_while_connected` / `test_stopping_the_app_leaves_nothing_running` |
+| 11 | Met — `test_events_are_real_baseevent_subclasses_registered_in_event_registry`, `test_the_consoles_own_app_reports_zero_errors` |
+
+## Verified
+
+| Gate | Result |
+| :--- | :--- |
+| `pytest tests/tools/state_console/ tools/` | 21 passed |
+| `pytest tests/ examples/student_management/tests/ tools/` (PySide6 + `PySide6-Fluent-Widgets` + `pyqtgraph` installed this session — every previously PySide6-absent test now runs for real) | **1326 passed**, 22 skipped, 1 deselected (the pre-existing shallow-clone `test_agents_docs_resolve.py` case) — `tests/infrastructure/event_bus/test_ipc_queue_event_bus.py` excluded from this combined run for the fork/Qt reason above, verified separately at 4/4 |
+| `ruff check` / `ruff format --check` (whole repo) | clean |
+| `mypy sagittarius_engine tests examples tools` | **clean** — with PySide6 actually installed, the long-standing documented `thread_affinity.py:124` false positive is gone too |
+| `scripts/verify_wheel_importable.py` | PASS — wheel builds, installs, imports, all 3 console scripts resolve |
+| `console.py --demo-faults` + `sagittarius-trace snapshot`, and the full `main.py` GUI, each against a real running server | manually run; `OverviewScreen` showed real lifecycle/thread-pool data and the demo's seeded typo event |
+
+## What is left
+
+Four screens (Events & wiring, Container, Tasks & threads, Signals) and the runtime-region
+navigation between more than one screen (`EPIC-001D`, itself still in progress) — everything
+in §3's table except Overview and Not-attached. `ConsoleConnectionExtension` and the packaging
+work do not change when those are added; each new screen is an addition in the same shape as
+`presentation/overview/`, subscribing to `SnapshotReceived` through `self.subscribe()`.
+
+## Run it
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/tools/state_console -v
+```
