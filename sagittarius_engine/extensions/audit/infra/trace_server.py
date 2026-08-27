@@ -40,14 +40,23 @@ reattaching, which the retained buffer makes safe to do.
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import logging
 import queue
 import threading
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from ..contracts import Envelope, MessageType, TraceRecord, trace_batch
+from ..contracts import (
+    Envelope,
+    MessageType,
+    StateSnapshot,
+    TraceRecord,
+    snapshot_message,
+    trace_batch,
+)
 from ..recorder import TraceRecorder
 
 #: Hosts this server accepts binding to **without** a token configured.
@@ -85,6 +94,14 @@ class TraceServer:
     @param token If set, a connecting client must supply a matching
         `?token=...` query parameter or the connection is rejected — closed
         with code `4401` before `hello` or any trace data is sent.
+    @param snapshot_provider `EPIC-007C`. Called once per client-sent frame —
+        the content is not parsed; any inbound message means "send me a
+        current snapshot" — and the result is sent back as one
+        `MessageType.SNAPSHOT` envelope. `None` (the default) leaves this
+        server exactly as `EPIC-005D` shipped it: trace-only, any inbound
+        frame simply ignored. Same token and off-loopback rules as the trace
+        path — an auth check that covers one of two message types is not an
+        auth check.
     @raises TraceServerConfigError `host` is not loopback and `token` is
         `None`. Refused here, at construction, rather than left to bind and
         quietly accept unauthenticated connections from anywhere reachable.
@@ -96,6 +113,7 @@ class TraceServer:
         host: str = "127.0.0.1",
         port: int = 0,
         token: str | None = None,
+        snapshot_provider: Callable[[], StateSnapshot] | None = None,
     ) -> None:
         if host not in _LOOPBACK_HOSTS and token is None:
             raise TraceServerConfigError(
@@ -108,6 +126,7 @@ class TraceServer:
         self.host = host
         self.port = port
         self._token = token
+        self._snapshot_provider = snapshot_provider
         self._clients: set[Any] = set()
         self._logger = logging.getLogger("sagittarius_engine.trace_server")
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -200,48 +219,91 @@ class TraceServer:
             # (backlog + live), never dropped. See the module docstring.
             self._recorder.add_tap(row_queue.put)
             try:
-                seq = 1
+                # Shared across the trace-forwarding loop and the snapshot-
+                # request loop (EPIC-007C) — a plain int, but `next()` on it
+                # never straddles an `await`, so two coroutines on the same
+                # event loop thread cannot race incrementing it.
+                seq_counter = itertools.count(1)
                 backlog = self._recorder.snapshot()
                 if backlog:
-                    await websocket.send(_envelope_json(trace_batch(seq, backlog)))
-                    seq += 1
+                    await websocket.send(
+                        _envelope_json(trace_batch(next(seq_counter), backlog))
+                    )
 
-                await self._forward_until_closed(websocket, row_queue, seq)
+                await self._forward_until_closed(websocket, row_queue, seq_counter)
             finally:
                 self._recorder.remove_tap(row_queue.put)
         finally:
             self._clients.discard(websocket)
 
     async def _forward_until_closed(
-        self, websocket: Any, row_queue: "queue.SimpleQueue[tuple[Any, ...]]", seq: int
+        self,
+        websocket: Any,
+        row_queue: "queue.SimpleQueue[tuple[Any, ...]]",
+        seq_counter: "itertools.count[int]",
     ) -> None:
-        """@brief Forwards newly-tapped rows in batches until the client
-        disconnects.
+        """@brief Runs trace forwarding, snapshot-request handling (`EPIC-007C`),
+        and disconnect detection concurrently until the client disconnects.
 
-        @details Runs the forwarding loop and `wait_closed()` concurrently
-        rather than checking a `closed` flag between sends: with a flag, a
-        disconnect during `websocket.send()` itself would only be noticed on
-        the *next* loop iteration, which is one avoidable wasted send (and,
-        worse, one avoidable delay before this connection's slot is freed).
+        @details Three tasks racing rather than one loop checking a `closed`
+        flag between sends: with a flag, a disconnect during `websocket.send()`
+        itself would only be noticed on the *next* loop iteration, which is one
+        avoidable wasted send (and, worse, one avoidable delay before this
+        connection's slot is freed).
         """
-        forward = asyncio.ensure_future(self._forward_loop(websocket, row_queue, seq))
+        forward = asyncio.ensure_future(
+            self._forward_loop(websocket, row_queue, seq_counter)
+        )
+        requests = asyncio.ensure_future(
+            self._snapshot_request_loop(websocket, seq_counter)
+        )
         closed = asyncio.ensure_future(websocket.wait_closed())
         try:
-            await asyncio.wait({forward, closed}, return_when=asyncio.FIRST_COMPLETED)
+            await asyncio.wait(
+                {forward, requests, closed}, return_when=asyncio.FIRST_COMPLETED
+            )
         finally:
-            for task in (forward, closed):
+            for task in (forward, requests, closed):
                 if not task.done():
                     task.cancel()
 
+    async def _snapshot_request_loop(
+        self, websocket: Any, seq_counter: "itertools.count[int]"
+    ) -> None:
+        """
+        @brief `EPIC-007C`: any frame the client sends means "send me a current
+        snapshot" — the content is not parsed, there is no request schema to
+        get wrong. Collection happens here, once per inbound frame, never on a
+        server-side timer: `ADR-001` §2.4 — a snapshot is collected when a
+        client asks for one, or on the interval *the client* polls at, and
+        never by anything the observed application does.
+
+        @details A no-op loop (reads and discards every frame) when no
+        provider was configured — `EPIC-005D`'s trace-only server keeps
+        behaving exactly as it always has for a client that sends it nothing,
+        which every existing client of this class does.
+        """
+        async for _message in websocket:
+            if self._snapshot_provider is None:
+                continue
+            snapshot = self._snapshot_provider()
+            await websocket.send(
+                _envelope_json(snapshot_message(next(seq_counter), snapshot))
+            )
+
     async def _forward_loop(
-        self, websocket: Any, row_queue: "queue.SimpleQueue[tuple[Any, ...]]", seq: int
+        self,
+        websocket: Any,
+        row_queue: "queue.SimpleQueue[tuple[Any, ...]]",
+        seq_counter: "itertools.count[int]",
     ) -> None:
         while True:
             rows = _drain(row_queue, _MAX_BATCH_ROWS)
             if rows:
                 records = tuple(TraceRecord.from_row(row) for row in rows)
-                await websocket.send(_envelope_json(trace_batch(seq, records)))
-                seq += 1
+                await websocket.send(
+                    _envelope_json(trace_batch(next(seq_counter), records))
+                )
             else:
                 await asyncio.sleep(_POLL_INTERVAL_SECONDS)
 

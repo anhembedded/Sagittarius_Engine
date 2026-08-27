@@ -470,6 +470,40 @@ def find_function_local_imports(
     return found
 
 
+def test_state_console_imports_nothing_outside_stdlib_and_this_engine():
+    """`EPIC-007C` criterion 7: `extensions/state_console/` imports only the
+    stdlib and this engine's own modules — never PySide6, never anything
+    from `tools/`."""
+    import sys
+
+    root = pathlib.Path(__file__).resolve().parent.parent / (
+        "sagittarius_engine/extensions/state_console"
+    )
+    violations: list[str] = []
+    for path in sorted(root.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                # node.level > 0 is a relative import (`from .extension import
+                # ...`) — a same-package sibling, not a third-party module.
+                modules = [node.module]
+            else:
+                continue
+            for module in modules:
+                top = module.split(".")[0]
+                if top in ("__future__", "sagittarius_engine"):
+                    continue
+                if top not in sys.stdlib_module_names:
+                    violations.append(f"{path}: imports {module!r}")
+
+    assert not violations, (
+        "extensions/state_console/ imported outside the stdlib and this "
+        "engine's own package:\n  " + "\n  ".join(violations)
+    )
+
+
 def test_no_unsanctioned_function_local_imports():
     """`code-rule.md` §45's two exceptions, and nothing beyond them.
 

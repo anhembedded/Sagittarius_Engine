@@ -178,3 +178,17 @@ class ITaskManager(ABC):
         @details `()` by default, for the same reason as `snapshot()`.
         """
         return ()
+
+    def max_retained_tasks(self) -> int:
+        """
+        @brief The configured retention limit `snapshot()` is bounded by —
+        `EPIC-007C`.
+
+        @details Found while wiring `BoundedStructures.retained_task_limit`
+        (`EPIC-007A`): reporting `retained_tasks` without the limit it is
+        bounded by is actively misleading, not merely incomplete — every
+        count would read as "approaching the limit" with no limit to compare
+        against. `-1` means "no configured limit is known", never `0`, which
+        is a real possible value some implementation might legitimately have.
+        """
+        return -1

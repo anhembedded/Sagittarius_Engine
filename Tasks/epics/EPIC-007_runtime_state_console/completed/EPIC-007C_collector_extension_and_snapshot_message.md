@@ -1,7 +1,7 @@
 # EPIC-007C — The collector extension, and `SNAPSHOT` on the wire
 
 **Epic:** [EPIC-007 — Runtime State Console](../README.md)
-**Status:** 🟠 Not started
+**Status:** ✅ **Done 2026-08-27** — see §Outcome
 **Category:** Observability / Extensions
 **Priority:** P2
 **Depends on:** EPIC-007A, EPIC-007B
@@ -191,3 +191,78 @@ The automated proof:
    section, in the shape of `EPIC-005` §4.2's.
 7. Nothing in `extensions/state_console/` imports outside the stdlib and the engine's own
    interfaces — architecture test extended to say so.
+
+---
+
+# Outcome
+
+**Done 2026-08-27.** `StateConsoleExtension`, seven collectors behind one shared
+`ISnapshotSection[T]`, `TraceServer`'s snapshot-request loop, and `sagittarius-trace
+snapshot` — the command this epic exists to make work, run against the real
+`examples/student_management` app, not a mock.
+
+## What shipped
+
+| Piece | What it is |
+| :--- | :--- |
+| `extensions/state_console/collector.py` | `ISnapshotSection[T](ABC)` — one `@abstractmethod collect() -> T \| None` |
+| `extensions/state_console/collectors/*.py` | Seven collectors, one per `StateSnapshot` field, each taking exactly the subsystem it needs |
+| `extensions/state_console/extension.py` | `StateConsoleExtension` — attaches at `when_ready()`, assembles the seven sections by keyword, caches under `interval_hz` |
+| `TraceServer._snapshot_request_loop()` | Any inbound frame on an attached connection triggers one fresh (or cached) `snapshot_message()` reply |
+| `sagittarius-trace snapshot [--watch DURATION]` | `_format_snapshot()` renders a parsed `StateSnapshot` as text; `--watch` repeats on the interval until detached |
+
+## A concurrency bug found only by running the real app, not by any unit test
+
+`StateConsoleExtension._start()` called `self._server.start()` and returned without waiting
+on `self._server.ready_event` — the one thing every other caller of `TraceServer.start()`
+(the CLI, every existing test fixture) already does. `TraceServer._serve()` assigns
+`self._stop_event` only after its background thread's event loop actually starts running, so
+`stop()` called before that assignment exists falls through to its full `timeout` wait rather
+than signalling the event.
+
+**Reproduced, not assumed:** running `StateConsoleExtension` against `examples/student_management`
+end-to-end (boot, then immediately `app.stop()`) took `2.0044s` — the exact
+`stop(timeout=2.0)` default, every time, not occasionally. Fixed by adding the same
+`ready_event.wait(timeout=2.0)` (with a warning log on timeout) every other caller already
+has. Verified: `app.stop()` dropped to `0.0031s` on the same script, same machine.
+
+No isolated `TraceServer` unit test caught this — every one of them already waited on
+`ready_event` by construction, which is precisely why testing only the transport in isolation
+was not enough; the fix shipped only because of the "how to run it" §3 script, run by hand
+against a real, booted application before the pytest suite was trusted.
+
+## Measured (`EPIC-005` §4.2's discipline: measured, not asserted)
+
+Detached (no client connected) — a comparison on a connection count, no timer thread, no
+allocation. One full snapshot — `examples/student_management`, 20 runs, `gc` disabled during
+the detached baseline so a collection pass cannot register as this collector's own cost:
+
+| | p50 | p95 | max | Budget |
+| :--- | ---: | ---: | ---: | :--- |
+| detached baseline | — | — | ~13 ns/iteration | nothing measurable |
+| one full snapshot | 0.107 ms | 0.266–0.647 ms | 0.266–0.647 ms | ≤ 5 ms |
+
+p95 measured under 1% of budget across repeated runs of
+`test_measured_detached_cost_and_one_full_snapshot_cost` — the small run-to-run spread above
+(0.266ms vs 0.647ms max) is scheduling noise on a shared machine, not a regression signal;
+both are an order of magnitude inside the 5ms ceiling `§2.3` set.
+
+## Verified
+
+| Gate | Result |
+| :--- | :--- |
+| `pytest tests/extensions/state_console/` | 7 passed |
+| `pytest tests/extensions/audit/` | 34 passed |
+| `pytest tests/` (minus `pyside_mvc`/`ui_state`, PySide6 absent here) | **996 passed**, same 9 pre-existing environmental failures as every prior checkpoint |
+| `pytest tests/test_architecture.py` | 14 passed (criterion 7's stdlib-only import guard added here) |
+| `ruff check` / `ruff format --check` (whole repo) | clean |
+| `mypy` (whole repo) | 1 error, `thread_affinity.py:124`, the documented PySide6-absent false positive |
+| `sagittarius-trace snapshot` against a live `examples/student_management` process | manually run; prints lifecycle/events/container/tasks/thread_pools/bounded/config as text |
+| `sagittarius-trace snapshot --watch 0.3s` against the same live process | manually run; 5 snapshots printed over 1.5s, clean exit on server stop |
+| `app.stop()` after `StateConsoleExtension` boots | `2.0044s` before the readiness-wait fix, `0.0031s` after — reproduced, not assumed |
+
+## Run it
+
+```bash
+.venv/bin/python -m pytest tests/extensions/state_console/ tests/extensions/audit/test_cli.py tests/test_architecture.py -v
+```

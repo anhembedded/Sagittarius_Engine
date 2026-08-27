@@ -434,3 +434,9 @@ class TaskManager(ITaskManager):
                 completed=cr_completed,
             ),
         )
+
+    def max_retained_tasks(self) -> int:
+        """@brief The configured retention limit `snapshot()` is bounded by —
+        `EPIC-007C`. Delegates to the same resolution `_cleanup_old_tasks()`
+        already uses, so the two can never disagree about the limit."""
+        return self._get_max_retained_tasks()

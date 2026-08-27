@@ -647,7 +647,15 @@ class TaskRecord:
     is how `EventRegistry`'s collision warning came to exist. The enum's
     *value* travels here as `state`.
 
-    @param age_ns Since the task was spawned, on the monotonic clock.
+    @param age_ns Since the task was spawned. **Corrected 2026-08-27, `EPIC-007C`**:
+        this originally said "on the monotonic clock", written before `EPIC-007B`
+        confirmed `BackgroundTask.start_time`/`end_time` are wall clock
+        (`datetime.now(UTC)`), not monotonic. Wall clock is the wrong clock for
+        *measuring a duration* elsewhere in this engine (`EPIC-005` §4.1's own
+        reasoning), but an "age" a diagnostic console rounds to whole seconds does
+        not need monotonic precision, and changing `BackgroundTask` to also carry a
+        monotonic timestamp is its own change, not a silent assumption to carry
+        here.
     @param error Terminal failure text for a `FAILED` task, empty otherwise.
     """
 
