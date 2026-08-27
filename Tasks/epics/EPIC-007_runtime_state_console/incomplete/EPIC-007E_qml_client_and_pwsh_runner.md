@@ -18,6 +18,57 @@ Design: <https://claude.ai/code/artifact/29b45155-8fb3-4b54-a6ce-2440f51d8330>. 
 artboards are information architecture, not a build target: no QML was written for them, and
 they say what the kit must be able to express, not how it will.
 
+## 1.1 The client is itself an App built on the engine
+
+Found while reviewing the spec against `examples/student_management`: the client does not
+need bespoke thread-safety code, a hand-rolled connection state machine, or its own DI —
+`examples/student_management/gui.py` already is the shape a PySide6 app on this engine takes,
+and copying it turns three hazards this milestone would otherwise own into things the engine
+already solved.
+
+**The pattern, copied rather than reinvented:**
+
+| `student_management` | The console |
+| :--- | :--- |
+| `build_app(extra_extensions=[PySideMvcExtension()])` | `build_app(extra_extensions=[PySideMvcExtension(), ConsoleConnectionExtension(uri, token)])` |
+| `StudentManagementExtension` registers use-case handlers | `ConsoleConnectionExtension` owns the websocket client |
+| `StudentEnrolled`/`StudentUpdated`/`StudentRemoved` domain events | `SnapshotReceived`, `ConsoleAttached`, `ConsoleDetached` domain events |
+| `RosterPresenter(BasePresenter)` subscribes, refreshes on event | six `*Presenter(BasePresenter)`, one per screen, each subscribes to `SnapshotReceived` |
+| `gui.py`: `QApplication` → `build_app()` → resolve view → `show()` → `qt_app.exec()` | identical shape, same file layout |
+
+**What this removes, not just relocates:**
+
+- **The thread hop is already solved.** A snapshot arrives on whichever thread is running the
+  websocket receive loop — not the Qt UI thread. `BasePresenter`'s event subscription already
+  crosses that hop through `QtEventBridge`/`thread_affinity`/`safe_ui_action` — the same
+  machinery `RosterPresenter` relies on for `student.added`. Writing new thread-marshaling
+  code for this milestone would be a second implementation of exactly what
+  `ui-architecture.md` §4's *"thread safety is non-negotiable"* already covers, and a worse
+  one: this package would not have had two years of `pyside_mvc` bug fixes behind it.
+- **The receive loop is a background task, not a bespoke `QThread`.** `ConsoleConnectionExtension`
+  runs its connect-and-receive loop via `ctx.task_manager.spawn(...)` — `CancellationToken`
+  and a clean stop path come free, and `app.stop()` tears it down the same way it tears down
+  any other hosted work. Same shutdown discipline `gui.py`'s own teardown comment already
+  worries about, applied instead of re-solved.
+- **The three console states of §4 are domain events, not polled flags.** `ConsoleAttached`
+  and `ConsoleDetached` are ordinary `BaseEvent` subclasses the connection extension emits;
+  a small `ConnectionStatusPresenter` (no view of its own) subscribes and drives which of the
+  three states §4 describes is showing. This is the same "event decouples what changed from
+  who changed it" the `RosterPresenter` docstring already states as the reason its own refresh
+  is event-driven rather than called manually after every dispatch.
+- **The palette wiring is `PySideMvcExtension`, unchanged**, supplying the console's own
+  values (`ADR-002` §2.2) through the identical `configure_app_qml()` call
+  `examples/student_management/infrastructure/ui/pyside_mvc_extension.py` already makes.
+
+**What stays genuinely new:** `ConsoleConnectionExtension` itself (the websocket client and
+the `SnapshotReceived`/`ConsoleAttached`/`ConsoleDetached` events), and the six screens'
+views/presenters/view-models. Everything between the socket and the screen is reuse.
+
+**Ordering constraint carried over unchanged**: `docs/ui_extension_lifecycle.md`'s finding —
+*"the composition root constructs `QApplication` before calling `App.boot()`"* — applies here
+exactly as it does in `gui.py`. The console's own entry point copies that file's shape line
+for line, not just its conclusion.
+
 ## 2. Packaging — three rules, each from a shipped defect
 
 `EPIC-005` §2's D6 and D7 are what happens when any of these is missed. All three are
@@ -36,18 +87,26 @@ already solved elsewhere in this repo; this milestone copies, it does not invent
 
 ## 3. Screens
 
-Six, matching the artboards. Each composes kit components rather than authoring primitives:
-`AppDataTable` for the event, container and task tables; `LogPanel` for findings;
-`StatefulButton`, `AppModal`, `BaseCard` derivations for the rest.
+Six, matching the artboards, each a `BaseView`/`BasePresenter` pair per §1.1's pattern —
+`RosterView`/`RosterPresenter` is the shape being followed, not a new one. Each composes kit
+components rather than authoring primitives: `AppDataTable` for the event, container and task
+tables; `LogPanel` for findings; `StatefulButton`, `AppModal`, `BaseCard` derivations for the
+rest.
 
-| Screen | Shows |
-| :--- | :--- |
-| Overview | verdict line, lifecycle strip, subsystem cards, findings preview |
-| Events & wiring | the declared ⋈ subscribed join, with a detail pane per event |
-| Container | registrations, lifetimes, what is built, unbound dependencies, cycles |
-| Tasks & threads | task table, pool saturation, queue depth, exclusive slots, scheduler |
-| Signals | dead-letter queue and state machines — `EPIC-007F` |
-| Not attached | the honest disconnected state — §4 |
+| Screen | Presenter subscribes to | Shows |
+| :--- | :--- | :--- |
+| Overview | `SnapshotReceived` | verdict line, lifecycle strip, subsystem cards, findings preview |
+| Events & wiring | `SnapshotReceived` | the declared ⋈ subscribed join, with a detail pane per event |
+| Container | `SnapshotReceived` | registrations, lifetimes, what is built, unbound dependencies, cycles |
+| Tasks & threads | `SnapshotReceived` | task table, pool saturation, queue depth, exclusive slots, scheduler |
+| Signals | `SnapshotReceived` | dead-letter queue and state machines — `EPIC-007F` |
+| Not attached | `ConsoleAttached`, `ConsoleDetached` | the honest disconnected state — §4 |
+
+None of the six holds a reference to the websocket, a parsing routine, or a reconnect timer.
+`ConsoleConnectionExtension` (§1.1) is the only thing that knows a socket exists; a presenter
+knows only that an event carrying a `StateSnapshot` arrived. This is the same boundary
+`RosterPresenter` keeps from its application-layer handlers — a presenter reacts to what
+changed, and has no idea what produced the change.
 
 ### 3.1 The console supplies its own palette
 
@@ -149,3 +208,15 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/tools/state_console -
 7. `run-console.ps1` runs under PowerShell 5.1.
 8. Any escape hatch used against the kit is named at its call site, and repeated ones are
    listed here as kit-promotion candidates.
+9. **No new thread-marshaling code.** A test proves a `SnapshotReceived` emitted from a
+   non-Qt background thread reaches a presenter's Qt-side slot without a new bridge,
+   timer, or queue written for this milestone — only `pyside_mvc`'s existing
+   `QtEventBridge`/`thread_affinity` path, exercised the same way `RosterPresenter`
+   already exercises it for `student.added`.
+10. **The receive loop is a `TaskManager` task**, not a bespoke `QThread` — visible in
+    `get_active_tasks()` while connected, cancelled cleanly by `app.stop()`, asserted by a
+    test that stops the app mid-stream and checks nothing is left running.
+11. **`ConsoleAttached`/`ConsoleDetached`/`SnapshotReceived` are real `BaseEvent`
+    subclasses**, registered in `EventRegistry` like any other domain event — so
+    `sagittarius-doctor` run against the console's own `build_app()` reports 0 errors,
+    the same dogfooding check `EPIC-007D` §3 holds the sample app to.

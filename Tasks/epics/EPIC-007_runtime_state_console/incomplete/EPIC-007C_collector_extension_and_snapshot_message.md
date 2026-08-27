@@ -32,6 +32,73 @@ to the lifecycle, never back. `EPIC-006C` established this and it is not re-argu
 app.use(StateConsoleExtension(port=8781, token=None, interval_hz=1.0))
 ```
 
+### 2.1.1 The collector architecture: `ISnapshotSection[T]`
+
+`StateConsoleExtension` does not collect the seven sections of `EPIC-007A`'s `StateSnapshot`
+itself. Each section is its own class, implementing one shared abstract base:
+
+```python
+# extensions/state_console/collector.py
+class ISnapshotSection[T](ABC):
+    """One section of a StateSnapshot, collected independently."""
+
+    @abstractmethod
+    def collect(self) -> T | None:
+        """The section's current value, or `None` if it cannot be observed."""
+```
+
+```
+extensions/state_console/
+├── extension.py            # StateConsoleExtension — holds one of each, assembles StateSnapshot
+├── collector.py            # ISnapshotSection[T]
+└── collectors/
+    ├── lifecycle.py         # LifecycleCollector(ISnapshotSection[LifecycleState])
+    ├── events.py            # EventCollector(ISnapshotSection[tuple[EventState, ...]])
+    ├── container.py         # ContainerCollector(ISnapshotSection[ContainerState])
+    ├── tasks.py             # TaskCollector(ISnapshotSection[tuple[TaskRecord, ...]])
+    ├── thread_pools.py      # ThreadPoolCollector(ISnapshotSection[tuple[ThreadPoolStats, ...]])
+    ├── bounded.py           # BoundedStructuresCollector(ISnapshotSection[BoundedStructures])
+    └── config.py            # ConfigCollector(ISnapshotSection[tuple[ConfigEntry, ...]])
+```
+
+Eight files for one extension — the most of any subtask in this epic — so the choice is
+recorded rather than left implicit.
+
+**`@abstractmethod`, not a concrete no-op default.** `IBusObserver`/`ITraceRecorder` use
+concrete no-op defaults because an implementer may have partial interest — an observer that
+only cares about failures should not have to write an empty `event_emitted`. No such case
+exists here: every collector exists to provide exactly one thing, so a silent no-op default
+would let a broken collector return `None` forever and read as "not observed" rather than
+"not implemented." `ConfigSource`/`IFileStorage`/`IStateStore`'s idiom — `ABC` +
+`@abstractmethod` — is the one that fits, because it is the same shape: several
+implementations of one contract, each expected to actually do the thing.
+
+**Each collector takes exactly what it needs in its constructor**, not an `IEngineContext`:
+`LifecycleCollector(lifecycle: Lifecycle)`, `EventCollector(bus: IEventBus)`,
+`ContainerCollector(container: IContainer)`, and so on. `WiringInspector`'s own docstring is
+the reason, quoted rather than re-argued: *"Takes the subsystems it needs one at a time
+rather than an engine context… a narrow signature is also what lets each check be tested
+against a two-line fixture instead of a booted application."* `StateConsoleExtension`
+resolves each dependency once, at construction, and holds one instance of each collector.
+
+**This is not a third-party extension point**, and the spec says so rather than implying
+otherwise. `IExtension`/`IMiddleware`/`IBusObserver` are genuinely open — an application
+registers its own. `StateSnapshot`'s seven fields are fixed by `EPIC-007A`'s schema; an eighth
+collector would have nowhere on the wire to put its result. The interface exists because this
+subtask creates more files of one shape than any other in the epic and each should honour the
+same contract, not because a consumer is expected to implement one.
+
+**Considered and not taken: one class, many methods**, the shape `WiringInspector` itself
+uses (`inspect_events()`, `inspect_container()`, `inspect_handlers()`, `inspect_lifecycle()`
+on one class) rather than one class per check. That precedent sits in the same package this
+epic depends on and cuts the other way — recorded here rather than silently overridden.
+Weighed against it: `StateSnapshot` already fixes the seven-way split (`EPIC-007A`), so the
+methods-on-one-class version would still be seven distinctly-shaped private methods with
+seven distinct constructor dependencies threaded through one `__init__` — the god-object
+shape `code-rule.md`'s own "No God Objects" clause warns against, once threading exists.
+Seven single-purpose classes behind one seven-line abstract keep each dependency local to the
+one collector that needs it, at the cost of the eight files this section names up front.
+
 ### 2.2 Collection is pull or interval, never event-driven
 
 `ADR-001` §2.4, and the reason it is not negotiable: `EPIC-005` §2's **D9** was
