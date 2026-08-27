@@ -136,3 +136,62 @@ def test_save_clears_dirty_so_second_save_is_noop(tmp_path):
     manager.save()  # nothing dirty anymore — must not clobber the manual edit
 
     assert json.loads(user_file.read_text()) == {"A": "a", "manually_added": "x"}
+
+
+# ------------------------------------------------------------ EPIC-007B: sources()
+
+
+def test_sources_labels_each_key_by_the_source_that_won_it(tmp_path, monkeypatch):
+    """ "Which layer won" is the question a config panel is opened for --
+    get_all() already answers *what* the merged value is, never *why*."""
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"json_k": "json_v"}))
+    monkeypatch.setenv("TEST_ENV_K", "env_v")
+
+    manager = ConfigManager()
+    manager.load_dict({"dict_k": "dict_v"})
+    manager.load_json(str(config_file))
+    manager.load_env("TEST_ENV_")
+    manager.get_all()  # forces _load()
+
+    sources = manager.sources()
+    assert sources["dict_k"] == "DictSource"
+    assert sources["json_k"] == f"json:{config_file}"
+    assert sources["K"] == "env:TEST_ENV_"
+
+
+def test_sources_reflects_override_order_the_same_way_get_all_does():
+    """A later source overriding an earlier one's key must report the later
+    source's label -- reporting the earlier one would be a lie about which
+    value actually won."""
+    manager = ConfigManager()
+    manager.load_dict({"shared_key": "from_dict"})
+    manager.load_json("/nonexistent/does-not-matter.json")  # JsonSource.read() -> {}
+    manager.load_dict({"shared_key": "from_second_dict"})
+
+    assert manager.get("shared_key") == "from_second_dict"
+    assert manager.sources()["shared_key"] == "DictSource"
+
+
+def test_set_labels_the_key_as_runtime_not_a_registered_source():
+    manager = ConfigManager()
+    manager.load_dict({"a": 1})
+    manager.set("b", 2)
+
+    sources = manager.sources()
+    assert sources["a"] == "DictSource"
+    assert sources["b"] == "runtime:set()"
+
+
+def test_sources_of_an_unloaded_manager_is_empty_not_a_crash():
+    manager = ConfigManager()
+    assert manager.sources() == {}
+
+
+def test_dictconfig_inherits_the_empty_default_honestly():
+    """DictConfig has no layering concept at all -- {} is the honest answer,
+    not a fabricated per-key label."""
+    from sagittarius_engine.infrastructure.config.dict_config import DictConfig
+
+    config = DictConfig({"a": 1, "b": 2})
+    assert config.sources() == {}

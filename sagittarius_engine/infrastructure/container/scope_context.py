@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from contextvars import ContextVar
 from typing import Any
 
@@ -22,16 +23,37 @@ class ScopeContext:
             session3 = container.resolve(ISession)  # brand-new instance
     """
 
-    def __init__(self, scoped_registry: dict[type, type]) -> None:
+    def __init__(
+        self,
+        scoped_registry: dict[type, type],
+        *,
+        on_enter: Callable[[], None] | None = None,
+        on_exit: Callable[[], None] | None = None,
+    ) -> None:
+        """
+        @param on_enter, on_exit `EPIC-007B`: hooks a container's own open-scope
+            census onto this scope's real lifetime, `__enter__`/`__exit__` — not the
+            moment `create_scope()` constructs the object, which can happen without the
+            `with` block that actually activates it ever running. `None` by default:
+            `StdLibContainer`'s own `self._scope_context` (used only for `resolve()`
+            lookups, never entered as a `with` block) must not be counted as an open
+            scope just because it exists.
+        """
         self._scoped_registry = scoped_registry
         self._token: Any = None
+        self._on_enter = on_enter
+        self._on_exit = on_exit
 
     def __enter__(self) -> "ScopeContext":
         self._token = _current_scope.set({})
+        if self._on_enter is not None:
+            self._on_enter()
         return self
 
     def __exit__(self, *args: object) -> None:
         _current_scope.reset(self._token)
+        if self._on_exit is not None:
+            self._on_exit()
 
     def resolve(self, abstract: type) -> Any | None:
         """

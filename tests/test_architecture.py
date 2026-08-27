@@ -1,6 +1,7 @@
 import ast
 import glob
 import os
+import pathlib
 
 import pytest
 
@@ -341,3 +342,195 @@ def test_async_event_bus_also_implements_subscriptions():
     )
     assert callable(getattr(AsyncioEventBus, "subscriptions", None))
     assert AsyncioEventBus.subscriptions is not IEventBus.subscriptions
+
+
+# ── Function-local imports: bounded, not forbidden (REF-001) ────────────────
+#
+# `code-rule.md` §45 read "Never place `import ...` inside functions", and the
+# engine did it 32 times. A rule nothing enforces is not a rule; §45 now names
+# two bounded exceptions and this guard is what bounds them.
+#
+# Same shape as `import_boundary.SANCTIONED_DEEP_IMPORTS`, which
+# `design-discipline.md` cites as the reference case for debt that is *named,
+# justified and unable to grow*.
+
+#: `(path, imported module)` pairs permitted to import inside a function.
+#: Adding a row is a deliberate act that shows up in review, which is the whole
+#: point — see `REF-001` for the two categories and what each one costs.
+SANCTIONED_LOCAL_IMPORTS: frozenset[tuple[str, str]] = frozenset(
+    {
+        # -- Category A: an optional dependency, at its single point of failure.
+        # The wheel declares no dependencies. Hoisting any of these makes the
+        # module unimportable without a package the engine does not require,
+        # which is `EPIC-005` §2's D7 exactly.
+        ("sagittarius_engine/extensions/audit/cli.py", "websockets.exceptions"),
+        ("sagittarius_engine/extensions/audit/cli.py", "websockets.sync.client"),
+        (
+            "sagittarius_engine/extensions/audit/infra/trace_server.py",
+            "websockets.asyncio.server",
+        ),
+        (
+            "sagittarius_engine/extensions/audit/exporters/otel.py",
+            "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+        ),
+        (
+            "sagittarius_engine/extensions/audit/exporters/otel.py",
+            "opentelemetry.sdk.resources",
+        ),
+        (
+            "sagittarius_engine/extensions/audit/exporters/otel.py",
+            "opentelemetry.sdk.trace",
+        ),
+        (
+            "sagittarius_engine/extensions/audit/exporters/otel.py",
+            "opentelemetry.sdk.trace.export",
+        ),
+        ("sagittarius_engine/extensions/health/health_check_query.py", "sqlalchemy"),
+        (
+            "sagittarius_engine/infrastructure/config/config_sources/dotenv_source.py",
+            "dotenv",
+        ),
+        # -- Category B: an intra-engine import whose comment claims a cycle.
+        # REF-001 measured that all eleven currently hoist in isolation, so the
+        # claim may be stale — but "imports fine when imported first" does not
+        # disprove an order-dependent cycle, and hoisting on that evidence would
+        # be exactly the "it works now" diagnosis `design-discipline.md`
+        # refuses. Sanctioned pending the stricter multi-order check REF-001
+        # leaves open; every one is a candidate for removal, not a precedent.
+        (
+            "sagittarius_engine/extensions/diagnostics/runtime.py",
+            "sagittarius_engine.domain.event_registry",
+        ),
+        (
+            "sagittarius_engine/infrastructure/config/config_manager.py",
+            "sagittarius_engine.infrastructure.config.dict_source",
+        ),
+        (
+            "sagittarius_engine/infrastructure/config/config_manager.py",
+            "sagittarius_engine.infrastructure.config.env_source",
+        ),
+        (
+            "sagittarius_engine/infrastructure/config/config_manager.py",
+            "sagittarius_engine.infrastructure.config.json_source",
+        ),
+        (
+            "sagittarius_engine/kernel/context.py",
+            "sagittarius_engine.interfaces.i_dispatcher",
+        ),
+        (
+            "sagittarius_engine/kernel/context.py",
+            "sagittarius_engine.runtime.async_runtime.async_runtime",
+        ),
+        (
+            "sagittarius_engine/kernel/context.py",
+            "sagittarius_engine.runtime.hosted.hosted_service_manager",
+        ),
+        (
+            "sagittarius_engine/kernel/context.py",
+            "sagittarius_engine.runtime.scheduler.scheduler",
+        ),
+        (
+            "sagittarius_engine/kernel/context.py",
+            "sagittarius_engine.runtime.tasks.task_manager",
+        ),
+        (
+            "sagittarius_engine/kernel/context.py",
+            "sagittarius_engine.utils.null_logger",
+        ),
+        (
+            "sagittarius_engine/kernel/module_auto_discovery.py",
+            "sagittarius_engine.kernel.module_loader",
+        ),
+    }
+)
+
+
+def find_function_local_imports(
+    root: str = "sagittarius_engine",
+) -> set[tuple[str, str]]:
+    """
+    @brief Every `(path, module)` imported inside a function body.
+
+    @details Walks the AST rather than grepping, so an import nested in a
+    `try`, an `except`, or a closure is found the same as a top-level one in
+    the function — those are precisely where they hide.
+    """
+    found: set[tuple[str, str]] = set()
+    for path in sorted(pathlib.Path(root).rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Import):
+                    for alias in inner.names:
+                        found.add((path.as_posix(), alias.name))
+                elif isinstance(inner, ast.ImportFrom):
+                    found.add((path.as_posix(), inner.module or ""))
+    return found
+
+
+def test_state_console_imports_nothing_outside_stdlib_and_this_engine():
+    """`EPIC-007C` criterion 7: `extensions/state_console/` imports only the
+    stdlib and this engine's own modules — never PySide6, never anything
+    from `tools/`."""
+    import sys
+
+    root = pathlib.Path(__file__).resolve().parent.parent / (
+        "sagittarius_engine/extensions/state_console"
+    )
+    violations: list[str] = []
+    for path in sorted(root.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                # node.level > 0 is a relative import (`from .extension import
+                # ...`) — a same-package sibling, not a third-party module.
+                modules = [node.module]
+            else:
+                continue
+            for module in modules:
+                top = module.split(".")[0]
+                if top in ("__future__", "sagittarius_engine"):
+                    continue
+                if top not in sys.stdlib_module_names:
+                    violations.append(f"{path}: imports {module!r}")
+
+    assert not violations, (
+        "extensions/state_console/ imported outside the stdlib and this "
+        "engine's own package:\n  " + "\n  ".join(violations)
+    )
+
+
+def test_no_unsanctioned_function_local_imports():
+    """`code-rule.md` §45's two exceptions, and nothing beyond them.
+
+    A new function-local import fails here rather than passing review as
+    "everyone else does it" — which is how thirty-two of them accumulated
+    under a rule that said "never".
+    """
+    unsanctioned = sorted(find_function_local_imports() - SANCTIONED_LOCAL_IMPORTS)
+
+    assert not unsanctioned, (
+        "function-local import(s) outside code-rule.md §45's two exceptions:\n  "
+        + "\n  ".join(f"{path} -> {module}" for path, module in unsanctioned)
+        + "\n\nHoist it to module scope. If it is an optional dependency at its "
+        "point of failure, or genuinely breaks an import cycle, add it to "
+        "SANCTIONED_LOCAL_IMPORTS with a comment saying which and why."
+    )
+
+
+def test_every_sanctioned_local_import_still_exists():
+    """The allowlist shrinks when a site is fixed; it must not keep stale rows.
+
+    A guard whose allowlist outlives what it excuses stops being a bound and
+    becomes a list nobody reads.
+    """
+    stale = sorted(SANCTIONED_LOCAL_IMPORTS - find_function_local_imports())
+
+    assert not stale, (
+        "SANCTIONED_LOCAL_IMPORTS names site(s) that no longer exist — delete "
+        "these rows:\n  " + "\n  ".join(f"{path} -> {module}" for path, module in stale)
+    )

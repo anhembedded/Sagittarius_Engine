@@ -30,8 +30,12 @@ write code that needs to run on an older Python; there is no fallback path.
 
 ## 1a. The completion gate — run this before calling anything done
 
-`scripts/ci-local.ps1` is the actual, authoritative local CI gate — 5 steps: ruff lint, ruff
-format check, mypy, pytest+coverage, architecture-boundary tests. (Moved from `pre_commit.ps1`
+`scripts/ci-local.ps1` is the actual, authoritative local CI gate — ruff lint, ruff format
+check, mypy, bandit, pip-audit, pytest+coverage, architecture-boundary tests by default (7
+steps); pass `-RunPackagingChecks` to add wheel/sdist build + `twine check` and the
+import-guard (build, install clean, import every module, resolve every console script) — off
+by default because both build a wheel from scratch, on purpose before any change to
+`pyproject.toml`, a console script, or an optional extra. (Moved from `pre_commit.ps1`
 at the repo root 2026-08-23, `TASK-030`, rebuilt on `Sagittarius_Elite_Warrior/scripts/
 ci-local.ps1`'s pattern — the "ci-local.ps1" name and `scripts/` location are now the same in
 both repos, deliberately.) The old version existed on disk and was not run for four consecutive

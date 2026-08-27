@@ -268,3 +268,126 @@ def test_an_ephemeral_port_is_resolved_after_binding(recorder):
         assert server.port != 0
     finally:
         server.stop()
+
+
+# ------------------------------------------------------ EPIC-007C: snapshots
+
+
+@pytest.fixture
+def a_snapshot():
+    from sagittarius_engine.extensions.audit.contracts import StateSnapshot
+
+    return StateSnapshot(t=1_234)
+
+
+async def _connect(server, token: str | None = None):
+    uri = f"ws://{server.host}:{server.port}"
+    if token is not None:
+        uri += f"?token={token}"
+    return await asyncio.wait_for(
+        websockets.asyncio.client.connect(uri), timeout=CONNECT_TIMEOUT_SECONDS
+    )
+
+
+async def test_any_inbound_frame_triggers_one_snapshot_reply(recorder, a_snapshot):
+    from sagittarius_engine.extensions.audit.contracts import MessageType
+
+    server = TraceServer(
+        recorder, host="127.0.0.1", port=0, snapshot_provider=lambda: a_snapshot
+    )
+    server.start()
+    assert server.ready_event.wait(timeout=READY_TIMEOUT_SECONDS)
+    try:
+        async with await _connect(server) as client:
+            await _recv_envelope(client)  # hello
+            await client.send("anything")
+            envelope = await _recv_envelope(client)
+            assert envelope["type"] == MessageType.SNAPSHOT.value
+            assert envelope["data"]["t"] == 1_234
+    finally:
+        server.stop()
+
+
+async def test_each_inbound_frame_gets_its_own_fresh_snapshot(recorder):
+    """The provider is called once per frame, not once per connection --
+    this is what makes `--watch` (repeated client-side asks) return updated
+    data rather than the same snapshot forever."""
+    from sagittarius_engine.extensions.audit.contracts import StateSnapshot
+
+    calls = []
+
+    def provider():
+        calls.append(1)
+        return StateSnapshot(t=len(calls))
+
+    server = TraceServer(recorder, host="127.0.0.1", port=0, snapshot_provider=provider)
+    server.start()
+    assert server.ready_event.wait(timeout=READY_TIMEOUT_SECONDS)
+    try:
+        async with await _connect(server) as client:
+            await _recv_envelope(client)  # hello
+
+            await client.send("refresh")
+            first = await _recv_envelope(client)
+            await client.send("refresh")
+            second = await _recv_envelope(client)
+
+            assert first["data"]["t"] == 1
+            assert second["data"]["t"] == 2
+            assert first["seq"] != second["seq"]
+    finally:
+        server.stop()
+
+
+async def test_no_provider_configured_ignores_inbound_frames_silently(recorder):
+    """EPIC-005D's trace-only server, unchanged: a client that sends
+    something to a server with no snapshot_provider gets nothing back for
+    it -- every existing TraceServer client sends nothing, so this is the
+    default this class has always had."""
+    server = TraceServer(recorder, host="127.0.0.1", port=0)  # no snapshot_provider
+    server.start()
+    assert server.ready_event.wait(timeout=READY_TIMEOUT_SECONDS)
+    try:
+        async with await _connect(server) as client:
+            await _recv_envelope(client)  # hello
+            await client.send("anything")
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(client.recv(), timeout=0.2)
+    finally:
+        server.stop()
+
+
+async def test_snapshot_path_is_refused_without_a_valid_token(recorder, a_snapshot):
+    """The auth check that gates trace data also gates snapshot data -- an
+    auth check that covers one of two message types is not an auth check."""
+    server = TraceServer(
+        recorder,
+        host="127.0.0.1",
+        port=0,
+        token="secret-token",
+        snapshot_provider=lambda: a_snapshot,
+    )
+    server.start()
+    assert server.ready_event.wait(timeout=READY_TIMEOUT_SECONDS)
+    try:
+        with pytest.raises(ConnectionClosed) as excinfo:
+            async with await _connect(server, token="wrong-token") as client:
+                await client.recv()
+        assert excinfo.value.rcvd.code == UNAUTHORIZED_CLOSE_CODE
+    finally:
+        server.stop()
+
+
+def test_snapshot_provider_alone_does_not_exempt_off_loopback_binding(
+    recorder, a_snapshot
+):
+    """The off-loopback-needs-a-token rule is construction-time and already
+    covers every message type this class sends -- a snapshot_provider does
+    not open a second, unguarded door."""
+    with pytest.raises(TraceServerConfigError):
+        TraceServer(
+            recorder,
+            host="0.0.0.0",
+            port=0,
+            snapshot_provider=lambda: a_snapshot,
+        )

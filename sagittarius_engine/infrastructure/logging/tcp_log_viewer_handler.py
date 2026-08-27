@@ -116,8 +116,6 @@ class TcpLogViewerHandler(logging.Handler):
                         try:
                             sock.close()
                         except Exception as e:
-                            import logging
-
                             logging.getLogger(__name__).error(
                                 f"Socket close error: {e}"
                             )
@@ -130,8 +128,6 @@ class TcpLogViewerHandler(logging.Handler):
             try:
                 sock.close()
             except Exception as e:
-                import logging
-
                 logging.getLogger(__name__).error(f"Socket close error: {e}")
 
     def close(self) -> None:

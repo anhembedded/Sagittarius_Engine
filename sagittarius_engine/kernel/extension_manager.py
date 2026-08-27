@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from sagittarius_engine.interfaces.i_engine_context import IEngineContext
@@ -42,20 +42,14 @@ class ModuleExtensionAdapter(IExtension[Any]):
         return self._descriptor
 
     def register(self, context: "IEngineContext") -> None:
-        from typing import cast
-
         kernel_ctx = cast("IKernelContext", context)
         self.legacy_module.register(kernel_ctx.app)
 
     def boot(self, context: "IEngineContext") -> None:
-        from typing import cast
-
         kernel_ctx = cast("IKernelContext", context)
         self.legacy_module.boot(kernel_ctx.app)
 
     def shutdown(self, context: "IEngineContext") -> None:
-        from typing import cast
-
         kernel_ctx = cast("IKernelContext", context)
         # Check for backwards compatibility with modules written before IModule had shutdown
         if hasattr(self.legacy_module, "shutdown"):

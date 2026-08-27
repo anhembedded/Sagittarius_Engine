@@ -1,11 +1,33 @@
 import functools
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import Future
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sagittarius_engine.interfaces.i_thread_manager import IThreadManager
+
+
+@dataclass(frozen=True, slots=True)
+class HeldSlot:
+    """
+    @brief Which key holds an `ExclusiveAction`'s one slot, and for how long —
+    `EPIC-007B`.
+
+    @details Singular by construction: one instance has exactly one slot (see the
+    class docstring below), so at most one `HeldSlot` can ever describe it — this is
+    `held_slot()`, not a plural `held_slots()`, because the class it reports on holds
+    at most one key at a time.
+
+    @param held_seconds On the monotonic clock, like every other duration this engine
+        measures — wall-clock is the wrong clock for "how long", and is not what a
+        slot held far longer than its task runs needs to answer.
+    """
+
+    key: str
+    held_seconds: float
 
 
 class ExclusiveAction:
@@ -53,6 +75,10 @@ class ExclusiveAction:
         self._thread_manager = thread_manager
         self._lock = threading.Lock()
         self._running_key: str | None = None
+        # EPIC-007B: monotonic, set the instant the slot is reserved, read by
+        # held_slot() — a slot held far longer than its task runs is a leaked
+        # single-flight key, and the control it guards never re-enables.
+        self._started_at: float | None = None
 
     def try_start(self, key: str) -> bool:
         """
@@ -68,6 +94,7 @@ class ExclusiveAction:
             if self._running_key is not None:
                 return False
             self._running_key = key
+            self._started_at = time.monotonic()
             return True
 
     def submit(
@@ -103,6 +130,18 @@ class ExclusiveAction:
         with self._lock:
             if self._running_key == key:
                 self._running_key = None
+                self._started_at = None
+
+    def held_slot(self) -> HeldSlot | None:
+        """@brief The key holding this instance's one slot, and how long it
+        has held it — `None` if the slot is free. `EPIC-007B`."""
+        with self._lock:
+            if self._running_key is None or self._started_at is None:
+                return None
+            return HeldSlot(
+                key=self._running_key,
+                held_seconds=time.monotonic() - self._started_at,
+            )
 
     def is_running(self, key: str | None = None) -> bool:
         """@brief True if `key` is the one currently running, or — when

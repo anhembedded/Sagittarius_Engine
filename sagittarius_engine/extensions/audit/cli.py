@@ -24,10 +24,18 @@ import contextlib
 import json
 import signal
 import sys
+import time
 from collections.abc import Sequence
 from typing import Any, TextIO
 
-from .contracts import Envelope, Hello, MessageType, ProtocolMismatch, TraceRecord
+from .contracts import (
+    Envelope,
+    Hello,
+    MessageType,
+    ProtocolMismatch,
+    StateSnapshot,
+    TraceRecord,
+)
 from .sagtrace import save_sagtrace
 
 #: See `extensions/diagnostics/cli.py` for the taxonomy this mirrors:
@@ -132,6 +140,174 @@ def attach(uri: str, save_path: str | None = None, out: TextIO = sys.stdout) -> 
     return EXIT_OK
 
 
+def _format_snapshot(snapshot: StateSnapshot) -> str:
+    """
+    @brief `EPIC-007C` §2.5's text rendering — a panel hides a missing field
+    behind blank space; this cannot, because every section is its own line
+    and an absent one is simply not there.
+    """
+    lines: list[str] = [f"snapshot @ {snapshot.t / 1_000_000_000:.6f}s"]
+
+    if snapshot.lifecycle is not None:
+        lc = snapshot.lifecycle
+        lines.append(
+            f"lifecycle: state={lc.state} "
+            f"extensions={lc.extensions_initialized}/{lc.extensions_registered} "
+            f"hosted={lc.hosted_started}/{lc.hosted_registered} "
+            f"scheduler_jobs={lc.scheduler_jobs} "
+            f"(without_next_run={lc.scheduler_jobs_without_next_run})"
+        )
+
+    if snapshot.events:
+        lines.append(f"events: {len(snapshot.events)}")
+        for event in snapshot.events:
+            flag = "" if event.registered else " [UNREGISTERED]"
+            lines.append(
+                f"  {event.name}{flag} handlers={len(event.handlers)} "
+                f"emits={event.emits} failures={event.failures}"
+            )
+
+    if snapshot.container is not None:
+        container = snapshot.container
+        lines.append(
+            f"container: {len(container.registrations)} registration(s), "
+            f"open_scopes={container.open_scopes}"
+        )
+        for reg in container.registrations:
+            state = "instantiated" if reg.instantiated else "not instantiated"
+            lines.append(
+                f"  {reg.abstract} -> {reg.concrete or '?'} [{reg.lifetime}] {state}"
+            )
+
+    if snapshot.tasks:
+        lines.append(f"tasks: {len(snapshot.tasks)}")
+        for task in snapshot.tasks:
+            error = f" error={task.error!r}" if task.error else ""
+            lines.append(
+                f"  {task.id} name={task.name!r} state={task.state} "
+                f"progress={task.progress:.0%} age={task.age_ns / 1_000_000_000:.1f}s"
+                f"{error}"
+            )
+
+    if snapshot.thread_pools:
+        lines.append("thread pools:")
+        for pool in snapshot.thread_pools:
+            lines.append(
+                f"  {pool.name}: {pool.in_flight}/{pool.max_workers} in flight, "
+                f"queue_depth={pool.queue_depth}, submitted={pool.submitted}, "
+                f"completed={pool.completed}"
+            )
+
+    if snapshot.bounded is not None:
+        bounded = snapshot.bounded
+        lines.append(
+            f"bounded: ring={bounded.ring_used}/{bounded.ring_capacity} "
+            f"(dropped={bounded.ring_dropped}), "
+            f"tasks={bounded.retained_tasks}/{bounded.retained_task_limit}, "
+            f"subscriptions={bounded.subscriptions}, "
+            f"gc_counts={list(bounded.gc_counts)}"
+        )
+
+    if snapshot.config:
+        noun = "entry" if len(snapshot.config) == 1 else "entries"
+        lines.append(f"config: {len(snapshot.config)} {noun}")
+        for entry in snapshot.config:
+            value = "***" if entry.masked else entry.value
+            source = f" (source={entry.source})" if entry.source else ""
+            lines.append(f"  {entry.key}={value}{source}")
+
+    if snapshot.findings:
+        lines.append(f"findings: {len(snapshot.findings)}")
+        for finding in snapshot.findings:
+            lines.append(f"  [{finding.severity}] {finding.subject}: {finding.message}")
+
+    return "\n".join(lines)
+
+
+def _parse_duration(text: str) -> float:
+    """@brief `"1s"`, `"500ms"`, or a bare number of seconds -- the same
+    small grammar as everywhere else a human types a duration into this CLI.
+    @raises ValueError For anything else, so `argparse` reports it as a
+    usage error rather than the watch loop failing on its first tick."""
+    text = text.strip()
+    if text.endswith("ms"):
+        return float(text[:-2]) / 1000.0
+    if text.endswith("s"):
+        return float(text[:-1])
+    return float(text)
+
+
+def snapshot(
+    uri: str,
+    watch_seconds: float | None = None,
+    out: TextIO = sys.stdout,
+) -> int:
+    """
+    @brief Connects to `uri`, requests one `StateSnapshot` (any inbound frame
+    triggers one — `EPIC-007C` §2.4), prints it as text, and — with
+    `watch_seconds` — repeats on that interval until detached (Ctrl+C, or the
+    server closing the connection).
+
+    @return `EXIT_OK` on a clean detach, `EXIT_USAGE` if nothing worth
+        trusting was ever produced — a failed connection, a peer that did not
+        speak `hello` first, or a protocol mismatch at any point.
+    """
+    from websockets.exceptions import ConnectionClosed
+    from websockets.sync.client import connect
+
+    try:
+        connection_cm = connect(uri)
+    except OSError as exc:
+        print(f"could not connect to {uri}: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    try:
+        with connection_cm as connection:
+            try:
+                envelope = _recv_envelope(connection)
+            except ProtocolMismatch as exc:
+                print(f"refusing to attach: {exc}", file=sys.stderr)
+                return EXIT_USAGE
+
+            if envelope.type is not MessageType.HELLO:
+                print(
+                    f"expected 'hello' first, got {envelope.type.value!r} — "
+                    f"is {uri} really a sagittarius-trace server?",
+                    file=sys.stderr,
+                )
+                return EXIT_USAGE
+
+            while True:
+                try:
+                    connection.send("snapshot")
+                    envelope = _recv_envelope(connection)
+                except ProtocolMismatch as exc:
+                    print(f"peer sent an incompatible message: {exc}", file=sys.stderr)
+                    return EXIT_USAGE
+                except ConnectionClosed:
+                    break
+
+                if envelope.type is MessageType.SNAPSHOT:
+                    print(
+                        _format_snapshot(StateSnapshot.from_dict(envelope.data)),
+                        file=out,
+                    )
+                elif envelope.type is MessageType.ERROR:
+                    print(
+                        f"server error: {envelope.data.get('detail')}", file=sys.stderr
+                    )
+
+                if watch_seconds is None:
+                    break
+                print("", file=out)
+                time.sleep(watch_seconds)
+    except KeyboardInterrupt:
+        pass
+
+    print("detached", file=out)
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sagittarius-trace",
@@ -152,6 +328,24 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "on detach (Ctrl+C, or the server closing the connection), write "
             "everything seen this session to PATH as a .sagtrace file"
+        ),
+    )
+
+    snapshot_parser = subparsers.add_parser(
+        "snapshot",
+        help="request one StateSnapshot from a TraceServer and print it as text",
+    )
+    snapshot_parser.add_argument(
+        "uri", help="ws://host:port[?token=...] of a running TraceServer"
+    )
+    snapshot_parser.add_argument(
+        "--watch",
+        metavar="DURATION",
+        default=None,
+        help=(
+            "keep the connection open and request a fresh snapshot every "
+            "DURATION (e.g. '1s', '500ms') until detached; a single snapshot "
+            "is requested and printed once when omitted"
         ),
     )
     return parser
@@ -182,6 +376,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         # ValueError: not on the main thread — a caller embedding this is not
         # the process owner, so having no handler is the correct outcome.
         signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
+    if args.command == "snapshot":
+        try:
+            watch_seconds = None if args.watch is None else _parse_duration(args.watch)
+        except ValueError:
+            print(f"--watch: not a duration: {args.watch!r}", file=sys.stderr)
+            return EXIT_USAGE
+        return snapshot(args.uri, watch_seconds)
     return attach(args.uri, args.save)
 
 

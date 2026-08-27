@@ -3,11 +3,16 @@ import logging
 import threading
 from collections import deque
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Any
 
 from sagittarius_engine.interfaces.i_config import IConfig
-from sagittarius_engine.interfaces.i_task_manager import ITaskHandle, ITaskManager
+from sagittarius_engine.interfaces.i_task_manager import (
+    ITaskHandle,
+    ITaskManager,
+    TaskSnapshot,
+)
+from sagittarius_engine.interfaces.i_thread_manager import PoolStats
 from sagittarius_engine.interfaces.i_trace_recorder import Lane as TraceLane
 from sagittarius_engine.runtime.tasks.background_task import BackgroundTask, TaskState
 from sagittarius_engine.runtime.tasks.cancellation_token import CancellationToken
@@ -26,22 +31,39 @@ class TaskManager(ITaskManager):
 
     _DEFAULT_MAX_RETAINED_TASKS = 50
     _MAX_RETAINED_TASKS_CONFIG_KEY = "task_manager.max_retained_tasks"
+    #: `EPIC-007B`'s `pool_stats()` reports these back — named here, not read
+    #: from `ThreadPoolExecutor._max_workers`, which is private
+    #: (`PoolStats`'s own docstring states the rule this follows: even a
+    #: stdlib type's internals are off-limits to this engine's introspection
+    #: surface).
+    _BACKGROUND_MAX_WORKERS = 20
+    _CRITICAL_MAX_WORKERS = 10
 
     def __init__(self, context: Any) -> None:
         self.context = context
         self.tasks: dict[str, BackgroundTask] = {}
         self._finished_task_ids: deque[str] = deque()
         self.background_executor = ThreadPoolExecutor(
-            max_workers=20,
+            max_workers=self._BACKGROUND_MAX_WORKERS,
             thread_name_prefix="SagittariusBgTask",
         )
         self.critical_executor = ThreadPoolExecutor(
-            max_workers=10,
+            max_workers=self._CRITICAL_MAX_WORKERS,
             thread_name_prefix="SagittariusCriticalTask",
         )
         # Backwards compatibility alias
         self.executor = self.background_executor
         self._lock = threading.Lock()
+        # EPIC-007B: counted at submit/finish rather than read out of either
+        # executor's own private `_work_queue` — see `PoolStats`'s docstring.
+        # Only sync submissions pass through these two pools; an async
+        # callable runs on `context.async_runtime` instead (see `spawn()`)
+        # and has no "worker count" to report in this shape, so it is
+        # deliberately absent from `pool_stats()` rather than force-fit.
+        self._background_submitted = 0
+        self._background_completed = 0
+        self._critical_submitted = 0
+        self._critical_completed = 0
         self._logger = logging.getLogger("App")
         # Resolved lazily (IConfig is normally registered by an extension
         # during boot, after this constructor already ran) and memoized —
@@ -91,6 +113,19 @@ class TaskManager(ITaskManager):
                 tid = self._finished_task_ids.popleft()
                 if tid in self.tasks:
                     del self.tasks[tid]
+
+    def _make_pool_done_callback(self, critical: bool) -> Callable[[Any], None]:
+        """@brief `EPIC-007B`: releases one pool's in-flight slot regardless of
+        how the future finished."""
+
+        def _on_done(_future: Any) -> None:
+            with self._lock:
+                if critical:
+                    self._critical_completed += 1
+                else:
+                    self._background_completed += 1
+
+        return _on_done
 
     def _wrap_sync(
         self, bg_task: BackgroundTask, fn: Callable[[], Any]
@@ -246,7 +281,20 @@ class TaskManager(ITaskManager):
                 target_executor = (
                     self.critical_executor if critical else self.background_executor
                 )
+                with self._lock:
+                    if critical:
+                        self._critical_submitted += 1
+                    else:
+                        self._background_submitted += 1
                 future = target_executor.submit(self._wrap_sync(bg_task, fn))
+                # Not `_wrap_sync`'s own `finally`: a future cancelled before
+                # it starts running never enters that body at all, which
+                # would leave `in_flight` permanently inflated for every
+                # cancel-before-start. `add_done_callback` fires on every
+                # terminal state an executor future can reach -- completed,
+                # raised, or cancelled -- so this is the one place that
+                # cannot miss a completion.
+                future.add_done_callback(self._make_pool_done_callback(critical))
                 bg_task.future = future
             except Exception as e:
                 bg_task.status = TaskState.FAILED
@@ -274,11 +322,22 @@ class TaskManager(ITaskManager):
     def cancel_all(self) -> None:
         """
         @brief Cancels all currently running tasks.
+
+        @details `task.cancel()` runs outside `self._lock` — found by `EPIC-007B`
+        turning it from a latent hazard into a live deadlock: cancelling a future that
+        has not yet started invokes its done callbacks *synchronously, on this thread*,
+        and `_make_pool_done_callback`'s callback now acquires this same lock. Calling
+        `.cancel()` while still holding the lock that its own callback needs is this
+        thread deadlocking on its own non-reentrant `Lock`. The snapshot of which tasks
+        to cancel is still taken under the lock — only the cancellation itself moves
+        outside it.
         """
         with self._lock:
-            for task in self.tasks.values():
-                if task.status == TaskState.RUNNING:
-                    task.cancel()
+            running = [
+                task for task in self.tasks.values() if task.status == TaskState.RUNNING
+            ]
+        for task in running:
+            task.cancel()
 
     def shutdown(self, timeout: float = 5.0) -> None:
         """
@@ -306,8 +365,6 @@ class TaskManager(ITaskManager):
             ]
 
         if critical_futures:
-            from concurrent.futures import wait
-
             wait(critical_futures, timeout=timeout)
 
         try:
@@ -316,3 +373,70 @@ class TaskManager(ITaskManager):
         except TypeError:
             self.critical_executor.shutdown(wait=False)
             self.background_executor.shutdown(wait=False)
+
+    def snapshot(self) -> tuple[TaskSnapshot, ...]:
+        """
+        @brief Every retained task, frozen — `EPIC-007B`.
+
+        @details Newest-first. Read under `self._lock`, same as `get_active_tasks()` —
+        that bounds the dict from changing size mid-iteration, not each individual
+        task's own field mutations, which a worker thread makes without acquiring this
+        lock (`bg_task.status = ...` inside `_wrap_sync`). A field or two read a few
+        nanoseconds apart from each other under the GIL is the same characteristic
+        `get_active_tasks()` already has today, not a new one introduced here.
+        """
+        with self._lock:
+            tasks = list(self.tasks.values())
+        return tuple(
+            TaskSnapshot(
+                id=task.id,
+                name=task.name,
+                state=task.status,
+                progress=task.progress,
+                critical=task.critical,
+                started_at=task.start_time,
+                ended_at=task.end_time,
+                error=str(task.error) if task.error is not None else None,
+            )
+            for task in reversed(tasks)
+        )
+
+    def pool_stats(self) -> tuple[PoolStats, ...]:
+        """@brief Occupancy of the `background`/`critical` executors — `EPIC-007B`.
+        See `PoolStats` for why `queue_depth` is derived rather than read from either
+        executor's own private queue."""
+        with self._lock:
+            bg_submitted, bg_completed = (
+                self._background_submitted,
+                self._background_completed,
+            )
+            cr_submitted, cr_completed = (
+                self._critical_submitted,
+                self._critical_completed,
+            )
+        bg_in_flight = bg_submitted - bg_completed
+        cr_in_flight = cr_submitted - cr_completed
+        return (
+            PoolStats(
+                name="background",
+                max_workers=self._BACKGROUND_MAX_WORKERS,
+                in_flight=bg_in_flight,
+                queue_depth=max(0, bg_in_flight - self._BACKGROUND_MAX_WORKERS),
+                submitted=bg_submitted,
+                completed=bg_completed,
+            ),
+            PoolStats(
+                name="critical",
+                max_workers=self._CRITICAL_MAX_WORKERS,
+                in_flight=cr_in_flight,
+                queue_depth=max(0, cr_in_flight - self._CRITICAL_MAX_WORKERS),
+                submitted=cr_submitted,
+                completed=cr_completed,
+            ),
+        )
+
+    def max_retained_tasks(self) -> int:
+        """@brief The configured retention limit `snapshot()` is bounded by —
+        `EPIC-007C`. Delegates to the same resolution `_cleanup_old_tasks()`
+        already uses, so the two can never disagree about the limit."""
+        return self._get_max_retained_tasks()

@@ -15,11 +15,18 @@ pytest.importorskip("websockets")
 import websockets.sync.server  # noqa: E402
 
 from sagittarius_engine.extensions.audit.cli import (  # noqa: E402
+    _parse_duration,
     attach,
     build_parser,
     main,
+    snapshot,
 )
-from sagittarius_engine.extensions.audit.contracts import Lane  # noqa: E402
+from sagittarius_engine.extensions.audit.contracts import (  # noqa: E402
+    PROTOCOL_VERSION,
+    Lane,
+    LifecycleState,
+    StateSnapshot,
+)
 from sagittarius_engine.extensions.audit.infra.trace_server import (  # noqa: E402
     TraceServer,
 )
@@ -51,6 +58,29 @@ def _wait_until(predicate, timeout=READY_TIMEOUT_SECONDS) -> bool:
             return True
         time.sleep(0.02)
     return False
+
+
+@pytest.fixture
+def snapshot_calls():
+    return []
+
+
+@pytest.fixture
+def running_snapshot_server(recorder, snapshot_calls):
+    def provider() -> StateSnapshot:
+        snapshot_calls.append(1)
+        return StateSnapshot(
+            t=len(snapshot_calls),
+            lifecycle=LifecycleState(
+                state="ready", extensions_registered=1, extensions_initialized=1
+            ),
+        )
+
+    server = TraceServer(recorder, host="127.0.0.1", port=0, snapshot_provider=provider)
+    server.start()
+    assert server.ready_event.wait(timeout=READY_TIMEOUT_SECONDS)
+    yield server
+    server.stop()
 
 
 # ------------------------------------------------------------- requirement 1
@@ -180,7 +210,14 @@ def test_a_protocol_mismatch_at_connect_fails_loudly_not_as_a_blank_stream():
 
 def test_a_peer_that_does_not_speak_hello_first_is_refused():
     def handler(websocket) -> None:
-        websocket.send(json.dumps({"v": 1, "type": "trace", "seq": 0, "data": []}))
+        # PROTOCOL_VERSION, not a literal 1. Hardcoding the version meant that
+        # the moment v2 landed this peer was *also* a version mismatch, so the
+        # refusal this test asserts would have come from `check_protocol()`
+        # rather than from the missing `hello` the test is named for — passing
+        # for the wrong reason, which is a detector turned into a rubber stamp.
+        websocket.send(
+            json.dumps({"v": PROTOCOL_VERSION, "type": "trace", "seq": 0, "data": []})
+        )
 
     with websockets.sync.server.serve(handler, "127.0.0.1", 0) as server:
         host, port = server.socket.getsockname()[:2]
@@ -202,6 +239,67 @@ def test_connecting_to_nothing_is_a_usage_error():
     assert code == 2
 
 
+# ---------------------------------------------------------------- snapshot
+
+
+def test_snapshot_prints_a_live_applications_state(running_snapshot_server):
+    """`EPIC-007C` criterion 2: `sagittarius-trace snapshot` prints a live
+    application's state in a terminal."""
+    uri = f"ws://{running_snapshot_server.host}:{running_snapshot_server.port}"
+    out = io.StringIO()
+
+    code = snapshot(uri, None, out=out)
+
+    assert code == 0
+    text = out.getvalue()
+    assert "lifecycle: state=ready extensions=1/1" in text
+    assert "detached" in text
+
+
+def test_watch_requests_exactly_one_snapshot_per_tick(
+    running_snapshot_server, snapshot_calls
+):
+    """`EPIC-007C` criterion 3: `--watch` re-reads on the interval and does
+    not re-collect between them — proven here by the count of printed
+    snapshots matching the count of provider calls exactly, not some
+    multiple of it."""
+    uri = f"ws://{running_snapshot_server.host}:{running_snapshot_server.port}"
+    out = io.StringIO()
+    result: dict = {}
+
+    def run():
+        result["code"] = snapshot(uri, 0.05, out=out)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    try:
+        assert _wait_until(lambda: len(snapshot_calls) >= 3)
+    finally:
+        running_snapshot_server.stop()
+        thread.join(timeout=JOIN_TIMEOUT_SECONDS)
+
+    assert not thread.is_alive()
+    assert out.getvalue().count("snapshot @") == len(snapshot_calls)
+
+
+def test_snapshot_connecting_to_nothing_is_a_usage_error():
+    out = io.StringIO()
+    code = snapshot("ws://127.0.0.1:1", None, out=out)
+    assert code == 2
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"), [("1s", 1.0), ("500ms", 0.5), ("2", 2.0), ("0.25s", 0.25)]
+)
+def test_parse_duration(text, expected):
+    assert _parse_duration(text) == expected
+
+
+def test_parse_duration_rejects_garbage():
+    with pytest.raises(ValueError):
+        _parse_duration("banana")
+
+
 # -------------------------------------------------------------------- argparse
 
 
@@ -217,6 +315,27 @@ def test_build_parser_accepts_attach_with_save():
     assert args.command == "attach"
     assert args.uri == "ws://host:1234"
     assert args.save == "out.sagtrace"
+
+
+def test_build_parser_accepts_snapshot_with_watch():
+    args = build_parser().parse_args(["snapshot", "ws://host:1234", "--watch", "1s"])
+    assert args.command == "snapshot"
+    assert args.uri == "ws://host:1234"
+    assert args.watch == "1s"
+
+
+def test_build_parser_accepts_snapshot_without_watch():
+    args = build_parser().parse_args(["snapshot", "ws://host:1234"])
+    assert args.watch is None
+
+
+def test_main_rejects_an_unparseable_watch_duration():
+    previous = signal.getsignal(signal.SIGTERM)
+    try:
+        out_code = main(["snapshot", "ws://127.0.0.1:1", "--watch", "banana"])
+        assert out_code == 2
+    finally:
+        signal.signal(signal.SIGTERM, previous)
 
 
 # --------------------------------------------------------------------- SIGTERM
