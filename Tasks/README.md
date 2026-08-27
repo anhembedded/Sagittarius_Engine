@@ -86,7 +86,7 @@ link is kept here; content is not duplicated.
 | **[EPIC-004](epics/EPIC-004_sqlite_shard_manager_and_elite_migration/README.md)** | Sharded-SQLite Manager & Elite Migration — absorb the consuming app's generic sharding layer into the engine, then migrate it onto it | ✅ Completed 2026-08-23 (3/3 subtasks done) |
 | **[EPIC-005](epics/EPIC-005_audit_telemetry_rebuild/README.md)** | Audit Telemetry Teardown & Trace Recorder — both dashboard clients are 100% non-functional; delete them and the server, rebuild the recorder half of SystemView, export to Perfetto/OpenTelemetry rather than building a timeline UI. Supersedes `TASK-002` | ✅ Complete 2026-08-26 — all four milestones; `sagittarius-trace` ships, the dashboard is deleted |
 | **[EPIC-006](epics/EPIC-006_wiring_and_readiness_diagnostics/README.md)** | Wiring & Readiness Diagnostics — join `EventRegistry` (declared) against `IEventBus` (subscribed) to catch mis-wiring at boot, plus an explicit `app.ready` milestone. Catches the silent-typo class nothing else can | 🟡 In Progress (5/6 subtasks done) |
-| **[EPIC-007](epics/EPIC-007_runtime_state_console/README.md)** | Runtime State Console — attach to a running app and see what is wired, registered and alive. Decided by [ADR-001](decisions/ADR-001_runtime_state_console_scope_and_transport.md)/[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md); every milestone ends in a runnable command, demoed through `examples/student_management` | 🟡 In Progress (3/6 subtasks done) |
+| **[EPIC-007](epics/EPIC-007_runtime_state_console/README.md)** | Runtime State Console — attach to a running app and see what is wired, registered and alive. Decided by [ADR-001](decisions/ADR-001_runtime_state_console_scope_and_transport.md)/[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md); every milestone ends in a runnable command, demoed through `examples/student_management` | 🟡 In Progress (4/6 subtasks done) |
 
 ---
 
@@ -102,6 +102,7 @@ the complete register live in [`Tasks/refix/README.md`](refix/README.md).
 | **[REF-001](refix/completed/REF-001_function_local_imports_rule_vs_code.md)** | `code-rule.md` §45 ("never") vs. 32 function-local imports in the engine | ✅ Done |
 | **[REF-002](refix/incomplete/REF-002_stale_backlog_links_after_task_moves.md)** | `Tasks/` documents linking into `backlog/` for tasks that moved to `completed/` | 🟠 Open |
 | **[REF-003](refix/incomplete/REF-003_epic_007_id_collision_across_repos.md)** | `EPIC-007A..F` cited in 8 documents meaning Elite Warrior's epic vs. this repo's own `EPIC-007` | 🟠 Open |
+| **[REF-005](refix/completed/REF-005_fsm_transition_to_raises_not_returns_false.md)** | `EPIC-007D`/`EPIC-007F` claim `transition_to()` returns `False` and raises nothing; it raises `InvalidStateTransitionError` | ✅ Done |
 
 ---
 

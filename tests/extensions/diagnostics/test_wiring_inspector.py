@@ -314,9 +314,9 @@ class _Job:
     def __init__(self, next_run):
         self.next_run = next_run
 
-        def job_func() -> None: ...
+        def fn() -> None: ...
 
-        self.job_func = job_func
+        self.fn = fn
 
 
 class _Scheduler:
@@ -333,6 +333,34 @@ def test_d3_reports_a_job_that_will_never_fire():
 
     assert finding.severity == "warning"
     assert "never fire" in finding.message
+
+
+def test_d3_names_the_dead_job_against_a_real_scheduler():
+    """`REF-004`: the fake in the test above shares its attribute name with
+    the bug it was meant to catch (`job_func`, which `ScheduledJob` has never
+    had). This drives the check against the engine's own
+    `runtime.scheduler.scheduler.Scheduler`/`ScheduledJob`, whose callable
+    lives at `.fn` — proving the fix names a real dead job rather than
+    reading `"anonymous job"` forever."""
+    from datetime import timedelta
+
+    from sagittarius_engine.runtime.scheduler.scheduler import ScheduledJob
+    from sagittarius_engine.runtime.scheduler.triggers import IntervalTrigger
+
+    def nightly_report() -> None: ...
+
+    job = ScheduledJob(nightly_report, IntervalTrigger(timedelta(hours=1)))
+    job.next_run = None  # seeded dead: see REF-004 -- a real Scheduler never
+    # leaves a job in `.jobs` with `next_run=None`; an exhausted job is
+    # dropped from the list entirely (`scheduler.py::_run()`), so this state
+    # is reachable only by deliberately setting it, exactly as a demo fault
+    # would.
+    manager = _Scheduler(jobs=[job])
+
+    (finding,) = _findings(WiringInspector().inspect(scheduler=manager), "D3")
+
+    assert finding.subject == nightly_report.__qualname__
+    assert finding.subject != "anonymous job"
 
 
 # ------------------------------------------------------------------- report

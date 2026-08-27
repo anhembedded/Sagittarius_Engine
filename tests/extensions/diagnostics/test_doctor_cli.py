@@ -207,6 +207,30 @@ def test_the_reference_application_passes_strict_inspection(capsys):
     assert exit_code == cli.EXIT_OK, capsys.readouterr().out
 
 
+def test_demo_faults_extension_existing_does_not_leak_into_the_doctor_gate(capsys):
+    """`EPIC-007D` §3/criterion 3: `DemoFaultsExtension` seeds exactly what
+    this gate exists to catch — importing and even constructing it must not
+    turn this build red. `doctor_target.build()` reaches it only through
+    `extra_extensions`, which it never passes; this proves that boundary
+    holds with the class not just present in the tree but instantiated."""
+    from examples.student_management.infrastructure.demo_faults.extension import (
+        DemoFaultsExtension,
+    )
+
+    DemoFaultsExtension()  # constructed, never wired into doctor_target.build()
+
+    exit_code = cli.main(
+        [
+            "examples.student_management.doctor_target:build",
+            "--handler-package",
+            "examples.student_management",
+            "--strict",
+        ]
+    )
+
+    assert exit_code == cli.EXIT_OK, capsys.readouterr().out
+
+
 def test_the_reference_application_report_is_deterministic(capsys):
     """A report that varies between runs cannot be diffed or trusted in CI."""
     target = ["examples.student_management.doctor_target:build", "--json"]

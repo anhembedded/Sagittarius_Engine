@@ -364,17 +364,35 @@ class WiringInspector:
 
     @staticmethod
     def _constructor_dependencies(concrete: type) -> list[tuple[str, Any]]:
-        """@brief `(param_name, annotation)` for each injectable constructor
+        """
+        @brief `(param_name, annotation)` for each injectable constructor
         parameter. Parameters with defaults are skipped — the container is not
-        obliged to supply them."""
+        obliged to supply them.
+
+        @details `eval_str=True` — found via `EPIC-007D`'s `DemoFaultsExtension`,
+        the first constructor this checker was ever run against that (a) uses
+        `from __future__ import annotations` and (b) is registered transient,
+        so `inspect_container()` actually reads it. Without `eval_str`,
+        `inspect.signature()` returns each annotation as the literal source
+        string (`"SystemClock"`, not the class) under postponed evaluation —
+        `annotation in registered` is then false for every dependency
+        regardless of whether it is actually bound, and the one case that
+        reaches a finding crashes formatting it (`str` has no `__name__`).
+        This was latent rather than theoretical: nothing in this repository's
+        own tests exercised a postponed-annotations class through
+        `inspect_container()` before this one did.
+        """
         try:
             # The class, not `concrete.__init__`: `signature()` on a class
             # already resolves the constructor and drops `self`, and reaching
             # for the dunder is unsound anyway — an instance's `__init__` can
             # come from an incompatible subclass, which mypy rejects outright.
-            signature = inspect.signature(concrete)
-        except (TypeError, ValueError):
-            # Builtins and C extensions have no introspectable signature. Not a
+            signature = inspect.signature(concrete, eval_str=True)
+        except (TypeError, ValueError, NameError):
+            # Builtins and C extensions have no introspectable signature; a
+            # forward reference that cannot be resolved in the class's own
+            # module (e.g. a TYPE_CHECKING-only import) raises NameError for
+            # the whole signature, not just that parameter. Neither is a
             # finding: it says nothing about whether the wiring is correct.
             return []
 
@@ -491,13 +509,21 @@ class WiringInspector:
 
     @staticmethod
     def _scheduler(scheduler: Any) -> list[Finding]:
-        """@brief D3 — a job that will never fire."""
+        """
+        @brief D3 — a job that will never fire.
+
+        @details `subject` reads `job.fn` — `runtime.scheduler.scheduler.ScheduledJob`'s
+        actual callable attribute (`REF-004`: this read `job.job_func`, an attribute that
+        class has never had, since before this docstring existed; every real dead job named
+        itself `"anonymous job"`). The only test exercising this check used a duck-typed fake
+        with the same wrong attribute name, so nothing caught it.
+        """
         return [
             Finding(
                 check="D3",
                 severity="warning",
                 subject=getattr(
-                    getattr(job, "job_func", None), "__qualname__", "anonymous job"
+                    getattr(job, "fn", None), "__qualname__", "anonymous job"
                 ),
                 message="scheduled, but has no next run time — it will never fire",
             )

@@ -133,6 +133,36 @@ class TestScheduler(unittest.TestCase):
         # Assert
         mock_context.tasks.spawn.assert_called_once()
 
+    def test_run_drops_a_dead_job_without_crashing_the_thread(self):
+        """`Scheduler._run()` used to crash comparing `None <= datetime`
+        the moment any job's `next_run` was `None` -- found via `EPIC-007D`
+        deliberately producing that state (the same condition
+        `WiringInspector`'s D3 check looks for). The whole background thread
+        died silently on the unhandled exception, with nothing in the
+        scheduler's own state showing it. This proves it no longer does."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.tasks = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        dead_fn = MagicMock(__name__="dead_fn")
+        dead_job = ScheduledJob(dead_fn, IntervalTrigger(timedelta(hours=1)))
+        dead_job.next_run = None
+        scheduler.add_job(dead_job)
+
+        scheduler.start()
+        import time
+
+        time.sleep(0.05)
+
+        # If _run() had raised, the thread would already be dead here --
+        # before stop() was ever called to end it deliberately.
+        self.assertTrue(scheduler._thread.is_alive())
+
+        scheduler.stop()
+
+        mock_context.tasks.spawn.assert_not_called()
+        self.assertNotIn(dead_job, scheduler.jobs)
+
     def test_start_stop_idempotent(self):
         # Arrange
         mock_context = MagicMock(spec=IEngineContext)

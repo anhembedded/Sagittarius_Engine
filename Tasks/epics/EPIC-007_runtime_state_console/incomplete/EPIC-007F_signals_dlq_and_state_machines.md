@@ -55,12 +55,16 @@ history, and the count per state — with no change to the FSM implementation at
 
 ### 3.1 The finding that justifies the panel
 
-`transition_to()` **returns `False` on an illegal transition and raises nothing.**
-
-A caller that does not check the return value carries on believing the move happened. There
-is no log line, no event, no exception — the application simply proceeds from a state it
-does not think it is in. That is the same silent class as `EPIC-006`'s A2 typo, and nothing
-in the engine surfaces it today.
+**Corrected `REF-005`:** this section originally claimed `transition_to()` "returns `False`
+on an illegal transition and raises nothing." That was never true of `BaseStateMachine` —
+`transition_to()`/`dispatch()` both `logger.error(...)` and raise
+`InvalidStateTransitionError` (`state_machine.py`, `declarative_state_machine.py`). The panel
+this section justifies is still worth building, on a narrower and accurate ground: a raised
+exception is visible only to a caller that catches it and does something with it, and nothing
+in the engine does that today. A rejected transition inside a handler the event bus already
+isolates (`handler_reporting.py`) is caught, logged once, and otherwise lost — the same shape
+as `EPIC-006`'s A2 typo, not because the FSM stays silent, but because everything downstream
+of it currently is.
 
 The transition log therefore renders rejected attempts **in `danger`, inline with the
 accepted ones**, and the count of rejections is a first-class number on the panel. If this
@@ -119,8 +123,10 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/tools/state_console/t
 2. The reprocess control is visible, disabled, and states why.
 3. A rejected transition appears in the transition log, marked as rejected, and is counted.
 4. A test drives a machine through an illegal transition and asserts the console reports it —
-   the behaviour is `transition_to()` returning `False`, so the test asserts on the console's
-   output, not on the FSM.
+   the behaviour is `transition_to()` raising `InvalidStateTransitionError` (`REF-005`), so
+   the panel's global callback fires only on a *successful* transition and the rejected one
+   has to be observed by catching the exception at the call site, not by reading a return
+   value; the test asserts on the console's output, not on the FSM.
 5. Watching a machine costs nothing measurable when the console is detached: the callback is
    registered only while a client is attached, or it is a plain append the collector reads.
 6. UI-thread freeze and off-thread-mutation counts appear when the observed app uses
