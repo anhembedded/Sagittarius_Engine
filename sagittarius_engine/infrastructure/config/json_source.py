@@ -17,6 +17,10 @@ class JsonSource(ConfigSource):
         """
         self.filepath = filepath
 
+    @property
+    def label(self) -> str:
+        return f"json:{self.filepath}"
+
     def read(self) -> dict[str, Any]:
         """@brief Reads the configuration from the JSON file."""
         if not os.path.exists(self.filepath):

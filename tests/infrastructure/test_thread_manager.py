@@ -137,3 +137,73 @@ def test_thread_manager_shutdown_cancels_tasks_that_have_not_started():
     assert queued_future.cancelled() is True
     running_task_release.set()
     assert running_future.result(timeout=2) is True
+
+
+# ------------------------------------------------------------ EPIC-007B: stats()
+
+
+def test_stats_reports_max_workers_and_name():
+    manager = ThreadManager(max_workers=3, name="worker-pool")
+    stats = manager.stats()
+    assert stats.name == "worker-pool"
+    assert stats.max_workers == 3
+    assert stats.submitted == 0
+    assert stats.completed == 0
+    assert stats.in_flight == 0
+    manager.shutdown(wait=True)
+
+
+def test_stats_counts_submitted_and_completed():
+    manager = ThreadManager(max_workers=2)
+
+    future = manager.submit(lambda: 1 + 1)
+    assert future.result(timeout=2.0) == 2
+
+    stats = None
+    for _ in range(50):
+        stats = manager.stats()
+        if stats.completed >= 1:
+            break
+        time.sleep(0.02)
+
+    assert stats.submitted == 1
+    assert stats.completed == 1
+    assert stats.in_flight == 0
+    manager.shutdown(wait=True)
+
+
+def test_stats_queue_depth_when_more_submissions_than_workers_are_in_flight():
+    manager = ThreadManager(max_workers=1)
+    release = threading.Event()
+
+    def blocker():
+        release.wait(timeout=2.0)
+
+    manager.submit(blocker)
+    time.sleep(0.05)
+    manager.submit(lambda: None)  # this one is genuinely queued behind the blocker
+    time.sleep(0.02)
+
+    stats = manager.stats()
+    assert stats.in_flight == 2
+    assert stats.max_workers == 1
+    assert stats.queue_depth == 1
+
+    release.set()
+    manager.shutdown(wait=True)
+
+
+def test_ithreadmanager_stats_default_is_none_not_a_zeroed_struct():
+    """A third-party IThreadManager written before `stats()` existed must not
+    fail to instantiate over it -- and its inherited default must read as
+    "not tracked", never as "observed, idle" (EPIC-007A's own distinction)."""
+    from sagittarius_engine.interfaces.i_thread_manager import IThreadManager
+
+    class MinimalThreadManager(IThreadManager):
+        def submit(self, task, *args, **kwargs):
+            raise NotImplementedError
+
+        def shutdown(self, wait: bool = True) -> None:
+            pass
+
+    assert MinimalThreadManager().stats() is None

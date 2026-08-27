@@ -207,3 +207,48 @@ def test_is_running_with_no_key_reports_whether_anything_is_running(
     action.try_start("load_history")
 
     assert action.is_running() is True
+
+
+# ------------------------------------------------------------- EPIC-007B: held_slot()
+
+
+def test_held_slot_is_none_when_the_slot_is_free(thread_manager) -> None:
+    action = ExclusiveAction(thread_manager=thread_manager)
+    assert action.held_slot() is None
+
+
+def test_held_slot_reports_the_key_and_a_growing_duration(thread_manager) -> None:
+    action = ExclusiveAction(thread_manager=thread_manager)
+    assert action.try_start("load_history") is True
+
+    first = action.held_slot()
+    assert first is not None
+    assert first.key == "load_history"
+    assert first.held_seconds >= 0
+
+    time.sleep(0.05)
+    second = action.held_slot()
+    assert second is not None
+    assert second.held_seconds > first.held_seconds
+
+
+def test_held_slot_is_none_again_after_finish(thread_manager) -> None:
+    action = ExclusiveAction(thread_manager=thread_manager)
+    action.try_start("load_history")
+    action.finish("load_history")
+    assert action.held_slot() is None
+
+
+def test_held_slot_is_singular_by_construction_only_one_key_at_a_time(
+    thread_manager,
+) -> None:
+    """One instance has exactly one slot -- try_start() for a second key while
+    the first is held must fail, so held_slot() can never need to report more
+    than one entry."""
+    action = ExclusiveAction(thread_manager=thread_manager)
+    assert action.try_start("first") is True
+    assert action.try_start("second") is False
+
+    slot = action.held_slot()
+    assert slot is not None
+    assert slot.key == "first"

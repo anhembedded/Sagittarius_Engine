@@ -49,6 +49,12 @@ class StdLibContainer(IContainer):
         self._scope_context: ScopeContext = ScopeContext(self._scoped_registry)
         # Cache for parsed __init__ dependencies to speed up resolution
         self._resolution_cache: dict[type, dict[str, dict[str, Any]]] = {}
+        # EPIC-007B: a count that only ever rises is a `with create_scope():`
+        # block that never exits -- invisible by any other means today.
+        # Decremented only in `ScopeContext.__exit__`, so a scope entered and
+        # never exited (leaked) stays counted rather than self-correcting;
+        # that is the signal this exists to surface, not a bug to hide.
+        self._open_scopes = 0
 
     def bind(self, abstract: type, concrete: type) -> None:
         """
@@ -206,7 +212,26 @@ class StdLibContainer(IContainer):
 
         @return A ScopeContext that activates a new isolated resolution scope.
         """
-        return ScopeContext(self._scoped_registry)
+        return ScopeContext(
+            self._scoped_registry,
+            on_enter=self._increment_open_scopes,
+            on_exit=self._decrement_open_scopes,
+        )
+
+    def _increment_open_scopes(self) -> None:
+        with self._lock:
+            self._open_scopes += 1
+
+    def _decrement_open_scopes(self) -> None:
+        with self._lock:
+            self._open_scopes = max(0, self._open_scopes - 1)
+
+    def open_scope_count(self) -> int:
+        """@brief How many `create_scope()` blocks are currently entered —
+        `EPIC-007B`. A count that only rises across successive reads is a
+        leaked scope: something entered one and never exited it."""
+        with self._lock:
+            return self._open_scopes
 
     def _resolve(self, abstract: type[T] | Any, resolving: set[type]) -> T:  # noqa: C901
         """

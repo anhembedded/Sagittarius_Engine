@@ -33,6 +33,11 @@ class ConfigManager(IConfig):
     @endcode
     """
 
+    #: `EPIC-007B`: the label `sources()` reports for a key set via @ref set rather
+    #: than supplied by any registered `ConfigSource` — a source-shaped answer for a
+    #: value that has no source, only a call site.
+    _RUNTIME_SOURCE_LABEL = "runtime:set()"
+
     def __init__(self) -> None:
         """@brief Constructor."""
         self._sources: list[ConfigSource] = []
@@ -40,6 +45,9 @@ class ConfigManager(IConfig):
         self._loaded = False
         self._writable_path: str | None = None
         self._dirty: dict[str, Any] = {}
+        # EPIC-007B: which registered source last won each key, in the same
+        # override order `_load()` already applies to `_cache`.
+        self._key_sources: dict[str, str] = {}
 
     def add_source(self, source: ConfigSource) -> None:
         """
@@ -97,10 +105,17 @@ class ConfigManager(IConfig):
         if self._loaded:
             return
         self._cache = {}
+        self._key_sources = {}
         for source in self._sources:
             try:
                 data = source.read()
                 self._cache.update(data)
+                # Same override order as the line above, by construction: a
+                # later source's label replaces an earlier one's for any key
+                # both supply, because this loop reaches the later source
+                # second.
+                for key in data:
+                    self._key_sources[key] = source.label
             except Exception as e:
                 logging.getLogger(__name__).error(f"Config read error: {e}")
         self._loaded = True
@@ -123,6 +138,14 @@ class ConfigManager(IConfig):
         self._load()
         return self._cache.copy()
 
+    def sources(self) -> dict[str, str]:
+        """
+        @brief Which registered source supplied the winning value, per key —
+        `EPIC-007B`. See `IConfig.sources()` for why this exists.
+        """
+        self._load()
+        return self._key_sources.copy()
+
     def set(self, key: str, value: Any) -> None:
         """
         @brief Sets a configuration value.
@@ -136,6 +159,7 @@ class ConfigManager(IConfig):
         self._load()
         self._cache[key] = value
         self._dirty[key] = value
+        self._key_sources[key] = self._RUNTIME_SOURCE_LABEL
 
     def save(self) -> None:
         """

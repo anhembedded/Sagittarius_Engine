@@ -151,3 +151,21 @@ class IContainer(ABC):
         fails if a new container does not.
         """
         return {}
+
+    def open_scope_count(self) -> int:
+        """
+        @brief How many `create_scope()` blocks are currently entered — `EPIC-007B`.
+
+        @details A count that only rises across successive reads is a leaked scope —
+        something entered a `with create_scope():` block and never exited it,
+        invisible by any other means today.
+
+        @par Why this is concrete rather than abstract
+        Same reasoning as `registrations()`: an `IContainer` implemented outside this
+        repository keeps working. `0` here is genuinely ambiguous between "nothing is
+        open" and "not tracked" — the same ambiguity `registrations()`'s own docstring
+        names for an empty mapping — and is accepted for the same reason: consistency
+        with the one escape hatch already established, rather than a second, differently
+        shaped one for this method alone.
+        """
+        return 0

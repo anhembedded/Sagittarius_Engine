@@ -38,3 +38,20 @@ class IConfig(ABC):
         @param value The configuration value to store.
         """
         ...
+
+    def sources(self) -> dict[str, str]:
+        """
+        @brief Which registered source supplied the winning value, per key —
+        `EPIC-007B`.
+
+        @details "Which layer won" is the question a config panel is actually opened
+        for: `get_all()` already answers *what* the merged value is, never *why*. Found
+        as a real gap while specifying `EPIC-007A`'s wire schema, and closed here.
+
+        @details Concrete, not abstract, for the same reason as `ITaskManager.snapshot()`
+        — an existing `IConfig` implementation (this engine's own `DictConfig`, a single
+        flat mapping with no layering at all, included) must not fail to instantiate over
+        a question it has no honest answer to. `{}` is that honest answer: every key is
+        source-unknown, not silently mislabelled.
+        """
+        return {}

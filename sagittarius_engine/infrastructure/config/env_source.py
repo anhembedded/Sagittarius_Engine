@@ -18,6 +18,10 @@ class EnvSource(ConfigSource):
         """
         self.prefix = prefix
 
+    @property
+    def label(self) -> str:
+        return f"env:{self.prefix}"
+
     def read(self) -> dict[str, Any]:
         """@brief Reads the configuration from environment variables."""
         result = {}

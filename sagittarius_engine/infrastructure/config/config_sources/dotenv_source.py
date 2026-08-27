@@ -37,6 +37,10 @@ class DotenvSource(ConfigSource):
         """
         self.filepath = filepath
 
+    @property
+    def label(self) -> str:
+        return f"dotenv:{self.filepath}"
+
     def read(self) -> dict[str, Any]:
         """@brief Reads the configuration from the .env file."""
         if not os.path.exists(self.filepath):
