@@ -221,6 +221,37 @@ def _format_snapshot(snapshot: StateSnapshot) -> str:
         for finding in snapshot.findings:
             lines.append(f"  [{finding.severity}] {finding.subject}: {finding.message}")
 
+    if snapshot.signals is not None:
+        signals = snapshot.signals
+        if signals.dead_letters:
+            lines.append(f"dead letters: {len(signals.dead_letters)}")
+            for dl in signals.dead_letters:
+                lines.append(
+                    f"  {dl.event_name}: {dl.exception_type}: {dl.exception_message} "
+                    f"(handler={dl.handler}, retries={dl.retries})"
+                )
+        if signals.state_machines:
+            lines.append(f"state machines: {len(signals.state_machines)}")
+            for machine in signals.state_machines:
+                lines.append(
+                    f"  {machine.name}: state={machine.current_state} "
+                    f"rejected={machine.rejected_count}"
+                )
+                for transition in machine.transitions:
+                    flag = " [REJECTED]" if transition.rejected else ""
+                    via = f" via {transition.event}" if transition.event else ""
+                    lines.append(
+                        f"    {transition.from_state} -> {transition.to_state}"
+                        f"{via}{flag}"
+                    )
+        if signals.ui_thread is not None:
+            ui_thread = signals.ui_thread
+            lines.append(
+                f"ui thread: freezes={ui_thread.freeze_count} "
+                f"(worst={ui_thread.worst_freeze_ms:.0f}ms), "
+                f"off_thread_mutations={ui_thread.off_thread_mutation_count}"
+            )
+
     return "\n".join(lines)
 
 

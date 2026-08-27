@@ -94,3 +94,91 @@ def test_signals_screen_says_not_yet_available_rather_than_an_empty_table(qtbot)
     for _ in range(5):
         qtbot.wait(1)
     assert root.property("notAttached") is True
+
+
+def test_signals_screen_renders_a_dead_letter_and_a_rejected_transition(qtbot):
+    """`EPIC-007F`: a real dead-lettered event and a real rejected
+    transition both reach this screen's tables."""
+    view = SignalsView()
+    qtbot.addWidget(view)
+    vm = SignalsViewModel()
+    view.bind(vm)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    vm.set_connection_state(ATTACHED_READING)
+    vm.set_dead_letters(
+        [
+            {
+                "eventName": "demo.student_deleted",
+                "handler": "_always_raises",
+                "exceptionType": "KeyError",
+                "exceptionMessage": "demo: enrolment record missing",
+                "payloadRepr": "{'student_id': 'demo-0000'}",
+                "retries": 1,
+            }
+        ]
+    )
+    vm.set_state_machines(
+        [{"name": "EnrolmentFlow", "currentState": "ENROLLED", "rejectedCount": 1}],
+        [
+            {
+                "machine": "EnrolmentFlow",
+                "fromState": "DRAFT",
+                "toState": "SUBMITTED",
+                "event": "",
+                "rejected": False,
+            },
+            {
+                "machine": "EnrolmentFlow",
+                "fromState": "ENROLLED",
+                "toState": "SUBMITTED",
+                "event": "",
+                "rejected": True,
+            },
+        ],
+    )
+    for _ in range(5):
+        qtbot.wait(1)
+
+    assert view.quick_widget.rootObject() is not None
+    assert vm.deadLetters[0]["eventName"] == "demo.student_deleted"
+    assert vm.stateMachines[0]["rejectedCount"] == 1
+    assert any(t["rejected"] for t in vm.transitions)
+    assert not vm.hasUiThreadHealth
+
+
+def test_ui_thread_health_section_appears_only_when_watched(qtbot):
+    view = SignalsView()
+    qtbot.addWidget(view)
+    vm = SignalsViewModel()
+    view.bind(vm)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    assert vm.hasUiThreadHealth is False
+
+    vm.set_ui_thread_health(2, 5200.0, 3)
+    for _ in range(5):
+        qtbot.wait(1)
+    assert vm.hasUiThreadHealth is True
+    assert vm.freezeCount == 2
+    assert vm.offThreadMutationCount == 3
+
+    vm.clear_ui_thread_health()
+    assert vm.hasUiThreadHealth is False
+
+
+def test_reprocess_control_states_why_it_is_disabled(qtbot):
+    view = SignalsView()
+    qtbot.addWidget(view)
+    vm = SignalsViewModel()
+    view.bind(vm)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    assert "ADR-003" in vm.reprocessDisabledReason
+    assert view.quick_widget.rootObject() is not None

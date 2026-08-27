@@ -23,7 +23,7 @@ work it was observing.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -91,6 +91,7 @@ __all__ = [
     "BoundedStructures",
     "ConfigEntry",
     "ContainerState",
+    "DeadLetterEntry",
     "Envelope",
     "EventState",
     "FindingRecord",
@@ -101,10 +102,14 @@ __all__ = [
     "ProtocolMismatch",
     "RecordKind",
     "RegistrationState",
+    "SignalsState",
+    "StateMachineState",
+    "StateMachineTransition",
     "StateSnapshot",
     "TaskRecord",
     "ThreadPoolStats",
     "TraceRecord",
+    "UiThreadHealth",
     "check_protocol",
     "error_message",
     "mask_config",
@@ -779,6 +784,259 @@ class BoundedStructures:
         )
 
 
+#: `repr()` of a dead-lettered payload is capped here — the payload is
+#: arbitrary application data (`ResilientEventBus.emit()` takes anything),
+#: not a schema this module controls, so it cannot be serialised field by
+#: field the way every other section here is. `repr()` always succeeds
+#: (unlike `json.dumps`, which would crash snapshot collection on the first
+#: non-primitive payload) and a cap keeps one oversized payload from
+#: dominating the wire the way an unbounded trace `args` dict would.
+_PAYLOAD_REPR_MAX_CHARS = 2000
+
+
+def _capped_repr(value: Any) -> str:
+    rendered = repr(value)
+    if len(rendered) > _PAYLOAD_REPR_MAX_CHARS:
+        return rendered[:_PAYLOAD_REPR_MAX_CHARS] + "…"
+    return rendered
+
+
+@dataclass(frozen=True, slots=True)
+class DeadLetterEntry:
+    """
+    @brief One event `ResilientEventBus` retried past `max_retries` and
+    parked — `EPIC-007F` §2. The first time anything in this repository
+    other than a test has read `get_dlq()`.
+
+    @param payload_repr `repr()` of the parked payload, not the payload
+        itself — see `_capped_repr`. Arbitrary application data crossing a
+        JSON wire has no safe general encoding; a string that always
+        renders is the honest choice over a serialiser that sometimes
+        crashes collection.
+    @param retries How many attempts were made before parking — always
+        `bus.max_retries`, since a handler is parked only once every retry
+        is spent; carried per-entry rather than left for a reader to know
+        the bus's configuration separately.
+    @param parked_at_ns Monotonic, same clock as `StateSnapshot.t` — when
+        the event was parked, not when this snapshot was collected.
+    """
+
+    event_name: str
+    handler: str = ""
+    exception_type: str = ""
+    exception_message: str = ""
+    payload_repr: str = ""
+    retries: int = 0
+    parked_at_ns: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "event_name": self.event_name,
+            "handler": self.handler,
+            "exception_type": self.exception_type,
+            "exception_message": self.exception_message,
+            "payload_repr": self.payload_repr,
+            "retries": self.retries,
+            "parked_at_ns": self.parked_at_ns,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DeadLetterEntry:
+        return cls(
+            event_name=data["event_name"],
+            handler=data.get("handler", ""),
+            exception_type=data.get("exception_type", ""),
+            exception_message=data.get("exception_message", ""),
+            payload_repr=data.get("payload_repr", ""),
+            retries=data.get("retries", 0),
+            parked_at_ns=data.get("parked_at_ns", 0),
+        )
+
+    @classmethod
+    def from_dlq_row(
+        cls, row: tuple[str, Any, Callable[..., Any], BaseException, int], retries: int
+    ) -> DeadLetterEntry:
+        """@brief Builds one entry from `ResilientEventBus.get_dlq()`'s own
+        row shape — the one place this module reaches into that decorator's
+        internal tuple, kept here rather than duplicated at every call
+        site."""
+        event_name, payload, handler, exc, parked_at_ns = row
+        return cls(
+            event_name=event_name,
+            handler=getattr(handler, "__qualname__", repr(handler)),
+            exception_type=type(exc).__name__,
+            exception_message=str(exc),
+            payload_repr=_capped_repr(payload),
+            retries=retries,
+            parked_at_ns=parked_at_ns,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StateMachineTransition:
+    """
+    @brief One transition attempt on a watched `BaseStateMachine` —
+    `EPIC-007F` §3.1, accepted and rejected alike.
+
+    @details `REF-005`: `transition_to()`/`dispatch()` raise
+    `InvalidStateTransitionError` rather than returning `False`, and the
+    global callback they call on success never fires on a rejection — so a
+    rejected attempt is captured separately, by catching that exception at
+    the watcher's own wrapper, not by reading a return value.
+
+    @param event The dispatched event's name, empty for a plain
+        `transition_to()` call (`BaseStateMachine` has no event concept —
+        only `DeclarativeStateMachine.dispatch()` does).
+    @param rejected Whether the matrix refused this transition. Rendered
+        inline with accepted transitions, in `danger` — "the panel this
+        section justifies is still worth building... a rejected transition
+        is caught, logged once, and otherwise lost."
+    """
+
+    from_state: str
+    to_state: str
+    event: str = ""
+    rejected: bool = False
+    at_ns: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "from_state": self.from_state,
+            "to_state": self.to_state,
+            "event": self.event,
+            "rejected": self.rejected,
+            "at_ns": self.at_ns,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> StateMachineTransition:
+        return cls(
+            from_state=data["from_state"],
+            to_state=data.get("to_state", ""),
+            event=data.get("event", ""),
+            rejected=data.get("rejected", False),
+            at_ns=data.get("at_ns", 0),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StateMachineState:
+    """
+    @brief One machine an application opted into watching via
+    `StateConsoleExtension.watch_state_machine(name, machine)` —
+    `EPIC-007F` §3.2. Explicit registration, not a subclass registry:
+    `EPIC-006D` found a registry would have discovered 0 of the demo app's
+    7 handlers, because the marker was duck-typed.
+
+    @param transitions Newest-last, bounded (`_StateMachineWatcher`'s own
+        cap) — a log, not an unbounded history.
+    @param rejected_count A first-class number, not something a reader
+        derives by filtering `transitions` — "the count of rejections is a
+        first-class number on the panel."
+    """
+
+    name: str
+    current_state: str = ""
+    transitions: tuple[StateMachineTransition, ...] = ()
+    rejected_count: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "current_state": self.current_state,
+            "transitions": [t.to_dict() for t in self.transitions],
+            "rejected_count": self.rejected_count,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> StateMachineState:
+        return cls(
+            name=data["name"],
+            current_state=data.get("current_state", ""),
+            transitions=tuple(
+                StateMachineTransition.from_dict(t) for t in data.get("transitions", ())
+            ),
+            rejected_count=data.get("rejected_count", 0),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class UiThreadHealth:
+    """
+    @brief Qt main-thread freeze and off-thread-mutation counts —
+    `EPIC-007F` §4. Present only when the observed app opted in via
+    `StateConsoleExtension.watch_ui_thread_health(source)`; absent
+    (`StateSnapshot.signals.ui_thread is None`) for any app that does not
+    use `pyside_mvc`, never zeroed — a zero here means "watched, no
+    violations", and showing it for an app that was never watched would be
+    a lie no different from `EPIC-005`'s D1.
+
+    @param worst_freeze_ms The longest single freeze `UIWatchdog` has
+        measured this run, `0.0` until the first one.
+    @param off_thread_mutation_count `@ui_mutator`'s cross-thread branch,
+        counted regardless of dev/production mode — dev mode raises,
+        production marshals via `QTimer.singleShot`, and both are the same
+        underlying violation.
+    """
+
+    freeze_count: int = 0
+    worst_freeze_ms: float = 0.0
+    off_thread_mutation_count: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "freeze_count": self.freeze_count,
+            "worst_freeze_ms": self.worst_freeze_ms,
+            "off_thread_mutation_count": self.off_thread_mutation_count,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> UiThreadHealth:
+        return cls(
+            freeze_count=data.get("freeze_count", 0),
+            worst_freeze_ms=data.get("worst_freeze_ms", 0.0),
+            off_thread_mutation_count=data.get("off_thread_mutation_count", 0),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SignalsState:
+    """
+    @brief The dead-letter queue and state-machine panels — `EPIC-007F`.
+    Every field independently optional/empty, same "absent means not
+    observed" rule `StateSnapshot` itself documents.
+    """
+
+    dead_letters: tuple[DeadLetterEntry, ...] = ()
+    state_machines: tuple[StateMachineState, ...] = ()
+    ui_thread: UiThreadHealth | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        if self.dead_letters:
+            out["dead_letters"] = [d.to_dict() for d in self.dead_letters]
+        if self.state_machines:
+            out["state_machines"] = [s.to_dict() for s in self.state_machines]
+        if self.ui_thread is not None:
+            out["ui_thread"] = self.ui_thread.to_dict()
+        return out
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SignalsState:
+        ui_thread = data.get("ui_thread")
+        return cls(
+            dead_letters=tuple(
+                DeadLetterEntry.from_dict(d) for d in data.get("dead_letters", ())
+            ),
+            state_machines=tuple(
+                StateMachineState.from_dict(s) for s in data.get("state_machines", ())
+            ),
+            ui_thread=None
+            if ui_thread is None
+            else UiThreadHealth.from_dict(ui_thread),
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class StateSnapshot:
     """
@@ -804,6 +1062,7 @@ class StateSnapshot:
     bounded: BoundedStructures | None = None
     config: tuple[ConfigEntry, ...] = ()
     findings: tuple[FindingRecord, ...] = ()
+    signals: SignalsState | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {"t": self.t}
@@ -823,6 +1082,8 @@ class StateSnapshot:
             out["config"] = [c.to_dict() for c in self.config]
         if self.findings:
             out["findings"] = [f.to_dict() for f in self.findings]
+        if self.signals is not None:
+            out["signals"] = self.signals.to_dict()
         return out
 
     @classmethod
@@ -830,6 +1091,7 @@ class StateSnapshot:
         lifecycle = data.get("lifecycle")
         container = data.get("container")
         bounded = data.get("bounded")
+        signals = data.get("signals")
         return cls(
             t=data.get("t", 0),
             lifecycle=None
@@ -848,6 +1110,7 @@ class StateSnapshot:
             findings=tuple(
                 FindingRecord.from_dict(f) for f in data.get("findings", ())
             ),
+            signals=None if signals is None else SignalsState.from_dict(signals),
         )
 
 

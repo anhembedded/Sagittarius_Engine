@@ -10,16 +10,18 @@ class is what keeps the doctor gate green. See
 `Tasks/refix/completed/REF-005_...md` for a correction made while writing
 this: `EnrolmentFlow`'s illegal move raises, it does not return `False`.
 
-@par What is deliberately NOT wired here
-`RuntimeMonitor` (R1/R2) and `ResilientEventBus`'s dead-letter queue are
-observed directly by this extension and logged at shutdown, matching
-`DiagnosticsExtension(watch_runtime=True)`'s own pattern — but neither
-reaches `sagittarius-trace snapshot` today. `StateSnapshot` has no field for
-either yet; that is `EPIC-007F`'s panel, not this milestone's.
-`ExclusiveAction.held_slot()` (`EPIC-007B`) is seeded and real, for the same
-reason: nothing in `EPIC-007C`'s collectors reads it yet. All three are
+@par What EPIC-007F wired in, and what is still deliberately not
+`console.watch_dlq()`/`watch_state_machine()` (`EPIC-007F` §2/§3) are called
+here when a `StateConsoleExtension` is passed in, so the dead-lettered
+`demo.student_deleted` and the rejected `EnrolmentFlow` transition both
+reach `sagittarius-trace snapshot`'s `signals` section — the console
+argument is optional precisely so this extension keeps working exactly as
+before when no console is attached (every seed is independently verifiable
+through this extension's own public attributes regardless).
+`RuntimeMonitor` (R1/R2) and `ExclusiveAction.held_slot()` (`EPIC-007B`)
+remain unwired: `StateSnapshot` has no field for either yet, and both are
 directly verifiable in this extension's own tests without a live console
-attached.
+attached, same as before.
 """
 
 from __future__ import annotations
@@ -86,9 +88,18 @@ class DemoFaultsExtension(IExtension[Any]):
     `self.rejected_transition`) without a live `sagittarius-trace` client.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, console: Any = None) -> None:
+        """
+        @param console A `StateConsoleExtension`, when one is attached
+            (`EPIC-007F`) — passed by `console.py` when `--demo-faults` runs
+            alongside `-Console`. `None` (the default) keeps every existing
+            direct-attribute test working unchanged, and skips
+            `watch_dlq()`/`watch_state_machine()` entirely rather than
+            failing.
+        """
         self.dependencies: list[str] = []
         self.runtime_monitor = RuntimeMonitor()
+        self._console = console
         self.resilient_bus: ResilientEventBus | None = None
         self.exclusive_action: ExclusiveAction | None = None
         self.enrolment_flow: EnrolmentFlow | None = None
@@ -138,6 +149,12 @@ class DemoFaultsExtension(IExtension[Any]):
         registers its retry wrapper on `inner_bus` directly, so the
         subscription lands on the same bus `EventCollector` already reads."""
         self.resilient_bus = ResilientEventBus(context.event_bus, max_retries=1)
+        if self._console is not None:
+            # Before the emit below, not after: `SignalsCollector` reads
+            # `get_dlq()` fresh at collection time regardless, but watching
+            # first is the same "opt in before you drive it" discipline
+            # `_seed_illegal_fsm_transition` follows for the FSM case.
+            self._console.watch_dlq(self.resilient_bus)
 
         def _always_raises(_payload: Any) -> None:
             raise KeyError("demo: enrolment record missing")
@@ -201,8 +218,13 @@ class DemoFaultsExtension(IExtension[Any]):
         """@brief `EnrolmentFlow`, driven legally then once illegally.
         `transition_to()` raises rather than returning `False`
         (`REF-005`) -- caught here, the same way any real caller would have
-        to."""
+        to. Watched *before* it is driven (`EPIC-007F` §3.2): a watcher
+        installed after the fact would never see either the legal history
+        or the illegal move, the same way any event listener added too late
+        misses what already happened."""
         self.enrolment_flow = EnrolmentFlow()
+        if self._console is not None:
+            self._console.watch_state_machine("EnrolmentFlow", self.enrolment_flow)
         self.rejected_transition = drive_one_illegal_move(self.enrolment_flow)
         logging.getLogger("App").info(
             "DemoFaultsExtension: rejected transition %s", self.rejected_transition

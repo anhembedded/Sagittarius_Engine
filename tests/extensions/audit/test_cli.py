@@ -15,6 +15,7 @@ pytest.importorskip("websockets")
 import websockets.sync.server  # noqa: E402
 
 from sagittarius_engine.extensions.audit.cli import (  # noqa: E402
+    _format_snapshot,
     _parse_duration,
     attach,
     build_parser,
@@ -23,9 +24,14 @@ from sagittarius_engine.extensions.audit.cli import (  # noqa: E402
 )
 from sagittarius_engine.extensions.audit.contracts import (  # noqa: E402
     PROTOCOL_VERSION,
+    DeadLetterEntry,
     Lane,
     LifecycleState,
+    SignalsState,
+    StateMachineState,
+    StateMachineTransition,
     StateSnapshot,
+    UiThreadHealth,
 )
 from sagittarius_engine.extensions.audit.infra.trace_server import (  # noqa: E402
     TraceServer,
@@ -237,6 +243,84 @@ def test_connecting_to_nothing_is_a_usage_error():
     out = io.StringIO()
     code = attach("ws://127.0.0.1:1", save_path=None, out=out)
     assert code == 2
+
+
+# ------------------------------------------------------ EPIC-007F rendering
+
+
+def test_format_snapshot_omits_the_signals_section_when_absent():
+    text = _format_snapshot(StateSnapshot())
+    assert "dead letters" not in text
+    assert "state machines" not in text
+    assert "ui thread" not in text
+
+
+def test_format_snapshot_renders_a_dead_letter():
+    snapshot_obj = StateSnapshot(
+        signals=SignalsState(
+            dead_letters=(
+                DeadLetterEntry(
+                    event_name="demo.student_deleted",
+                    handler="handlers._always_raises",
+                    exception_type="KeyError",
+                    exception_message="demo: enrolment record missing",
+                    retries=1,
+                ),
+            )
+        )
+    )
+    text = _format_snapshot(snapshot_obj)
+    assert "dead letters: 1" in text
+    assert "demo.student_deleted: KeyError: demo: enrolment record missing" in text
+    assert "retries=1" in text
+
+
+def test_format_snapshot_renders_a_rejected_transition_flagged():
+    snapshot_obj = StateSnapshot(
+        signals=SignalsState(
+            state_machines=(
+                StateMachineState(
+                    name="EnrolmentFlow",
+                    current_state="ENROLLED",
+                    rejected_count=1,
+                    transitions=(
+                        StateMachineTransition(
+                            from_state="DRAFT", to_state="SUBMITTED"
+                        ),
+                        StateMachineTransition(
+                            from_state="ENROLLED", to_state="SUBMITTED", rejected=True
+                        ),
+                    ),
+                ),
+            )
+        )
+    )
+    text = _format_snapshot(snapshot_obj)
+    assert "state machines: 1" in text
+    assert "EnrolmentFlow: state=ENROLLED rejected=1" in text
+    assert "DRAFT -> SUBMITTED" in text
+    assert "ENROLLED -> SUBMITTED [REJECTED]" in text
+    # the accepted transition must NOT carry the flag
+    accepted_line = next(
+        line for line in text.splitlines() if "DRAFT -> SUBMITTED" in line
+    )
+    assert "[REJECTED]" not in accepted_line
+
+
+def test_format_snapshot_renders_ui_thread_health_only_when_present():
+    without = _format_snapshot(StateSnapshot(signals=SignalsState()))
+    assert "ui thread" not in without
+
+    with_health = _format_snapshot(
+        StateSnapshot(
+            signals=SignalsState(
+                ui_thread=UiThreadHealth(
+                    freeze_count=2, worst_freeze_ms=5200.0, off_thread_mutation_count=3
+                )
+            )
+        )
+    )
+    assert "ui thread: freezes=2 (worst=5200ms), off_thread_mutations=3" in with_health
 
 
 # ---------------------------------------------------------------- snapshot

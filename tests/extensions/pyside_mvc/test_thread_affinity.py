@@ -29,7 +29,9 @@ from PySide6.QtCore import QObject, Signal, Slot
 
 from sagittarius_engine.extensions.pyside_mvc.safety.thread_affinity import (
     CrossThreadUiMutationError,
+    get_off_thread_mutation_count,
     not_a_ui_mutator,
+    reset_off_thread_mutation_count,
     set_thread_affinity_dev_mode,
     ui_mutator,
     unprotected_mutators,
@@ -53,12 +55,15 @@ class _Target(QObject):
 def setup_function() -> None:
     # Global dev-mode flag (see thread_affinity.py's own module docstring
     # for why it's process-wide) — reset before every test so one test's
-    # mode can't leak into the next.
+    # mode can't leak into the next. The off-thread-mutation counter is the
+    # same kind of process-wide state, reset for the same reason.
     set_thread_affinity_dev_mode(False)
+    reset_off_thread_mutation_count()
 
 
 def teardown_function() -> None:
     set_thread_affinity_dev_mode(False)
+    reset_off_thread_mutation_count()
 
 
 def test_a_same_thread_call_runs_synchronously_and_returns_normally() -> None:
@@ -122,6 +127,63 @@ def test_production_mode_does_not_raise_and_marshals_onto_the_main_thread(
 
     assert target.value == 7
     assert target.called_from_thread is main_thread
+
+
+def test_a_same_thread_call_does_not_count_as_an_off_thread_mutation() -> None:
+    target = _Target()
+
+    target.set_value(42)
+
+    assert get_off_thread_mutation_count() == 0
+
+
+def test_dev_mode_raise_still_counts_the_violation() -> None:
+    """The counter tracks the violation itself, not which branch handles
+    it -- `EPIC-007F` §4 reports dev-mode and production the same way."""
+    set_thread_affinity_dev_mode(True)
+    target = _Target()
+
+    worker = threading.Thread(target=lambda: _try(target.set_value, 1))
+    worker.start()
+    worker.join(timeout=5)
+
+    assert get_off_thread_mutation_count() == 1
+
+
+def test_production_marshaling_counts_the_violation_too(qapp) -> None:
+    set_thread_affinity_dev_mode(False)
+    target = _Target()
+
+    worker = threading.Thread(target=lambda: target.set_value(7))
+    worker.start()
+    worker.join(timeout=5)
+
+    assert get_off_thread_mutation_count() == 1
+
+    # Drain the deferred call so it doesn't leak into the next test.
+    deadline = time.monotonic() + 2.0
+    while target.value is None and time.monotonic() < deadline:
+        qapp.processEvents()
+        time.sleep(0.01)
+
+
+def test_two_cross_thread_calls_count_twice() -> None:
+    set_thread_affinity_dev_mode(True)
+    target = _Target()
+
+    for _ in range(2):
+        worker = threading.Thread(target=lambda: _try(target.set_value, 1))
+        worker.start()
+        worker.join(timeout=5)
+
+    assert get_off_thread_mutation_count() == 2
+
+
+def _try(func, *args) -> None:
+    try:
+        func(*args)
+    except CrossThreadUiMutationError:
+        pass
 
 
 class _ScanTargetBase(QObject):

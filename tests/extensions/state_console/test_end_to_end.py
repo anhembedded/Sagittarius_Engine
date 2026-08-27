@@ -11,6 +11,7 @@ import asyncio
 import gc
 import json
 import time
+from enum import Enum, auto
 
 import pytest
 
@@ -26,8 +27,17 @@ from sagittarius_engine.extensions.audit.contracts import (  # noqa: E402
     StateSnapshot,
     check_protocol,
 )
+from sagittarius_engine.extensions.fsm.exceptions import (  # noqa: E402
+    InvalidStateTransitionError,
+)
+from sagittarius_engine.extensions.fsm.state_machine import (
+    BaseStateMachine,  # noqa: E402
+)
 from sagittarius_engine.extensions.state_console import (
     StateConsoleExtension,  # noqa: E402
+)
+from sagittarius_engine.infrastructure.event_bus.resilient_event_bus import (  # noqa: E402
+    ResilientEventBus,
 )
 
 READY_TIMEOUT_SECONDS = 3.0
@@ -165,6 +175,100 @@ async def test_a_request_within_the_minimum_interval_returns_the_cached_snapshot
             assert first.t == second.t
     finally:
         app.stop()
+
+
+# ------------------------------------------------------------------- EPIC-007F
+
+
+class _DoorState(Enum):
+    CLOSED = auto()
+    OPEN = auto()
+
+
+async def test_a_dead_letter_and_a_rejected_transition_appear_in_a_real_snapshot(
+    running_app,
+):
+    """`EPIC-007F` criteria 1/3/4: a real dead-lettered event and a real
+    rejected transition, watched via the public `watch_dlq()`/
+    `watch_state_machine()` API, reach a real client over the real wire --
+    not asserted against the collector or the watcher in isolation."""
+    app, ext = running_app
+
+    resilient_bus = ResilientEventBus(app.context.event_bus, max_retries=0)
+
+    def _always_raises(_payload):
+        raise KeyError("boom")
+
+    resilient_bus.on("test.dlq_event", _always_raises)
+    ext.watch_dlq(resilient_bus)
+    resilient_bus.emit("test.dlq_event", {"id": "x"})
+
+    door = BaseStateMachine(_DoorState.CLOSED)
+    door.add_transition(_DoorState.CLOSED, _DoorState.OPEN)
+    ext.watch_state_machine("Door", door)
+    assert door.transition_to(_DoorState.OPEN) is True
+    with pytest.raises(InvalidStateTransitionError):
+        door.transition_to(_DoorState.OPEN)  # OPEN -> OPEN is not a legal move
+
+    async with await _connect(ext) as client:
+        await _recv_envelope(client)  # hello
+        envelope = await _request_snapshot(client)
+
+    snapshot = StateSnapshot.from_dict(envelope["data"])
+    assert snapshot.signals is not None
+
+    (dead_letter,) = snapshot.signals.dead_letters
+    assert dead_letter.event_name == "test.dlq_event"
+    assert dead_letter.exception_type == "KeyError"
+    assert "boom" in dead_letter.exception_message
+    assert dead_letter.retries == 0
+    assert dead_letter.parked_at_ns > 0
+
+    (machine,) = [m for m in snapshot.signals.state_machines if m.name == "Door"]
+    assert machine.current_state == "OPEN"
+    assert machine.rejected_count == 1
+    accepted = [t for t in machine.transitions if not t.rejected]
+    rejected = [t for t in machine.transitions if t.rejected]
+    assert accepted == [t for t in machine.transitions if t.from_state == "CLOSED"]
+    assert len(rejected) == 1
+    assert rejected[0].from_state == "OPEN"
+    assert rejected[0].to_state == "OPEN"
+
+
+async def test_watching_costs_nothing_measurable_while_detached(running_app):
+    """`EPIC-007F` criterion 5: `watch_dlq()`/`watch_state_machine()` are a
+    plain append and a bound-method wrap respectively -- no timer, no
+    subscription. Driving the watched machine while no client is connected
+    must not be measurably more expensive than driving an unwatched one."""
+    _app, ext = running_app
+
+    watched = BaseStateMachine(_DoorState.CLOSED)
+    watched.add_transition(_DoorState.CLOSED, _DoorState.OPEN)
+    watched.add_transition(_DoorState.OPEN, _DoorState.CLOSED)
+    ext.watch_state_machine("WatchedDoor", watched)
+
+    unwatched = BaseStateMachine(_DoorState.CLOSED)
+    unwatched.add_transition(_DoorState.CLOSED, _DoorState.OPEN)
+    unwatched.add_transition(_DoorState.OPEN, _DoorState.CLOSED)
+
+    def _drive(machine: BaseStateMachine, iterations: int) -> float:
+        start = time.perf_counter_ns()
+        for i in range(iterations):
+            machine.transition_to(_DoorState.OPEN if i % 2 == 0 else _DoorState.CLOSED)
+        return (time.perf_counter_ns() - start) / iterations
+
+    iterations = 5_000
+    unwatched_ns = _drive(unwatched, iterations)
+    watched_ns = _drive(watched, iterations)
+
+    print(
+        f"\nEPIC-007F watch_state_machine cost: unwatched={unwatched_ns:.0f} ns/call, "
+        f"watched={watched_ns:.0f} ns/call"
+    )
+    # A generous ceiling, not a tight budget: the point is "not measurably
+    # worse" (no per-call I/O, no timer), not a specific microbenchmark
+    # number this test would then be tuned to hit.
+    assert watched_ns < unwatched_ns * 5 + 10_000
 
 
 # ----------------------------------------------------------------- criterion 4

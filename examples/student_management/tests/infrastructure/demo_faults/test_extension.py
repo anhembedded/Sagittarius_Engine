@@ -21,6 +21,7 @@ from examples.student_management.infrastructure.demo_faults.extension import (
 from examples.student_management.main import build_app
 from sagittarius_engine.extensions.diagnostics.inspector import WiringInspector
 from sagittarius_engine.extensions.fsm.exceptions import InvalidStateTransitionError
+from sagittarius_engine.extensions.state_console import StateConsoleExtension
 
 
 @pytest.fixture
@@ -82,10 +83,11 @@ def test_seeds_r2_and_a_real_dead_letter(app, demo):
     assert demo.resilient_bus is not None
     dlq = demo.resilient_bus.get_dlq()
     assert len(dlq) == 1
-    event_name, payload, _handler, exc = dlq[0]
+    event_name, payload, _handler, exc, parked_at_ns = dlq[0]
     assert event_name == "demo.student_deleted"
     assert payload == {"student_id": "demo-0000"}
     assert isinstance(exc, KeyError)
+    assert parked_at_ns > 0
 
 
 # ------------------------------------------------------------------------ C2
@@ -138,6 +140,42 @@ def test_seeds_one_illegal_fsm_transition(app, demo):
     assert demo.enrolment_flow is not None
     assert demo.enrolment_flow.current_state == EnrolmentState.ENROLLED
     assert isinstance(demo.rejected_transition, InvalidStateTransitionError)
+
+
+# ----------------------------------------------------------------- EPIC-007F
+
+
+def test_with_a_console_attached_the_dlq_and_fsm_reach_a_real_snapshot():
+    """`EPIC-007F` wiring: the console argument, not the demo faults
+    themselves -- `test_seeds_r2_and_a_real_dead_letter`/
+    `test_seeds_one_illegal_fsm_transition` already cover the faults
+    directly. This is the one test asserting the two are actually
+    connected, end to end through a real `StateConsoleExtension.collect()`."""
+    console = StateConsoleExtension(port=0)
+    demo = DemoFaultsExtension(console=console)
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = Path(tmp) / "test.db"
+        app = build_app(db_url=f"sqlite:///{db_path}", extra_extensions=[console, demo])
+        try:
+            snapshot = console.collect()
+        finally:
+            app.stop()
+
+    assert snapshot.signals is not None
+
+    (dead_letter,) = snapshot.signals.dead_letters
+    assert dead_letter.event_name == "demo.student_deleted"
+    assert dead_letter.exception_type == "KeyError"
+
+    (machine,) = [
+        m for m in snapshot.signals.state_machines if m.name == "EnrolmentFlow"
+    ]
+    assert machine.current_state == "ENROLLED"
+    assert machine.rejected_count == 1
+    assert any(
+        t.rejected and t.from_state == "ENROLLED" and t.to_state == "SUBMITTED"
+        for t in machine.transitions
+    )
 
 
 # ----------------------------------------------------------- every seed, once

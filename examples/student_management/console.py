@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     console_extension = StateConsoleExtension(port=args.port, token=args.token)
     extensions: list = [console_extension]
     if args.demo_faults:
-        extensions.append(DemoFaultsExtension())
+        extensions.append(DemoFaultsExtension(console=console_extension))
 
     app = build_app(extra_extensions=extensions)
     # Not args.port: with --port 0 (ephemeral), that is the request, not the

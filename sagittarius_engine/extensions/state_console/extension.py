@@ -9,9 +9,10 @@ the dependency points from the extension to the lifecycle, never back
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from typing import Any
 
-from sagittarius_engine.extensions.audit.contracts import StateSnapshot
+from sagittarius_engine.extensions.audit.contracts import StateSnapshot, UiThreadHealth
 from sagittarius_engine.extensions.audit.infra.trace_server import TraceServer
 from sagittarius_engine.extensions.audit.recorder import TraceRecorder
 from sagittarius_engine.extensions.state_console.collectors.bounded import (
@@ -27,9 +28,15 @@ from sagittarius_engine.extensions.state_console.collectors.events import EventC
 from sagittarius_engine.extensions.state_console.collectors.lifecycle import (
     LifecycleCollector,
 )
+from sagittarius_engine.extensions.state_console.collectors.signals import (
+    SignalsCollector,
+)
 from sagittarius_engine.extensions.state_console.collectors.tasks import TaskCollector
 from sagittarius_engine.extensions.state_console.collectors.thread_pools import (
     ThreadPoolCollector,
+)
+from sagittarius_engine.extensions.state_console.state_machine_watcher import (
+    _StateMachineWatcher,
 )
 from sagittarius_engine.interfaces import IExtension
 from sagittarius_engine.interfaces.i_thread_manager import IThreadManager
@@ -80,6 +87,27 @@ class StateConsoleExtension(IExtension[Any]):
         self._last_snapshot: StateSnapshot | None = None
         self._last_collected_at: float | None = None
 
+        # EPIC-007F §2/§3/§4 — populated only by explicit opt-in, never
+        # discovered. A ResilientEventBus wraps whichever bus an
+        # application chose, on top of it rather than in place of it
+        # (ResilientEventBus.on() registers on inner_bus directly), so
+        # there is no way to find one by walking context.event_bus.
+        #
+        # All three are mutable containers `SignalsCollector` is handed a
+        # direct reference to, deliberately, not read via a getter: an
+        # application's own `when_ready()` callback (e.g. a demo extension
+        # seeding a fault) commonly runs *after* this extension's own
+        # `_start()` has already built its collectors — readiness callbacks
+        # fire in registration order (`EngineLifecycle._ready_callbacks`),
+        # and this extension typically registers first. A plain
+        # reassignable attribute captured by value at collector-build time
+        # would miss a `watch_*()` call made after that point; a container
+        # mutated in place is visible through the same reference regardless
+        # of when it is mutated.
+        self._dlq_buses: list[Any] = []
+        self._state_machine_watchers: dict[str, _StateMachineWatcher] = {}
+        self._ui_thread_health_sources: list[Callable[[], UiThreadHealth]] = []
+
     def register(self, context: Any) -> None:
         pass
 
@@ -94,6 +122,52 @@ class StateConsoleExtension(IExtension[Any]):
         if self._server is not None:
             self._server.stop()
             self._server = None
+
+    # --------------------------------------------------------- EPIC-007F §5
+
+    def watch_dlq(self, bus: Any) -> None:
+        """
+        @brief Opts a `ResilientEventBus` into the dead-letter panel —
+        `EPIC-007F` §2.
+
+        @details A plain append: `get_dlq()` is read fresh at collection
+        time, so watching costs nothing measurable while detached
+        (criterion 5) — there is no timer, no subscription, nothing that
+        runs on its own.
+        """
+        self._dlq_buses.append(bus)
+
+    def watch_state_machine(self, name: str, machine: Any) -> None:
+        """
+        @brief Opts a `BaseStateMachine` into the state-machine panel —
+        `EPIC-007F` §3.2.
+
+        @details Explicit, one line per machine, at the point the
+        application constructs it — not a subclass registry
+        (`EPIC-006D` found one would have discovered 0 of the demo app's 7
+        handlers, because the marker was duck-typed). Installs
+        `_StateMachineWatcher`, which wraps `transition_to`/`dispatch` on
+        `machine` itself; call this *before* driving the machine, or an
+        already-happened transition is invisible to it, same as any
+        listener added after the fact.
+        """
+        self._state_machine_watchers[name] = _StateMachineWatcher(name, machine)
+
+    def watch_ui_thread_health(self, source: Callable[[], UiThreadHealth]) -> None:
+        """
+        @brief Opts UI-thread freeze/off-thread-mutation counts into the
+        signals panel — `EPIC-007F` §4.
+
+        @details `source` is a callback, not a value: `sagittarius_engine`
+        must not import `PySide6` (`ADR-001` §2.10), so this extension
+        cannot read a `UIWatchdog` itself. The application supplies a
+        zero-argument function (typically closing over its own `UIWatchdog`
+        and reading `pyside_mvc.safety.get_off_thread_mutation_count()`)
+        that this collector calls once per snapshot. A second call replaces
+        the source rather than adding a second one — only one application
+        is being observed.
+        """
+        self._ui_thread_health_sources[:] = [source]
 
     # ------------------------------------------------------------- wiring
 
@@ -162,6 +236,11 @@ class StateConsoleExtension(IExtension[Any]):
                 if isinstance(context.recorder, TraceRecorder)
                 else None,
             ),
+            SignalsCollector(
+                self._dlq_buses,
+                self._state_machine_watchers,
+                self._ui_thread_health_sources,
+            ),
         ]
         if config is not None:
             collectors.append(ConfigCollector(config, reveal=self._reveal_config))
@@ -200,6 +279,7 @@ class StateConsoleExtension(IExtension[Any]):
             thread_pools=by_type["ThreadPoolCollector"].collect(),
             bounded=by_type["BoundedStructuresCollector"].collect(),
             config=config_collector.collect() if config_collector is not None else (),
+            signals=by_type["SignalsCollector"].collect(),
         )
         self._last_snapshot = snapshot
         self._last_collected_at = now

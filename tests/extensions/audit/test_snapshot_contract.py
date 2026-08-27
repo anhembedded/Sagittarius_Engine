@@ -26,6 +26,7 @@ from sagittarius_engine.extensions.audit.contracts import (
     BoundedStructures,
     ConfigEntry,
     ContainerState,
+    DeadLetterEntry,
     Envelope,
     EventState,
     FindingRecord,
@@ -33,9 +34,13 @@ from sagittarius_engine.extensions.audit.contracts import (
     MessageType,
     ProtocolMismatch,
     RegistrationState,
+    SignalsState,
+    StateMachineState,
+    StateMachineTransition,
     StateSnapshot,
     TaskRecord,
     ThreadPoolStats,
+    UiThreadHealth,
     check_protocol,
     mask_config,
     snapshot_message,
@@ -129,6 +134,40 @@ def _populated_snapshot() -> StateSnapshot:
                 hint='did you mean "student.updated"?',
             ),
         ),
+        signals=SignalsState(
+            dead_letters=(
+                DeadLetterEntry(
+                    event_name="student.deleted",
+                    handler="handlers._always_raises",
+                    exception_type="KeyError",
+                    exception_message="enrolment record missing",
+                    payload_repr="{'student_id': 'demo-0000'}",
+                    retries=1,
+                    parked_at_ns=42_000_000,
+                ),
+            ),
+            state_machines=(
+                StateMachineState(
+                    name="EnrolmentFlow",
+                    current_state="ENROLLED",
+                    transitions=(
+                        StateMachineTransition(
+                            from_state="DRAFT", to_state="SUBMITTED", at_ns=1_000
+                        ),
+                        StateMachineTransition(
+                            from_state="ENROLLED",
+                            to_state="SUBMITTED",
+                            rejected=True,
+                            at_ns=2_000,
+                        ),
+                    ),
+                    rejected_count=1,
+                ),
+            ),
+            ui_thread=UiThreadHealth(
+                freeze_count=1, worst_freeze_ms=5200.0, off_thread_mutation_count=3
+            ),
+        ),
     )
 
 
@@ -159,6 +198,11 @@ def test_an_empty_snapshot_survives_a_round_trip_unchanged():
         BoundedStructures(),
         ConfigEntry(key="k"),
         FindingRecord(check="c", severity="info", subject="s", message="m"),
+        DeadLetterEntry(event_name="e"),
+        StateMachineTransition(from_state="A", to_state="B"),
+        StateMachineState(name="m"),
+        UiThreadHealth(),
+        SignalsState(),
     ],
     ids=lambda i: type(i).__name__,
 )
@@ -183,6 +227,54 @@ def test_a_snapshot_travels_whole_inside_an_envelope():
 
     received = Envelope.from_dict(envelope.to_dict())
     assert StateSnapshot.from_dict(received.data) == original
+
+
+# ---------------------------------------------------------------------- signals
+
+
+def test_dead_letter_entry_builds_from_a_real_get_dlq_row():
+    """`DeadLetterEntry.from_dlq_row()` against the actual five-tuple shape
+    `ResilientEventBus.get_dlq()` returns — not a hand-rolled stand-in."""
+
+    def _always_raises(_payload):
+        raise KeyError("boom")
+
+    row = ("student.deleted", {"student_id": "x"}, _always_raises, KeyError("boom"), 99)
+
+    entry = DeadLetterEntry.from_dlq_row(row, retries=1)
+
+    assert entry.event_name == "student.deleted"
+    assert "_always_raises" in entry.handler
+    assert entry.exception_type == "KeyError"
+    assert "boom" in entry.exception_message
+    assert entry.payload_repr == "{'student_id': 'x'}"
+    assert entry.retries == 1
+    assert entry.parked_at_ns == 99
+
+
+def test_an_oversized_payload_repr_is_capped_not_rejected():
+    """A payload large enough to dominate the wire is truncated, not left to
+    crash collection or balloon the snapshot -- `repr()` always succeeds,
+    which is the property this exists for."""
+    huge_payload = {"blob": "x" * 10_000}
+    row = ("e", huge_payload, lambda _d: None, ValueError("v"), 1)
+
+    entry = DeadLetterEntry.from_dlq_row(row, retries=0)
+
+    assert len(entry.payload_repr) < 2100
+    assert entry.payload_repr.endswith("…")
+
+
+def test_ui_thread_health_absent_is_not_the_same_as_zeroed():
+    """`EPIC-007F` §6, criterion 6's own wording: a zero means "watched, no
+    violations"; an app that was never watched must report `None`, not a
+    `UiThreadHealth` full of zeros that reads as clean."""
+    signals = SignalsState()
+    assert signals.ui_thread is None
+    assert "ui_thread" not in signals.to_dict()
+
+    watched_and_clean = SignalsState(ui_thread=UiThreadHealth())
+    assert "ui_thread" in watched_and_clean.to_dict()
 
 
 # ------------------------------------------------------------------- protocol

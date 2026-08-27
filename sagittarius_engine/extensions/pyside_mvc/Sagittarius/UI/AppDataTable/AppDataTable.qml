@@ -39,6 +39,18 @@ BaseCard {
     property bool zebra: true
     property string emptyText: "No data"
 
+    //: Optional per-row accent — a function `(rowData) => color | null`.
+    //: `null` (the default) draws nothing extra, so every existing consumer
+    //: is unaffected. Added for `EPIC-007F`'s Signals screen, which needs a
+    //: rejected state-machine transition to read as visually distinct
+    //: ("rendered inline with the accepted ones, in danger") without a
+    //: bespoke row-coloring reimplementation the way `zebra`'s own history
+    //: (7+ independent copies before promotion) argues against. Layered as
+    //: a low-opacity overlay on top of the priority-ordered background
+    //: below, rather than replacing it, so a selected/hovered accented row
+    //: still reads as selected/hovered first.
+    property var rowAccent: null
+
     //: Click-to-sort state. Every column sorts by default (unless its own
     //: spec sets `sortable: false`) — common enough table behaviour that a
     //: consumer shouldn't have to opt in per screen (found 2026-08-23: a
@@ -299,6 +311,21 @@ BaseCard {
                 }
 
                 HoverHandler { id: rowHover }
+
+                //: See `rowAccent`'s own doc comment — `null` means no
+                //: overlay, computed once per row rather than inline in a
+                //: `visible`/`color` binding pair so `rowAccent()` is only
+                //: ever called once per row per model change.
+                readonly property var _accentColor: root.rowAccent
+                    ? root.rowAccent(rowDelegate.rowData)
+                    : null
+
+                Rectangle {
+                    anchors.fill: parent
+                    visible: rowDelegate._accentColor !== null
+                    color: rowDelegate._accentColor || "transparent"
+                    opacity: 0.18
+                }
 
                 MouseArea {
                     anchors.fill: parent

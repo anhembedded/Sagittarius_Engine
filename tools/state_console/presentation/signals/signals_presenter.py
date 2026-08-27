@@ -37,5 +37,52 @@ class SignalsPresenter(BasePresenter):
         self.view_model.set_connection_state(NOT_ATTACHED)
         self.view_model.set_detach_reason(event.reason)
 
-    def _on_snapshot(self, _event: SnapshotReceived) -> None:
+    def _on_snapshot(self, event: SnapshotReceived) -> None:
         self.view_model.set_connection_state(ATTACHED_READING)
+        signals = event.snapshot.signals
+        if signals is None:
+            return
+
+        self.view_model.set_dead_letters(
+            [
+                {
+                    "eventName": d.event_name,
+                    "handler": d.handler,
+                    "exceptionType": d.exception_type,
+                    "exceptionMessage": d.exception_message,
+                    "payloadRepr": d.payload_repr,
+                    "retries": d.retries,
+                }
+                for d in signals.dead_letters
+            ]
+        )
+
+        machines = [
+            {
+                "name": m.name,
+                "currentState": m.current_state,
+                "rejectedCount": m.rejected_count,
+            }
+            for m in signals.state_machines
+        ]
+        transitions = [
+            {
+                "machine": m.name,
+                "fromState": t.from_state,
+                "toState": t.to_state,
+                "event": t.event,
+                "rejected": t.rejected,
+            }
+            for m in signals.state_machines
+            for t in m.transitions
+        ]
+        self.view_model.set_state_machines(machines, transitions)
+
+        if signals.ui_thread is not None:
+            self.view_model.set_ui_thread_health(
+                signals.ui_thread.freeze_count,
+                signals.ui_thread.worst_freeze_ms,
+                signals.ui_thread.off_thread_mutation_count,
+            )
+        else:
+            self.view_model.clear_ui_thread_health()
