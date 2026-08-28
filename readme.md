@@ -53,13 +53,20 @@ Your architecture. Your domain. Your database. Your UI framework. Sagittarius En
   attach ws://…` streams it live from outside the process — including what happened *before* you
   attached — and saves a `.sagtrace` that opens in Perfetto or replays into OpenTelemetry.
   See below.
+- **Runtime state console** — `StateConsoleExtension` answers *"what does this application look
+  like right now?"*: wiring, registrations, live tasks, thread-pool occupancy, and (opt-in) a
+  dead-letter queue and watched state machines. `sagittarius-trace snapshot ws://…` reads it as
+  text, or open the full PySide6+QML dashboard. Detached cost is unmeasurable — nothing runs
+  until a client asks. See below.
 
 > A **Remote Audit Dashboard (TUI)** was listed here until 2026-08-25 — "inspect live engine
 > telemetry from a separate terminal via the built-in HTTP telemetry server". Every part of that
 > sentence was wrong: there was no HTTP telemetry server (telemetry moved to WebSocket in
 > `f0247bd` and the CLI was never updated, so it polled `http://localhost:9999` against a socket
-> that speaks WebSocket), and neither client worked at all. `EPIC-005` rebuilt it as the trace
-> recorder above; the dashboard and both its clients were deleted on 2026-08-26.
+> that speaks WebSocket), and neither client worked at all. `EPIC-005` rebuilt the recording half
+> as the trace recorder above; `EPIC-007` rebuilt the live-inspection half properly as the
+> runtime state console above, with real end-to-end tests against a live server this time — the
+> original dashboard and both its non-functional clients were deleted on 2026-08-26.
 
 ---
 
@@ -329,13 +336,75 @@ Full reference — the design, the wire protocol, the overhead measurements:
 
 ---
 
+## Watching a running application from outside it — the runtime state console
+
+`sagittarius-trace` above answers *"what happened, and how long did it take?"* This answers a
+different question: **"what does this application look like right now?"** — what is wired,
+what is registered, what is alive, and what looks wrong about that, without reconstructing it
+from a log.
+
+### Attach it
+
+```python
+from sagittarius_engine.extensions.state_console import StateConsoleExtension
+
+app.use(StateConsoleExtension(port=8781))
+app.boot()
+```
+
+Rides the same `TraceServer` transport `sagittarius-trace attach` uses. Nothing runs on a
+timer and nothing subscribes to anything — a snapshot is built only when a connected client
+actually asks for one, so a detached application pays nothing measurable for having it turned on.
+
+### Read it as text, or open the dashboard
+
+```console
+$ sagittarius-trace snapshot ws://127.0.0.1:8781
+snapshot @ 1543.349494s
+lifecycle: state=ready extensions=5/5 hosted=0/0 scheduler_jobs=0 (without_next_run=0)
+events: 20
+container: 13 registration(s), open_scopes=0
+thread pools:
+  background: 0/20 in flight, queue_depth=0, submitted=0, completed=0
+bounded: ring=0/0 (dropped=0), tasks=0/50, subscriptions=2, gc_counts=[259, 11, 0]
+config: 3 entries
+detached
+```
+
+```bash
+# the full five-screen PySide6+QML dashboard instead — Overview, Events & wiring,
+# Container, Tasks & threads, Signals — behind an optional [dashboard] extra
+scripts/run-console.ps1 -Attach ws://127.0.0.1:8781
+```
+
+### The Signals panel is opt-in, not discovered
+
+A dead-lettered event (`ResilientEventBus`'s retry queue) and a rejected state-machine
+transition are both visible only to whatever explicitly watches them:
+
+```python
+console.watch_dlq(resilient_bus)
+console.watch_state_machine("EnrolmentFlow", flow)   # before driving it
+```
+
+Explicit rather than a subclass registry — guessing at which state machines exist has already
+cost this codebase a rewrite once; naming one cannot be wrong the way discovering it can.
+
+Step-by-step guide, including how to wire the Signals panel into your own application:
+[`.agents/context/state_console_usage.md`](.agents/context/state_console_usage.md).
+
+Full reference — every collected section, the security model, where the pieces are:
+[`.agents/context/state_console.md`](.agents/context/state_console.md).
+
+---
+
 ## Examples
 
 The `examples/` directory contains reference applications that demonstrate real-world Engine usage.
 
 | Project | Directory | Description |
 | --- | --- | --- |
-| Student Management | `examples/student_management/` | Clean Architecture CLI + `pyside_mvc` QML desktop UI, real SQLite persistence, `IExtension`-based module registration, event-driven UI refresh. Rebuilt 2026-08-23 (`EPIC-002`) — see `.agents/context/examples.md` for the full breakdown. |
+| Student Management | `examples/student_management/` | Clean Architecture CLI + `pyside_mvc` QML desktop UI, real SQLite persistence, `IExtension`-based module registration, event-driven UI refresh, and a headless mode with the runtime state console attached (`console.py --demo-faults`, `EPIC-007`). Rebuilt 2026-08-23 (`EPIC-002`) — see `.agents/context/examples.md` for the full breakdown. |
 
 `student_management` is the only example. Six other rows this table used to list —
 `desktop/`, `worker/`, `trading_bot/`, `websocket/`, `plugin_system/`, `rest_api/` — were
