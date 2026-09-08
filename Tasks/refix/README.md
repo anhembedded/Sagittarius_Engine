@@ -58,3 +58,4 @@ that rests on everyone remembering the decision has not been made — it has bee
 | **[REF-001](completed/REF-001_function_local_imports_rule_vs_code.md)** | `code-rule.md` §45 ("never") vs. 32 function-local imports in the engine | ✅ Done 2026-08-27 |
 | **[REF-002](incomplete/REF-002_stale_backlog_links_after_task_moves.md)** | `Tasks/` documents linking into `backlog/` vs. files that now live in `completed/` | 🟠 Open |
 | **[REF-003](incomplete/REF-003_epic_007_id_collision_across_repos.md)** | `EPIC-007A..F` cited in 8 documents meaning Elite Warrior's epic vs. this repo's own `EPIC-007` | 🟠 Open |
+| **[REF-005](completed/REF-005_fsm_transition_to_raises_not_returns_false.md)** | `EPIC-007D`/`EPIC-007F` claim `transition_to()` returns `False` and raises nothing; it raises `InvalidStateTransitionError` | ✅ Done 2026-08-27 |

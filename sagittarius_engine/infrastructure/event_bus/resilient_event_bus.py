@@ -1,4 +1,5 @@
 import threading
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -48,7 +49,15 @@ class ResilientEventBus(IEventBus):
         """
         self.inner_bus = inner_bus
         self.max_retries = max_retries
-        self._dlq: list[tuple[str, Any, Callable, Exception]] = []
+        #: `(event_name, data, handler, exception, parked_at_ns)` — the fifth
+        #: element was added for `EPIC-007F`'s dead-letter panel, which needs
+        #: to say *when* an event was parked; every existing reader indexes
+        #: at most `[3]` (confirmed by grep before this change), so this is
+        #: additive, not a break of the four-tuple shape.
+        #: `time.perf_counter_ns()`, matching every other timestamp on the
+        #: `EPIC-007A` wire (`TraceRecord.t`, `StateSnapshot.t`) — monotonic,
+        #: immune to NTP steps, and directly comparable to them.
+        self._dlq: list[tuple[str, Any, Callable, Exception, int]] = []
         self.logger = resolve_bus_logger(logger)
 
         self._wrapper_map: dict[tuple[str, Callable], Callable] = {}
@@ -104,7 +113,15 @@ class ResilientEventBus(IEventBus):
                             #: thought to call `get_dlq()`.
                             report_handler_failure(self.logger, event_name, handler, e)
                             with self._lock:
-                                self._dlq.append((event_name, data, handler, e))
+                                self._dlq.append(
+                                    (
+                                        event_name,
+                                        data,
+                                        handler,
+                                        e,
+                                        time.perf_counter_ns(),
+                                    )
+                                )
 
             self._wrapper_map[key] = resilient_wrapper
 
@@ -161,10 +178,11 @@ class ResilientEventBus(IEventBus):
             for name, handlers in self.inner_bus.subscriptions().items()
         }
 
-    def get_dlq(self) -> list[tuple[str, Any, Callable, Exception]]:
+    def get_dlq(self) -> list[tuple[str, Any, Callable, Exception, int]]:
         """
         @brief Retrieves the Dead Letter Queue.
-        @return A list of failed events stored in the DLQ.
+        @return A list of failed events stored in the DLQ, each
+            `(event_name, data, handler, exception, parked_at_ns)`.
         """
         with self._lock:
             return list(self._dlq)
@@ -176,7 +194,7 @@ class ResilientEventBus(IEventBus):
         with self._lock:
             current_dlq = self._dlq
             self._dlq = []
-        for event_name, data, handler, _ in current_dlq:
+        for event_name, data, handler, _exc, _parked_at in current_dlq:
             for attempt in range(self.max_retries + 1):
                 try:
                     handler(data)
@@ -185,4 +203,6 @@ class ResilientEventBus(IEventBus):
                     if attempt == self.max_retries:
                         report_handler_failure(self.logger, event_name, handler, e)
                         with self._lock:
-                            self._dlq.append((event_name, data, handler, e))
+                            self._dlq.append(
+                                (event_name, data, handler, e, time.perf_counter_ns())
+                            )

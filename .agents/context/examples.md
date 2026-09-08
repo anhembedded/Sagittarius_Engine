@@ -49,6 +49,18 @@ A real, running Clean Architecture app with a QML UI, backend and frontend both.
 - **`pyside_mvc` booted as a real `IExtension`** — the first sample app in this repo that
   doesn't skip `pyside_mvc` for plain `QtWidgets`.
 
+### Runtime state console (`EPIC-007`)
+
+A fourth entry point, `console.py`, boots the app headlessly with `StateConsoleExtension`
+attached instead of the GUI or CLI — see [`state_console.md`](state_console.md). Its
+`--demo-faults` flag additionally attaches `DemoFaultsExtension`
+(`infrastructure/demo_faults/`), which seeds one instance of every condition the engine's
+diagnostics claim to catch (a typo'd subscription, a dead-lettered event, an unbound
+dependency, a dead scheduled job, a held exclusive slot, a rejected state-machine transition)
+— opt-in, and never in `doctor_target.build()`'s own path, so it cannot regress the CI wiring
+gate. Full seed table and reasoning:
+[`docs/runtime_state_console_demo.md`](../../examples/student_management/docs/runtime_state_console_demo.md).
+
 ### Honest module coverage
 
 Not every engine module is used — forcing one in without a genuine need would teach a
@@ -73,9 +85,15 @@ python -m examples.student_management.main list
 
 # GUI
 python -m examples.student_management.gui
+
+# headless, with the runtime state console attached
+python examples/student_management/console.py --demo-faults
 ```
+
+Or, from PowerShell, `run.ps1` picks the mode: `-Cli`, `-Console [-DemoFaults]`, or the GUI by
+default (`examples/student_management/run.ps1`'s own comment-based help has every switch).
 
 ### Tests
 
-`pytest examples/student_management/` — 34 tests, also collected automatically by the root
+`pytest examples/student_management/` — 64 tests, also collected automatically by the root
 suite (no special config needed; `pyproject.toml` sets no `testpaths` restriction).

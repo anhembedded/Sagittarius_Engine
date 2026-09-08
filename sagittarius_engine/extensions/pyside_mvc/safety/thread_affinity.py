@@ -1,8 +1,41 @@
 import functools
+import threading
 from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
+
+#: Process-wide, counting `@ui_mutator`'s cross-thread branch regardless of
+#: which way it resolves (`CrossThreadUiMutationError` in dev mode,
+#: `QTimer.singleShot` marshaling in production) -- both are the same
+#: underlying violation, just handled differently. `EPIC-007F` §4: the
+#: runtime state console reports this alongside `UIWatchdog`'s freeze count
+#: as the cheapest red flag a `pyside_mvc` app can show.
+_off_thread_mutation_count = 0
+_off_thread_mutation_lock = threading.Lock()
+
+
+def get_off_thread_mutation_count() -> int:
+    """@brief How many times `@ui_mutator` caught a cross-thread call this
+    process, dev mode and production alike."""
+    with _off_thread_mutation_lock:
+        return _off_thread_mutation_count
+
+
+def reset_off_thread_mutation_count() -> None:
+    """@brief Test-only reset of the process-wide counter, same precedent as
+    `set_thread_affinity_dev_mode` being the one function allowed to touch
+    `_dev_mode_enabled` from outside this module."""
+    global _off_thread_mutation_count
+    with _off_thread_mutation_lock:
+        _off_thread_mutation_count = 0
+
+
+def _record_off_thread_mutation() -> None:
+    global _off_thread_mutation_count
+    with _off_thread_mutation_lock:
+        _off_thread_mutation_count += 1
+
 
 #: Process-wide, not per-instance: a `QObject` mutator has no reliable way
 #: to reach `IConfig` on its own (`BaseQmlViewModel` takes no DI container —
@@ -67,6 +100,8 @@ def ui_mutator(func: Callable) -> Callable:
     def wrapper(self: QObject, *args: Any, **kwargs: Any) -> Any:
         if QThread.currentThread() is self.thread():
             return func(self, *args, **kwargs)
+
+        _record_off_thread_mutation()
 
         if _dev_mode_enabled:
             raise CrossThreadUiMutationError(

@@ -49,6 +49,12 @@ sagittarius-doctor = "sagittarius_engine.extensions.diagnostics.cli:main"
 # names the transport as a bare requirement, unlike OTel support below, which
 # is explicitly optional.
 sagittarius-trace = "sagittarius_engine.extensions.audit.cli:main"
+# `EPIC-007E`: the runtime state console's GUI client. `tools/state_console/main.py`
+# imports PySide6 only inside `main()`, never at module scope (`ADR-002` §2.4,
+# the same `sagittarius-audit` lesson above) — `verify_wheel_importable.py`
+# step 3 resolves this entry point (imports the module, walks to the
+# attribute) without `dashboard` installed, and must keep succeeding.
+sagittarius-console = "tools.state_console.main:main"
 
 [tool.setuptools.packages.find]
 include = ["sagittarius_engine*", "tools*"]
@@ -65,8 +71,19 @@ sagittarius_engine = [
     "extensions/pyside_mvc/Sagittarius/UI/*/*.qml",
     "extensions/pyside_mvc/runtime/*.qml",
 ]
+tools = [
+    # EPIC-007E's own QML screens — same reasoning as the engine's own
+    # Sagittarius/UI/*.qml entries above: package-data is the only
+    # mechanism that ships non-.py files into the wheel.
+    "state_console/presentation/*/qml/*.qml",
+]
 
 [project.optional-dependencies]
+# `EPIC-007E`/`ADR-002` §2.4: `tools/state_console` needs PySide6 to actually
+# run, but the engine itself must not gain a UI dependency (`ADR-001` §2.10)
+# and the wheel stays zero-dependency by design (§1.1 above) — an extra, not
+# a bare requirement, mirroring `otel` below.
+dashboard = ["PySide6>=6.5"]
 # `audit = ["rich>=13.0.0"]` was removed by EPIC-005A's teardown. Its only
 # consumer was `tools/audit_dashboard_cli.py`, deleted in the same change —
 # and that command could never connect in the first place (EPIC-005 §2, D1:

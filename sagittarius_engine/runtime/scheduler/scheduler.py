@@ -151,6 +151,17 @@ class Scheduler:
                 next_wakeup = now + timedelta(seconds=1.0)
 
                 for job in self.jobs:
+                    if job.next_run is None:
+                        # A job with no next run is dead — dropped here rather
+                        # than compared against `now`, which crashed this
+                        # thread outright (`TypeError`, `None` vs `datetime`)
+                        # the first time anything produced this state: found
+                        # via EPIC-007D's DemoFaultsExtension deliberately
+                        # seeding WiringInspector's D3 condition into a live
+                        # Scheduler. A background thread dying silently on an
+                        # unhandled exception is worse than the state that
+                        # caused it, whatever produces that state next.
+                        continue
                     if job.next_run <= now:
                         jobs_to_run.append(job)
                     else:

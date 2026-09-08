@@ -9,7 +9,9 @@ thread alive and observable" concern.
 
 from .thread_affinity import (
     CrossThreadUiMutationError,
+    get_off_thread_mutation_count,
     not_a_ui_mutator,
+    reset_off_thread_mutation_count,
     set_thread_affinity_dev_mode,
     ui_mutator,
     unprotected_mutators,
@@ -24,7 +26,9 @@ __all__ = [
     "UIMatrixMixin",
     "UIWatchdog",
     "UiActionFailedEvent",
+    "get_off_thread_mutation_count",
     "not_a_ui_mutator",
+    "reset_off_thread_mutation_count",
     "safe_ui_action",
     "set_thread_affinity_dev_mode",
     "setup_qt_signal_handling",

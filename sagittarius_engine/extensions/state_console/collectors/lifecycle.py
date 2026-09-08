@@ -3,8 +3,20 @@
 Reads the same four subsystems `WiringInspector.inspect_lifecycle()` already
 reads, by the same attribute names — `registered_extensions`,
 `initialized_extensions`, `ext.descriptor.name/enabled/dependencies`,
-`services`, `started_services`, `jobs`, `job.job_func`, `job.next_run` — so
-this collector and that inspector never drift about what those words mean.
+`services`, `started_services`, `jobs`, `job.next_run` — so this collector
+and that inspector never drift about what those words mean.
+
+@warning `scheduler_jobs_without_next_run` reads `context.scheduler.jobs`
+live, the same as `WiringInspector`'s D3 check. Found while implementing
+`EPIC-007D`'s demo seed for this exact condition: a real `Scheduler`'s
+background thread drops a `next_run=None` job from `.jobs` on its very next
+wake — `add_job()` itself calls `notify_all()`, so that "next wake" is
+essentially immediate — which means this field can be non-zero for a real
+`Scheduler` only in the narrow instant between a job going dead and that
+thread's next loop iteration. It is honest (never wrong), but is not a
+reliable way to observe this condition against this engine's own
+`Scheduler`. See `examples/student_management/infrastructure/demo_faults/`
+for how the demo seed works around it.
 """
 
 from __future__ import annotations

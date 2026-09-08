@@ -1,6 +1,8 @@
 # EPIC-007: Runtime State Console
 
-- **Status**: 🟡 **In Progress** — 3/6 subtasks done (`A`, `B`, `C` shipped 2026-08-27)
+- **Status**: ✅ **6/6 subtasks done** (`A`-`F` shipped 2026-08-27). `F`'s criterion 6
+  (UI-thread health) is partial — real, tested plumbing with no live GUI demo; see its own
+  Outcome section
 - **Created**: 2026-08-27
 - **Priority**: P2
 - **Category**: Observability / Diagnostics / Tooling
@@ -54,7 +56,7 @@ transport message, and a client — not a new instrumentation programme.
 | extension registered but never initialised; service never started; job that never fires | checks **D1 D2 D3** |
 | emitted into the void; handler raised | `RuntimeMonitor`, checks **R1 R2** |
 | ring-buffer fill, drops, taps | `TraceRecorder` |
-| dead-lettered events | `ResilientEventBus.get_dlq()` — **called by nothing but tests** |
+| dead-lettered events | `ResilientEventBus.get_dlq()` — was **called by nothing but tests**; `EPIC-007F`'s `watch_dlq()` is now the first non-test caller |
 | state-machine transitions, including rejected ones | `BaseStateMachine.add_global_callback()` |
 
 Three things genuinely do not exist and are built here: a task snapshot that includes
@@ -80,9 +82,9 @@ to a live process.
 | **[A](completed/EPIC-007A_snapshot_contract_protocol_v2.md)** ✅ | Snapshot dataclasses in `contracts.py`; `PROTOCOL_VERSION` 1 → 2 | `pytest tests/extensions/audit/test_snapshot_contract.py` | ✅ **Done 2026-08-27** — 23 tests; masking checks the value as well as the key; a v1 peer is refused naming both versions |
 | **[B](completed/EPIC-007B_public_read_apis.md)** ✅ | `ITaskManager.snapshot()`/`pool_stats()`, `IThreadManager.stats()`, `IConfig.sources()`, `IContainer.open_scope_count()`, `ExclusiveAction.held_slot()` | `pytest tests/runtime/tasks/test_task_manager.py -k "snapshot or pool_stats"` | ✅ **Done 2026-08-27** — found and fixed a real deadlock in the process: `.cancel()` on a queued future firing its done-callback synchronously while the caller still held the same lock the callback needed |
 | **[C](completed/EPIC-007C_collector_extension_and_snapshot_message.md)** ✅ | `StateConsoleExtension` + `SNAPSHOT` over the existing `TraceServer` | `sagittarius-trace snapshot ws://127.0.0.1:8781` | ✅ **Done 2026-08-27** — found and fixed a real readiness race (`app.stop()` 2.0044s → 0.0031s); one full snapshot measured p50=0.107ms/p95≤0.65ms against a 5ms budget |
-| **[D](incomplete/EPIC-007D_student_management_demo_wiring.md)** | Demo wiring in `examples/student_management`, incl. seeded faults | `.\examples\student_management\run.ps1 -Console -DemoFaults` | The sample app boots with the console attached and every panel has something real to show |
-| **[E](incomplete/EPIC-007E_qml_client_and_pwsh_runner.md)** | `tools/state_console/` QML client + `scripts/run-console.ps1` | `.\scripts\run-console.ps1 -Demo` | One command starts the sample app and the console together and tears both down |
-| **[F](incomplete/EPIC-007F_signals_dlq_and_state_machines.md)** | Dead-letter queue and state-machine panels | `.\scripts\run-console.ps1 -Demo` | A dead-lettered event and a rejected transition are both visible; neither is visible anywhere today |
+| **[D](completed/EPIC-007D_student_management_demo_wiring.md)** ✅ | Demo wiring in `examples/student_management`, incl. seeded faults | `.\examples\student_management\run.ps1 -Console -DemoFaults` | ✅ **Done 2026-08-27** — found and fixed 3 bugs along the way: `WiringInspector`'s D3 check named the wrong attribute, it crashed on any postponed-annotations constructor, and `Scheduler._run()` crashed its own thread on a `next_run=None` job |
+| **[E](completed/EPIC-007E_qml_client_and_pwsh_runner.md)** ✅ | `tools/state_console/` QML client + `scripts/run-console.ps1` | `.\scripts\run-console.ps1 -Demo` | ✅ **Done 2026-08-27** — all five screens (Overview folds in "Not attached"), a `PresenterManager`-driven navigation shell, smoke-tested against a live server; found and filed `BUG-013` (`AppDataTable` fuses an adjacent right/left-aligned column pair), worked around locally |
+| **[F](completed/EPIC-007F_signals_dlq_and_state_machines.md)** ✅ | Dead-letter queue and state-machine panels | `.\scripts\run-console.ps1 -Demo` | ✅ **Done 2026-08-27** — a real dead letter and a real rejected transition both reach a real snapshot and render on the Signals screen (rejected row in `danger`), verified end to end against a live server; UI-thread health counters are real and tested but not demoed against a live GUI app (named gap, see Outcome) |
 
 **Order: A → B → C → D → E → F.** C is the first milestone that attaches to a live process
 and is independently valuable — a text rendering over SSH is a usable tool even if E never

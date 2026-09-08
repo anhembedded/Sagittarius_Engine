@@ -80,6 +80,12 @@ class UIWatchdog(QtCore.QObject):
         self._is_frozen: bool = False
         self._lock: threading.Lock = threading.Lock()
 
+        #: `EPIC-007F` §4 — the runtime state console's "cheapest red flag"
+        #: reads these two, so they are tracked here rather than derived from
+        #: log lines a console would otherwise have to scrape.
+        self._freeze_count: int = 0
+        self._worst_freeze_elapsed_sec: float = 0.0
+
         self._monitor_thread: threading.Thread | None = None
         self._heartbeat_timer: QtCore.QTimer | None = None
 
@@ -152,8 +158,28 @@ class UIWatchdog(QtCore.QObject):
                     self._is_frozen = True
                 self._handle_freeze(elapsed)
 
+    @property
+    def freeze_count(self) -> int:
+        """@brief How many distinct freezes this watchdog has detected this
+        run — `EPIC-007F` §4."""
+        with self._lock:
+            return self._freeze_count
+
+    @property
+    def worst_freeze_elapsed_sec(self) -> float:
+        """@brief The longest single freeze measured so far, `0.0` until the
+        first one — `EPIC-007F` §4."""
+        with self._lock:
+            return self._worst_freeze_elapsed_sec
+
     def _handle_freeze(self, elapsed: float) -> None:
         """Capture the Main Thread stack trace and log a diagnostic warning."""
+        with self._lock:
+            self._freeze_count += 1
+            self._worst_freeze_elapsed_sec = max(
+                self._worst_freeze_elapsed_sec, elapsed
+            )
+
         frames = sys._current_frames()
         main_frame = frames.get(self._main_thread_id)
 
