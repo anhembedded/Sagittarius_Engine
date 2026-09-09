@@ -99,6 +99,7 @@ __all__ = [
     "Lane",
     "LifecycleState",
     "MessageType",
+    "ModuleState",
     "ProtocolMismatch",
     "RecordKind",
     "RegistrationState",
@@ -490,6 +491,29 @@ class FindingRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class ModuleState:
+    """
+    @brief One registered extension, as `ExtensionManager` reports it.
+
+    @param ready Whether this extension ever reached `initialized_extensions`
+        -- the same registered-vs-initialized distinction
+        `WiringInspector`'s own D1 check reads
+        (`diagnostics/inspector.py::_extensions`), not a separate notion of
+        "module" invented here.
+    """
+
+    name: str
+    ready: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "ready": self.ready}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ModuleState:
+        return cls(name=data["name"], ready=data.get("ready", False))
+
+
+@dataclass(frozen=True, slots=True)
 class LifecycleState:
     """
     @brief Where the engine got to, and how long each step took.
@@ -497,6 +521,11 @@ class LifecycleState:
     @param transitions `(state_name, ns_since_session_epoch)` in the order
         reached. Monotonic nanoseconds, like every other timestamp here -- the
         wall clock is anchored once, in `Hello`.
+    @param modules Every registered extension by name plus its ready state --
+        `EPIC-008B` §4's Overview restyle needs per-module detail
+        (`reference/handoff.md` §7.1/§7.2's module grid and table), which
+        `extensions_registered`/`extensions_initialized`'s aggregate counts
+        alone cannot answer ("5/5 initialized" doesn't say *which* five).
     """
 
     state: str = ""
@@ -507,6 +536,7 @@ class LifecycleState:
     hosted_started: int = 0
     scheduler_jobs: int = 0
     scheduler_jobs_without_next_run: int = 0
+    modules: tuple[ModuleState, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -518,6 +548,7 @@ class LifecycleState:
             "hosted_started": self.hosted_started,
             "scheduler_jobs": self.scheduler_jobs,
             "scheduler_jobs_without_next_run": self.scheduler_jobs_without_next_run,
+            "modules": [m.to_dict() for m in self.modules],
         }
 
     @classmethod
@@ -535,6 +566,7 @@ class LifecycleState:
             scheduler_jobs_without_next_run=data.get(
                 "scheduler_jobs_without_next_run", 0
             ),
+            modules=tuple(ModuleState.from_dict(m) for m in data.get("modules", ())),
         )
 
 

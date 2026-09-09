@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sagittarius_engine.extensions.audit.contracts import LifecycleState
+from sagittarius_engine.extensions.audit.contracts import LifecycleState, ModuleState
 from sagittarius_engine.extensions.state_console.collector import ISnapshotSection
 from sagittarius_engine.kernel.lifecycle import EngineLifecycle
 
@@ -59,9 +59,25 @@ class LifecycleCollector(ISnapshotSection[LifecycleState]):
     def collect(self) -> LifecycleState:
         extensions_registered = 0
         extensions_initialized = 0
+        modules: tuple[ModuleState, ...] = ()
         if self._extension_manager is not None:
-            extensions_registered = len(self._extension_manager.registered_extensions)
+            registered = self._extension_manager.registered_extensions
+            extensions_registered = len(registered)
             extensions_initialized = len(self._extension_manager.initialized_extensions)
+            # By name, not object identity -- the same set WiringInspector's
+            # own D1 check builds (inspector.py::_extensions), so "ready"
+            # here can never disagree with what sagittarius-doctor reports.
+            initialized_names = {
+                ext.descriptor.name
+                for ext in self._extension_manager.initialized_extensions
+            }
+            modules = tuple(
+                ModuleState(
+                    name=ext.descriptor.name,
+                    ready=ext.descriptor.name in initialized_names,
+                )
+                for ext in registered
+            )
 
         hosted_registered = 0
         hosted_started = 0
@@ -87,4 +103,5 @@ class LifecycleCollector(ISnapshotSection[LifecycleState]):
             hosted_started=hosted_started,
             scheduler_jobs=scheduler_jobs,
             scheduler_jobs_without_next_run=scheduler_jobs_without_next_run,
+            modules=modules,
         )

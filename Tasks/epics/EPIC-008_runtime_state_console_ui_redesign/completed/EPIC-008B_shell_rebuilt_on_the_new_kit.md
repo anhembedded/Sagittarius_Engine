@@ -1,8 +1,9 @@
 # EPIC-008B: Shell rebuilt on the new kit
 
-- **Status**: 🔄 In Progress
+- **Status**: ✅ Done
 - **Category**: Tooling (`tools/state_console`)
 - **Started Date**: 2026-09-09
+- **Completed Date**: 2026-09-09
 
 ---
 
@@ -123,9 +124,50 @@ seeded recents, submitting a real address reaches `READING` and closes the overl
 `change…` while attached shows the exact "Currently attached to..." copy with the current
 target's recents row disabled and marked `attached`.
 
-### 4. Overview restyle
+### 4. Overview restyle — ✅ done
 
-Not started — depends on §2's shell chrome existing first.
+Restyled onto `reference/handoff.md` §7.1/§7.2: two sub-tabs (Status/Modules, local QML state —
+no new kit component, same reasoning as the connect flow), three plates (Connection/Lifecycle/
+Signals) plus a worker-pools table for Status, a modules table for Modules.
+
+- **A real backend gap closed, not worked around:** the module grid/table need per-module
+  name + ready state, which the wire protocol never carried — `LifecycleState` only had
+  aggregate counts ("5/5 initialized," never *which* five). Added `ModuleState` (`name`,
+  `ready`) and a `LifecycleState.modules` field (`sagittarius_engine/extensions/audit/
+  contracts.py`), populated by `LifecycleCollector` from `ExtensionManager.registered_extensions`
+  / `initialized_extensions` — by name, matching `WiringInspector`'s own D1 check exactly, so
+  "ready" here can never disagree with what `sagittarius-doctor` reports. `LifecycleCollector`
+  had no dedicated test file until now (`test_lifecycle_collector.py`, 4 tests).
+- **Connection plate** — state name/note colour-matched to the band's own vocabulary, snapshot
+  age, and a real "snapshots received N" running tally (`OverviewViewModel.snapshotsReceived`,
+  a client-side count reset on every fresh attach — the wire protocol carries no such counter).
+- **Lifecycle plate** — phase, `X/Y modules initialized`, and a real module grid (one cell per
+  `ModuleState`, filled `accent` when ready, hairline outline when not, hover tooltip
+  `"<name> · ready|initializing"`).
+- **Signals plate** — reuses `count_signals()` (moved from `presentation/shell/` to `domain/`:
+  it has no Qt/shell dependency and `OverviewPresenter` needed the exact same computation
+  `ShellPresenter`'s rail badges already used — duplicating it per screen was the thing this
+  module exists to avoid). The four-row breakdown and "N open"/"All clear" figure are real; the
+  per-row "jump to offending section+sub-tab" click-through is not built — named in
+  `OverviewScreen.qml`'s own header comment as depending on cross-screen navigation
+  `PresenterManager`'s stack has no channel for today, and on sub-tabs subtasks C-F haven't
+  built yet.
+- **Worker pools table** — extended with occupancy/submitted/completed columns.
+  `AppDataTable`'s `rowAccent` hook (already shipped for `EPIC-007F`, not new here) tints a
+  whole row `danger` when occupancy hits 100% or queued exceeds 20, in place of the design's
+  per-cell colouring — `AppDataTable` cells are plain text with no per-cell delegate, and adding
+  one for a single consumer would be the premature-kit-feature mistake this epic has avoided
+  twice already (`EPIC-008A` §5, this file's own §3).
+- **Modules table** — built directly in `OverviewScreen.qml` (not `AppDataTable`): the
+  `initialized`/`initializing` tag needs real colour (`accent100`/`accent800` vs `danger`,
+  matching the handoff's own token names exactly), which again needs a per-cell delegate
+  `AppDataTable` doesn't have. A small, fixed-order, non-sortable list has no need for
+  `AppDataTable`'s sorting/resizing/zebra machinery anyway.
+
+Verified against a real demo app with seeded faults, offscreen: Status tab shows live
+Connection/Lifecycle/Signals plates (3 snapshots received, 5/5 modules, 4 open signals: 2
+undeclared events + 2 dead-letter/rejections) and a real, populated pools table; Modules tab
+lists all five real extensions by name, each tagged `initialized`.
 
 ## 🧪 Verification & Test Coverage
 
@@ -152,5 +194,18 @@ Not started — depends on §2's shell chrome existing first.
   Screenshots offscreen against a real demo app: cold `Attach…` view with seeded recents,
   submitting a real address reaching `READING`, and `change…` while attached showing the
   verbatim "Currently attached to..." copy with the current target's row disabled.
-- §4: gallery/screenshot proof once implemented, per `EPIC-008`'s own milestone table
-  ("every subtask ends in a command a reader can run and a screenshot of what it produces").
+- §4: `tests/extensions/audit/test_snapshot_contract.py` (round-trips `ModuleState` and
+  `LifecycleState.modules`), `tests/extensions/state_console/test_lifecycle_collector.py`
+  (4 new tests — empty, ready-vs-stuck by name, order preserved), and
+  `tests/tools/state_console/test_overview_presenter.py` (5 new tests — a `Mock` container +
+  real `MemoryEventBus`, no `QApplication`/websocket needed: modules populated from a real
+  snapshot, the snapshots-received tally counting up and resetting on reattach, signal counts
+  derived from a real snapshot, `_thread_pool_row()`'s occupancy math including the
+  zero-`max_workers` guard) plus 3 new tests in `test_overview_screen.py` (Signals plate real
+  counts and "All clear", the module grid + Modules tab reflecting ready/stuck by name and
+  colour). Screenshots offscreen against a real demo app with seeded faults: Status tab (3
+  snapshots received, 5/5 modules, 4 open signals) and Modules tab (five real extensions, each
+  tagged `initialized`).
+
+All four subtasks now done. `EPIC-008B` as a whole is complete: `EPIC-008` subtasks C-F
+(Events & wiring, Container, Tasks & threads, Signals restyles) are next.

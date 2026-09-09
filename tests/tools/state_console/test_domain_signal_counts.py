@@ -14,7 +14,7 @@ from sagittarius_engine.extensions.audit.contracts import (
     StateSnapshot,
     TaskRecord,
 )
-from tools.state_console.presentation.shell.signal_counts import count_signals
+from tools.state_console.domain.signal_counts import count_signals
 
 
 def test_an_empty_snapshot_has_no_signals_anywhere():

@@ -32,6 +32,7 @@ from sagittarius_engine.extensions.audit.contracts import (
     FindingRecord,
     LifecycleState,
     MessageType,
+    ModuleState,
     ProtocolMismatch,
     RegistrationState,
     SignalsState,
@@ -68,6 +69,10 @@ def _populated_snapshot() -> StateSnapshot:
             hosted_started=2,
             scheduler_jobs=3,
             scheduler_jobs_without_next_run=1,
+            modules=(
+                ModuleState(name="DatabaseExtension", ready=True),
+                ModuleState(name="StudentManagementExtension", ready=False),
+            ),
         ),
         events=(
             EventState(
@@ -190,6 +195,7 @@ def test_an_empty_snapshot_survives_a_round_trip_unchanged():
     "instance",
     [
         LifecycleState(),
+        ModuleState(name="m"),
         EventState(name="e"),
         RegistrationState(abstract="A"),
         ContainerState(),

@@ -1,14 +1,18 @@
-"""`count_signals` — `EPIC-008B` §2's rail badge counts.
+"""`count_signals` — `EPIC-008B` §2's rail badge counts, reused by §4's
+Overview → Status "Signals" plate (same numbers, two different renderings).
 
 Pure function over a `StateSnapshot`, deliberately not a new wire field
 (`reference/handoff.md` §6: "a fault badge appears... when that section's
 signal count > 0" — a *display* concern, derived from data the snapshot
 already carries, the same way `OverviewPresenter` already derives
 `snapshotAgeSeconds` from timestamps rather than the server sending an
-"age" field). Kept in its own module, independent of Qt, so the counting
-rules are testable without a `TraceServer` or a `QApplication` — the same
-reasoning `tools/state_console/domain/events.py`'s `_DEFAULT_CODE_BY_KIND`
-earned its own pure-Python test file for.
+"age" field). Lives in `domain/`, not `presentation/shell/` (where it
+started): it has no Qt or shell dependency, `OverviewPresenter` needed the
+exact same computation, and duplicating it per screen would be the thing
+this module exists to avoid. Kept in its own module regardless, independent
+of Qt, so the counting rules are testable without a `TraceServer` or a
+`QApplication` — the same reasoning `tools/state_console/domain/events.py`'s
+`_DEFAULT_CODE_BY_KIND` earned its own pure-Python test file for.
 
 Each count mirrors a rule `reference/handoff.md` already states elsewhere
 for the same data, not an invented threshold:

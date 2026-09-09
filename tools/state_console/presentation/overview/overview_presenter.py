@@ -22,6 +22,7 @@ from tools.state_console.domain.events import (
     ConsoleDetached,
     SnapshotReceived,
 )
+from tools.state_console.domain.signal_counts import count_signals
 from tools.state_console.presentation.overview.overview_view_model import (
     ATTACHED_IDLE,
     ATTACHED_READING,
@@ -41,6 +42,7 @@ class OverviewPresenter(BasePresenter):
         self.view_model = OverviewViewModel()
         self.view.bind(self.view_model)
         self._last_snapshot_at: float | None = None
+        self._snapshots_received = 0
         self._connect_engine_events()
 
         self._age_timer = QTimer(self)
@@ -54,6 +56,10 @@ class OverviewPresenter(BasePresenter):
 
     def _on_attached(self, _event: ConsoleAttached) -> None:
         self.view_model.set_connection_state(ATTACHED_IDLE)
+        # A fresh attach -- reset the running tally rather than let it carry
+        # over from a previous, unrelated connection.
+        self._snapshots_received = 0
+        self.view_model.set_snapshots_received(0)
 
     def _on_detached(self, event: ConsoleDetached) -> None:
         self.view_model.set_connection_state(NOT_ATTACHED)
@@ -62,6 +68,8 @@ class OverviewPresenter(BasePresenter):
     def _on_snapshot(self, event: SnapshotReceived) -> None:
         self.view_model.set_connection_state(ATTACHED_READING)
         self._last_snapshot_at = time.monotonic()
+        self._snapshots_received += 1
+        self.view_model.set_snapshots_received(self._snapshots_received)
 
         snapshot = event.snapshot
         if snapshot.lifecycle is not None:
@@ -70,18 +78,37 @@ class OverviewPresenter(BasePresenter):
                 snapshot.lifecycle.extensions_registered,
                 snapshot.lifecycle.extensions_initialized,
             )
+            self.view_model.set_modules(
+                [
+                    {"name": module.name, "ready": module.ready}
+                    for module in snapshot.lifecycle.modules
+                ]
+            )
         self.view_model.set_thread_pools(
-            [
-                {
-                    "name": pool.name,
-                    "inFlight": pool.in_flight,
-                    "maxWorkers": pool.max_workers,
-                    "queueDepth": pool.queue_depth,
-                }
-                for pool in snapshot.thread_pools
-            ]
+            [self._thread_pool_row(pool) for pool in snapshot.thread_pools]
         )
+        self.view_model.set_signal_counts(count_signals(snapshot))
         self._tick_snapshot_age()
+
+    @staticmethod
+    def _thread_pool_row(pool: Any) -> dict:
+        occupancy_percent = (
+            round(100 * pool.in_flight / pool.max_workers) if pool.max_workers else 0
+        )
+        return {
+            "name": pool.name,
+            "inFlight": pool.in_flight,
+            "maxWorkers": pool.max_workers,
+            "queueDepth": pool.queue_depth,
+            "submitted": pool.submitted,
+            "completed": pool.completed,
+            # Both forms are exposed: OverviewScreen.qml's rowAccent needs
+            # the number for its >= 100 threshold check, its AppDataTable
+            # column needs a display string -- AppDataTable cells render a
+            # column's raw value as-is, with no per-cell formatting hook.
+            "occupancyPercent": occupancy_percent,
+            "occupancyText": f"{occupancy_percent}%",
+        }
 
     def _tick_snapshot_age(self) -> None:
         if self._last_snapshot_at is None:

@@ -22,8 +22,11 @@ class OverviewViewModel(BaseQmlViewModel):
     connectionStateChanged = Signal()
     detachReasonChanged = Signal()
     lifecycleChanged = Signal()
+    modulesChanged = Signal()
     threadPoolsChanged = Signal()
     snapshotAgeSecondsChanged = Signal()
+    snapshotsReceivedChanged = Signal()
+    signalCountsChanged = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -32,8 +35,17 @@ class OverviewViewModel(BaseQmlViewModel):
         self._lifecycle_state = ""
         self._extensions_registered = 0
         self._extensions_initialized = 0
+        self._modules: list[dict] = []
         self._thread_pools: list[dict] = []
         self._snapshot_age_seconds = -1.0
+        self._snapshots_received = 0
+        self._signal_counts = {
+            "events": 0,
+            "container": 0,
+            "tasks": 0,
+            "signals": 0,
+            "overview": 0,
+        }
 
     def _get_connection_state(self) -> str:
         return self._connection_state
@@ -82,11 +94,20 @@ class OverviewViewModel(BaseQmlViewModel):
         self._extensions_initialized = initialized
         self.lifecycleChanged.emit()
 
-    def _get_thread_pools(self) -> list:
-        return self._thread_pools
+    def _get_modules(self) -> list:
+        return self._modules
 
     # "QVariantList" -- PySide6's own idiom for exposing a Python list to
     # QML, same as RosterViewModel.students.
+    modules = Property("QVariantList", _get_modules, notify=modulesChanged)  # type: ignore[arg-type]
+
+    def set_modules(self, modules: list[dict]) -> None:
+        self._modules = modules
+        self.modulesChanged.emit()
+
+    def _get_thread_pools(self) -> list:
+        return self._thread_pools
+
     threadPools = Property("QVariantList", _get_thread_pools, notify=threadPoolsChanged)  # type: ignore[arg-type]
 
     def set_thread_pools(self, pools: list[dict]) -> None:
@@ -103,3 +124,31 @@ class OverviewViewModel(BaseQmlViewModel):
     def set_snapshot_age_seconds(self, value: float) -> None:
         self._snapshot_age_seconds = value
         self.snapshotAgeSecondsChanged.emit()
+
+    def _get_snapshots_received(self) -> int:
+        return self._snapshots_received
+
+    #: How many `SnapshotReceived` events this presenter has seen since
+    #: attaching -- `reference/handoff.md` §7.1's "snapshots received N" on
+    #: the Connection plate. Purely a client-side tally (the wire protocol
+    #: carries no running counter), reset on every fresh attach.
+    snapshotsReceived = Property(
+        int, _get_snapshots_received, notify=snapshotsReceivedChanged
+    )
+
+    def set_snapshots_received(self, value: int) -> None:
+        self._snapshots_received = value
+        self.snapshotsReceivedChanged.emit()
+
+    def _get_signal_counts(self) -> dict:
+        return self._signal_counts
+
+    #: `{"events", "container", "tasks", "signals", "overview"}` -- the same
+    #: shape `signal_counts.count_signals()` returns, exposed as-is so QML
+    #: reads `viewModel.signalCounts.events` etc. directly rather than this
+    #: class unpacking it into four near-identical properties.
+    signalCounts = Property("QVariant", _get_signal_counts, notify=signalCountsChanged)  # type: ignore[arg-type]
+
+    def set_signal_counts(self, counts: dict) -> None:
+        self._signal_counts = counts
+        self.signalCountsChanged.emit()

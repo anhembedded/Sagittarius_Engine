@@ -33,6 +33,7 @@ from tools.state_console.domain.events import (
     ConsoleFailureKind,
     SnapshotReceived,
 )
+from tools.state_console.domain.signal_counts import count_signals
 from tools.state_console.infrastructure.console_connection_extension import (
     ConsoleConnectionExtension,
 )
@@ -47,7 +48,6 @@ from tools.state_console.presentation.shell.recent_addresses_store import (
     RecentAddressesStore,
     default_recent_addresses_settings,
 )
-from tools.state_console.presentation.shell.signal_counts import count_signals
 
 #: How often the live-ticking age/elapsed/stale clocks refresh -- same
 #: cadence and reasoning as OverviewPresenter._AGE_TICK_MS.
