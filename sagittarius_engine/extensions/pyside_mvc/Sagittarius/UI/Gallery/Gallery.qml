@@ -175,6 +175,36 @@ Rectangle {
                 }
             }
 
+            // ---- App rail --------------------------------------------
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spaceXl
+                Layout.rightMargin: Theme.spaceXl
+                spacing: Theme.spaceMd
+
+                SectionLabel { text: "APP RAIL — indexed nav, active state, signal badges (EPIC-008A)" }
+                AppRail {
+                    Layout.preferredWidth: 218
+                    Layout.preferredHeight: 260
+                    activeSectionId: "events"
+                    sections: [
+                        { id: "overview", label: "Overview", badgeCount: 0 },
+                        { id: "events", label: "Events && wiring", badgeCount: 2 },
+                        { id: "container", label: "Container", badgeCount: 1 },
+                        { id: "tasks", label: "Tasks && threads", badgeCount: 0 },
+                        { id: "signals", label: "Signals", badgeCount: 10 }
+                    ]
+                    footer: Text {
+                        text: "Read-only. This tool never writes to the attached process."
+                        color: Theme.muted
+                        font.pixelSize: Theme.fontSizeSm
+                        wrapMode: Text.Wrap
+                        textFormat: Text.PlainText
+                        padding: Theme.spaceMd
+                    }
+                }
+            }
+
             // ---- Buttons -------------------------------------------------
             ColumnLayout {
                 Layout.fillWidth: true

@@ -22,80 +22,23 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QMetaObject, QObject, Qt, QUrl, Slot
+from PySide6.QtCore import QMetaObject, QObject, Qt, Slot
 from PySide6.QtGui import QColor
-from PySide6.QtQml import QQmlComponent, QQmlEngine, QQmlPropertyMap
 
-from sagittarius_engine.extensions.pyside_mvc.tokens import with_token_defaults
-
-_FIXTURES_DIR = Path(__file__).parent / "fixtures"
-_PYSIDE_MVC_DIR = (
-    Path(__file__).resolve().parents[3]
-    / "sagittarius_engine"
-    / "extensions"
-    / "pyside_mvc"
+from tests.extensions.pyside_mvc._standalone_qml_theme import (
+    load_qml_fixture,
+    standalone_theme_engine,
 )
 
-#: Four genuinely distinguishable required colours -- the point is telling
-#: `accent`/`accent700`/`danger`/`muted` apart in a test assertion, which an
-#: all-black placeholder palette cannot do.
-_DISTINCT_PALETTE = {
-    "bg": "#111111",
-    "bgSidebar": "#111111",
-    "bgCard": "#111111",
-    "bgCardHeader": "#111111",
-    "border": "#222222",
-    "textPrimary": "#eeeeee",
-    "accent": "#3366ff",
-    "success": "#22cc88",
-    "warning": "#ffaa22",
-    "danger": "#ff3355",
-    "muted": "#888888",
-}
+_FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 def _standalone_theme_engine():
-    """@brief A fresh `QQmlEngine` with `Theme` populated from
-    `_DISTINCT_PALETTE` via the real `with_token_defaults()` (so `accent700`
-    etc. are the genuine derived values, not hand-typed stand-ins) --
-    entirely independent of the shared `get_theme_bridge()` singleton.
-
-    @return `(engine, theme, merged)` -- the caller must keep `engine` AND
-    `theme` alive for as long as any object it created is in use (a
-    `QQmlPropertyMap` context property is only referenced, not owned, by
-    the engine)."""
-    merged = with_token_defaults(_DISTINCT_PALETTE)
-    engine = QQmlEngine()
-    engine.addImportPath(str(_PYSIDE_MVC_DIR))
-    theme = QQmlPropertyMap()
-    for key, value in merged.items():
-        theme.insert(key, value)
-    engine.rootContext().setContextProperty("Theme", theme)
-    return engine, theme, merged
+    return standalone_theme_engine()
 
 
 def _load_band(engine):
-    """@brief Loads the probe and gives it a `QObject` parent (`engine`
-    itself) before returning.
-
-    @details A root object handed back by `QQmlComponent.create()` has no
-    parent of its own (`parent=0x0`, confirmed by inspection) — without
-    one, once this function's local `component` goes out of scope and is
-    garbage-collected, the underlying C++ item is destroyed with it
-    ("Internal C++ object already deleted", reproduced empirically), even
-    though the caller still holds a live Python reference to `obj`. Setting
-    a real `QObject` parent hands ownership to Qt's own parent-child
-    lifetime management instead of Python refcounting for `component`.
-    """
-    component = QQmlComponent(
-        engine,
-        QUrl.fromLocalFile(str(_FIXTURES_DIR / "live_connection_band_probe.qml")),
-    )
-    obj = component.create()
-    assert component.errors() == [], component.errors()
-    assert obj is not None
-    obj.setParent(engine)
-    return obj
+    return load_qml_fixture(engine, _FIXTURES_DIR / "live_connection_band_probe.qml")
 
 
 class _Recorder(QObject):

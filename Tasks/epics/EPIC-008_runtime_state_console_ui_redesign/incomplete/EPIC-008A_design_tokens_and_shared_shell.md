@@ -122,17 +122,46 @@ Python the way `Button.clicked()` (zero-arg, used for the action button) can —
 constructor is available from Python — so that one binding is verified by code review, the same
 class of gap `AppDataTable`'s own drag-to-resize test already discloses.
 
-### 3. Rail navigation with signal-count badges — new kit component
+### 3. Rail navigation with signal-count badges — new kit component — ✅ done
 
 Today's `ConsoleShellView` sidebar (`tools/state_console/presentation/shell/
 console_shell_view.py`) is deliberately raw `QWidget`/`QPushButton` because nothing needed
 theming yet (see that file's own docstring). The handoff's rail — indexed rows, active-state
 border treatment, a per-row fault badge, hover states, a footer block — is themed enough that
-it belongs in the kit as `AppRail` (or similar; naming TBD), composed from existing primitives
-(`BaseCard`-family) rather than raw `Rectangle`/`Item`. `console_shell_view.py` becomes a thin
-consumer wiring route names + labels + badge counts into it — the badge *counts themselves*
-(derived from snapshot signal totals) stay `tools/state_console` domain logic (tier 3), fed in
-as plain integers (tier 2).
+it belongs in the kit; landed as `Sagittarius/UI/AppRail/AppRail.qml`, built directly on
+`Rectangle`/`ColumnLayout` (same reasoning as `LiveConnectionBand`: the kit's own components are
+built on Qt Quick primitives directly, `BaseCard`'s icon/title card chrome doesn't fit a nav
+row's shape and forcing it in would be the wrong abstraction, not a shortcut avoided).
+
+- **Tier 1:** sequential numbering (`01`, `02`, … computed from list position, not supplied),
+  active/hover/badge rendering, and a `_selectRow(id)` function that both the row's own
+  `MouseArea` calls and a test can invoke directly with a `QVariant` argument (the same
+  workaround `LiveConnectionBand`'s tests needed for anything gated behind a real
+  `MouseArea.clicked(mouse)`).
+- **Tier 2:** `sections` — a plain schema-driven array (`{ id, label, badgeCount }`), the same
+  shape `AppDataTable.columns` already uses, generalized from "table columns" to "nav rows".
+  `badgeCount <= 0` means no badge at all, not a badge showing `0` — `reference/handoff.md`'s
+  own "zero rows are muted, not hidden" principle, applied here as *no badge* rather than a
+  zeroed one.
+- **Tier 3:** a generic `footer` slot (any `Item`, reparented in via `Binding`) rather than a
+  hardcoded target/process info-block or an appearance toggle — this component has no opinion
+  on what a "target" or "process" is; `console_shell_view.py` (`EPIC-008B`) supplies that.
+
+**A real, reusable finding surfaced while writing this component's own tests:** a plain
+`Repeater` (not just a `ListView` delegate, as `AppDataTable`'s expansion `Loader` already
+showed) breaks `QObject.findChild()` the same way, AND repeatedly searching
+(`find_visual_child()`, a fresh `childItems()` walk each call) over a tree containing one
+reproduced a second, sharper failure: "Internal C++ object already deleted" on the *second*
+independent search — a `Repeater`-managed item's Python wrapper, once dropped, appears to take
+the underlying live, still-parented C++ item down with it. Fixed by adding
+`collect_all_items()` to the shared test helper (`tests/extensions/pyside_mvc/
+_standalone_qml_theme.py`, factored out of `test_live_connection_band.py` in the process so both
+files share one `standalone_theme_engine()`/`load_qml_fixture()` implementation): collect the
+whole subtree ONCE into a list the test keeps alive, never re-walk it. This is now the
+documented, load-bearing pattern for any future kit test touching a `Repeater`/`Loader`.
+
+7 new tests in `tests/extensions/pyside_mvc/test_app_rail.py`. Demonstrated in the gallery with
+three badge states (none/2/10) and a footer.
 
 ### 4. `AppDataTable` — sortable columns + expandable row — ✅ done
 
