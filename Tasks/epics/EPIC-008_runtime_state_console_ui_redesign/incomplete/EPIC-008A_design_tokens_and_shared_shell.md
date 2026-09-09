@@ -75,24 +75,6 @@ top-level `pyside_mvc` package (the only supported import surface, `ui-architect
 `tests/extensions/pyside_mvc/` suite (179 tests) still green; `ruff`/`ruff format`/`mypy`
 clean on the changed files.
 
-New **token names** (not derived — genuinely new concepts, per `EPIC-008` §2.1): `surface`,
-`chrome`, `divider`, `hatch`, `gridLine`, and an `ink` triplet. Decide during implementation
-whether `ink` is three numeric tokens (`inkR`/`inkG`/`inkB`, QML composes `Qt.rgba` itself) or
-a single packed value with a documented QML helper — pick whichever `theme_bridge.py`'s
-`QQmlPropertyMap` shape makes less awkward to bind, and record the choice here once made.
-Classify each as required (`vocabulary.py`) or default-backed (`defaults.py`) using the same
-test `vocabulary.py`'s own docstring applies: is this something every real consumer already
-conceptually has an opinion on (required), or something safe to ship a generic default for
-until a consumer opts in (default-backed)? `surface`/`chrome`/`divider` look like the former
-(every themed app has a "background but slightly different" surface colour already, even if
-today it's the same literal as `bg`); `hatch`/`gridLine` look like the latter (Industry-specific
-decoration, not a universal UI concept).
-
-Existing state-console `Palette.as_ui_dict()`-equivalent (`tools/state_console/presentation/
-theme/palette.py`'s `STATE_CONSOLE_PALETTE`) needs the newly-required keys added once that
-classification is settled — it is the one real consumer this subtask must not leave unable to
-boot.
-
 ### 2. `LiveConnectionBand` — new kit component
 
 The status band (`reference/handoff.md` §4): stripe + pulsing state dot + label/note + a
@@ -128,21 +110,42 @@ consumer wiring route names + labels + badge counts into it — the badge *count
 (derived from snapshot signal totals) stay `tools/state_console` domain logic (tier 3), fed in
 as plain integers (tier 2).
 
-### 4. `AppDataTable` — sortable columns + expandable row
+### 4. `AppDataTable` — sortable columns + expandable row — ✅ done
 
-Extends the existing component (`Sagittarius/UI/AppDataTable/AppDataTable.qml`, already
-carrying `rowAccent` from `EPIC-007F`) rather than a new type:
+Extends the existing component (`Sagittarius/UI/AppDataTable/AppDataTable.qml`) rather than a
+new type:
 
-- **Sort** — per `ui-architecture.md` §1.2's own worked example ("should a table know how to
-  sort? The mechanism yes; which column, which comparator is tier 2"). Column definitions
-  already declare `sortable`-shaped metadata per the schema-driven table rule (§3); add a
-  `sortKey`/comparator hook per column and a header click → toggle-direction → `↑`/`↓`
-  indicator, all inside the component. *Which* column is currently sorted, and surviving a
-  data refresh without losing that state, is `tools/state_console`'s view-model concern (it
-  already owns the data array the table binds to).
-- **Expand** — a per-row expansion slot (used today only by Tasks & threads' failed-row detail,
-  `EPIC-008E`). The *mechanism* (one row expanded at a time, height animation, delegate slot)
-  is tier 1; the *content* shown when expanded is tier 2, supplied by the consumer.
+- **Sort — already shipped, discovered on inspection, no new work needed.** Reading the
+  component before touching it found `sortKey`/`sortAscending`, per-column `sortable` (default
+  true), header click-to-toggle with a `▲`/`▼` indicator, and raw-value (not formatted-text)
+  comparison already in place, added for `TASK-036` before this epic existed. `_sortedModel()`
+  recomputes from `root.model` and the two sort properties on every dependency change, so
+  sort state is inherently preserved across a live model replacement (a snapshot refresh) —
+  it was never index-based to begin with. This file's original plan assumed sort needed
+  building; it didn't, and no change was made here.
+- **Expand — built.** A per-row expansion slot, tracked by **identity**
+  (`rowData[rowIdKey]`), not list index — an index-based "row 3 is expanded" would silently
+  point at a different row, or none, the instant a live snapshot refresh reorders or resizes
+  the model array, which is exactly the failure mode `EPIC-007F`'s own signals data is prone
+  to. New properties: `expandedDelegate` (a `Component`; its root item must declare
+  `property var rowData`, kept live-bound via an internal `Binding` so content inside an open
+  expansion keeps updating on later snapshot ticks, not frozen at the moment it opened),
+  `expandPredicate` (optional `(rowData) => bool`; `null` means every row may expand),
+  `rowIdKey` (default `"id"`), `expandedRowKey`. `expandPredicate` is enforced as a real
+  invariant inside the component's own `_isExpanded` computation, not only gated in the row's
+  click handler — setting `expandedRowKey` directly to a row the predicate disallows does not
+  expand it either. Delegate restructured from a bare `Rectangle` to a `Column` (band +
+  conditional `Loader`) so the row's height auto-adjusts; mechanism is tier 1, expansion
+  content is tier 2 (supplied by the consumer), matching `ui-architecture.md` §1.2.
+  4 new tests in `tests/extensions/pyside_mvc/test_widget_kit_gallery.py` plus a new fixture
+  (`fixtures/app_data_table_expandable_probe.qml`); demonstrated in the gallery
+  (`Gallery.qml`'s "expandable row" table, clicking the Failed task). One real finding along
+  the way: `QObject.findChild()` cannot see a `Loader`-created item from the table's root —
+  confirmed empirically (the item genuinely loads, with correct live-bound data, yet
+  `findChild()` returns `None` even seconds later) — because a `ListView`'s `contentItem`
+  breaks the `QObject` parent chain `findChild()` walks. Fixed by testing via `childItems()`
+  (the visual tree) recursively instead, the same pattern
+  `test_app_data_table_zoom_factor_scales_row_height` already used one level deep.
 
 ### 5. Connect-flow input primitives
 

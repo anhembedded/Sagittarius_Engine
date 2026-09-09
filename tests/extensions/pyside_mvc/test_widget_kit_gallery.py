@@ -360,6 +360,109 @@ def test_app_data_table_resized_column_keeps_others_and_last_absorbs_rest(qtbot)
     assert widths[2] == pytest.approx(576.0 - 200.0 - 150.0)
 
 
+def _find_visual_child(item, object_name: str):
+    """@brief Depth-first search over `childItems()` (the visual tree), not
+    `QObject.findChild()` (the QObject-parent tree). A `ListView`'s
+    `contentItem` breaks the latter — confirmed empirically: `findChild()`
+    from the table's root cannot see into a `Loader`-created item, even
+    seconds after it has genuinely loaded, while walking `childItems()`
+    finds it immediately. `test_app_data_table_zoom_factor_scales_row_height`
+    already relies on the same `contentItem.childItems()` pattern for
+    exactly this reason; this generalizes it to search recursively instead
+    of indexing one known level."""
+    if item.objectName() == object_name:
+        return item
+    for child in item.childItems():
+        found = _find_visual_child(child, object_name)
+        if found is not None:
+            return found
+    return None
+
+
+def test_app_data_table_expands_the_matching_row_by_identity(qtbot):
+    """`expandedRowKey` (EPIC-008A) is matched by `rowData[rowIdKey]`, not by
+    list position — setting it loads `expandedDelegate` and live-binds
+    `rowData` onto it."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "app_data_table_expandable_probe.qml"))
+    )
+    assert widget.errors() == []
+    widget.resize(600, 200)
+    widget.show()
+    for _ in range(5):
+        qtbot.wait(1)
+    root = widget.rootObject()
+    assert root is not None
+
+    # Nothing expanded initially.
+    assert _find_visual_child(root, "expansionProbe") is None
+
+    root.setProperty("expandedRowKey", "row-2")
+    for _ in range(5):
+        qtbot.wait(1)
+
+    probe = _find_visual_child(root, "expansionProbe")
+    assert probe is not None
+    assert probe.property("rowData")["name"] == "beta"
+
+
+def test_app_data_table_collapses_when_the_key_matches_no_row(qtbot):
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "app_data_table_expandable_probe.qml"))
+    )
+    assert widget.errors() == []
+    widget.resize(600, 200)
+    widget.show()
+    for _ in range(5):
+        qtbot.wait(1)
+    root = widget.rootObject()
+    assert root is not None
+
+    root.setProperty("expandedRowKey", "row-2")
+    for _ in range(5):
+        qtbot.wait(1)
+    assert _find_visual_child(root, "expansionProbe") is not None
+
+    root.setProperty("expandedRowKey", "no-such-row")
+    for _ in range(5):
+        qtbot.wait(1)
+    assert _find_visual_child(root, "expansionProbe") is None
+
+
+def test_app_data_table_expand_predicate_blocks_a_disallowed_row_even_by_direct_key(
+    qtbot,
+):
+    """`expandPredicate` is a real invariant, not just a click-affordance —
+    the fixture only allows the Failed row ("row-2") to expand, so setting
+    `expandedRowKey` straight to "row-1" (Running) must not expand it, even
+    though "row-1" is a genuine row identity."""
+    widget = create_quick_widget()
+    qtbot.addWidget(widget)
+
+    widget.setSource(
+        QUrl.fromLocalFile(str(_FIXTURES_DIR / "app_data_table_expandable_probe.qml"))
+    )
+    assert widget.errors() == []
+    widget.resize(600, 200)
+    widget.show()
+    for _ in range(5):
+        qtbot.wait(1)
+    root = widget.rootObject()
+    assert root is not None
+
+    root.setProperty("expandedRowKey", "row-1")
+    for _ in range(5):
+        qtbot.wait(1)
+
+    assert _find_visual_child(root, "expansionProbe") is None
+
+
 def test_time_range_card_clear_resets_toggle_and_both_dates(qtbot):
     """Clear (TASK-036, found missing 2026-08-23) resets the whole range in
     one click instead of requiring the toggle and both fields cleared by

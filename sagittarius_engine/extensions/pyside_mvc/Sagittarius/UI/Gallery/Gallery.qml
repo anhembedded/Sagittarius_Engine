@@ -30,6 +30,65 @@ Rectangle {
         textFormat: Text.PlainText
     }
 
+    // ---- Expandable-row demo data (EPIC-008A) --------------------------
+    // A row's own click-to-expand only makes sense for rows that have
+    // somewhere further to go — `expandPredicate` below restricts it to
+    // the Failed one, exactly the Tasks & threads use case this exists
+    // for (`reference/handoff.md` §7.5).
+    readonly property var sampleTasks: [
+        { id: "tsk-8801", name: "reindex-parcels", state: "Running", progress: 62 },
+        { id: "tsk-8790", name: "purge-expired-cache", state: "Completed", progress: 100 },
+        {
+            id: "tsk-8841", name: "sync-inventory", state: "Failed", progress: 40,
+            errorType: "TimeoutException",
+            error: "Handler exceeded its 30s execution budget."
+        }
+    ]
+    readonly property var taskColumns: [
+        { key: "name", title: "Task", weight: 2 },
+        { key: "state", title: "State", weight: 1 },
+        {
+            key: "progress", title: "Progress", weight: 1, align: Text.AlignRight,
+            formatter: function (v) { return v + "%" }
+        }
+    ]
+
+    // `expandedDelegate`'s contract: its root item must declare
+    // `property var rowData` — AppDataTable keeps it live-bound to the
+    // expanded row's current data via an internal `Binding`.
+    component TaskFailureDetail: Rectangle {
+        property var rowData: null
+        implicitHeight: detailColumn.implicitHeight + Theme.spaceMd * 2
+        color: Theme.dangerFill
+        opacity: 0.08
+        border.color: Theme.danger
+        border.width: 1
+
+        ColumnLayout {
+            id: detailColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: Theme.spaceMd
+            spacing: Theme.spaceXs
+
+            Text {
+                text: rowData ? rowData.errorType : ""
+                color: Theme.dangerText
+                font.bold: true
+                textFormat: Text.PlainText
+            }
+            Text {
+                Layout.fillWidth: true
+                text: rowData ? rowData.error : ""
+                color: Theme.textPrimary
+                wrapMode: Text.Wrap
+                textFormat: Text.PlainText
+            }
+        }
+    }
+    readonly property Component taskFailureDetailComponent: Component { TaskFailureDetail {} }
+
     readonly property var sampleTrades: [
         { symbol: "BTCUSDT", side: "LONG", qty: 0.50, price: 65210.50, pnl: 128.40 },
         { symbol: "ETHUSDT", side: "SHORT", qty: 2.00, price: 3180.25, pnl: -42.10 },
@@ -172,6 +231,16 @@ Rectangle {
                     Layout.preferredHeight: 180
                     columns: root.tradeColumns
                     model: root.sampleTrades
+                }
+
+                SectionLabel { text: "DATA TABLE — expandable row (click the Failed task; only Failed rows expand)" }
+                AppDataTable {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 160
+                    columns: root.taskColumns
+                    model: root.sampleTasks
+                    expandedDelegate: root.taskFailureDetailComponent
+                    expandPredicate: function (row) { return row.state === "Failed" }
                 }
             }
 

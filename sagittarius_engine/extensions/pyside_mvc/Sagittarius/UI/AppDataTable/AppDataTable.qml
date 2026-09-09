@@ -51,6 +51,34 @@ BaseCard {
     //: still reads as selected/hovered first.
     property var rowAccent: null
 
+    //: Per-row expansion (`EPIC-008A`, mechanism half of `ui-architecture.md`
+    //: §1.2's tiering — expand's *content* is the consumer's, expand's
+    //: *mechanism* is the component's). Tracked by identity
+    //: (`rowData[rowIdKey]`), not by list index: the model array is wholly
+    //: replaced on every live refresh, so an index-based "row 3 is
+    //: expanded" would silently point at a different row — or none — the
+    //: moment a snapshot reorders or resizes the list. Identity survives
+    //: that; the interaction contract this satisfies (`reference/
+    //: handoff.md` §8) is explicit that expansion must survive a refresh
+    //: the same way sort and selection do.
+    //:
+    //: `expandedDelegate` is the consumer-supplied content Component; its
+    //: root item must declare `property var rowData` — this component
+    //: keeps it live-bound to the expanded row's current data via a
+    //: `Binding`, so a value inside an open expansion (e.g. a task's
+    //: `progress`) still updates on the next snapshot tick, exactly like
+    //: every closed row's own cells already do.
+    //: `expandPredicate` (optional `(rowData) => bool`) restricts which
+    //: rows may expand at all — e.g. only a Failed task's row — a `null`
+    //: predicate (the default) means every row is expandable once
+    //: `expandedDelegate` is set. Only one row is ever expanded at a time:
+    //: expanding a second row implicitly collapses the first, by
+    //: construction (`expandedRowKey` holds exactly one value).
+    property Component expandedDelegate: null
+    property var expandPredicate: null
+    property string rowIdKey: "id"
+    property var expandedRowKey: null
+
     //: Click-to-sort state. Every column sorts by default (unless its own
     //: spec sets `sortable: false`) — common enough table behaviour that a
     //: consumer shouldn't have to opt in per screen (found 2026-08-23: a
@@ -286,7 +314,7 @@ BaseCard {
             model: root._sortedModel()
             ScrollBar.vertical: ScrollBar {}
 
-            delegate: Rectangle {
+            delegate: Column {
                 id: rowDelegate
                 required property var modelData
                 //: A delegate that declares any `required property` opts
@@ -301,68 +329,122 @@ BaseCard {
                 //: unreachable from inside that Repeater's delegate.
                 property var rowData: modelData
 
+                //: Whether this specific row is allowed to expand at all —
+                //: see `expandPredicate`'s own doc comment above.
+                readonly property bool _expandable: root.expandedDelegate !== null &&
+                    (root.expandPredicate ? root.expandPredicate(rowDelegate.rowData) : true)
+                //: Identity, not index — see `expandedRowKey`'s doc comment.
+                //: Gated on `_expandable` here, not only in the click
+                //: handler below: `expandPredicate` is a real invariant
+                //: ("this row can never open"), not merely a click
+                //: affordance — setting `expandedRowKey` directly to a
+                //: non-expandable row's identity must not open it either.
+                readonly property bool _isExpanded: root.expandedRowKey !== null &&
+                    rowDelegate._expandable &&
+                    rowDelegate.rowData[root.rowIdKey] === root.expandedRowKey
+
+                //: Explicit width: a positioner (`Column`) auto-sizes the
+                //: dimensions a consumer does NOT override, but this one
+                //: must still match the ListView's own width, exactly as
+                //: the plain `Rectangle` delegate this replaced did. Height
+                //: is deliberately left to auto-sizing — it is the sum of
+                //: `band` (always present) and `expansionLoader` (present
+                //: only while `_isExpanded`), which is the whole mechanism
+                //: that lets one row grow without any manual height maths.
                 width: ListView.view.width
-                height: root.rowHeight * root.zoomFactor
-                //: Priority: selected > hovered > zebra > transparent.
-                color: {
-                    if (rowDelegate.index === rows.currentIndex) return Theme.stateActiveTint
-                    if (rowHover.hovered) return Theme.stateHoverBg
-                    return root.zebra && (rowDelegate.index % 2 === 1) ? Theme.bgCardHeader : "transparent"
-                }
-
-                HoverHandler { id: rowHover }
-
-                //: See `rowAccent`'s own doc comment — `null` means no
-                //: overlay, computed once per row rather than inline in a
-                //: `visible`/`color` binding pair so `rowAccent()` is only
-                //: ever called once per row per model change.
-                readonly property var _accentColor: root.rowAccent
-                    ? root.rowAccent(rowDelegate.rowData)
-                    : null
 
                 Rectangle {
-                    anchors.fill: parent
-                    visible: rowDelegate._accentColor !== null
-                    color: rowDelegate._accentColor || "transparent"
-                    opacity: 0.18
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root._userSelected = true
-                        rows.currentIndex = rowDelegate.index
-                        root.rowClicked(rowDelegate.index, rowDelegate.rowData)
+                    id: band
+                    width: parent.width
+                    height: root.rowHeight * root.zoomFactor
+                    //: Priority: selected > hovered > zebra > transparent.
+                    color: {
+                        if (rowDelegate.index === rows.currentIndex) return Theme.stateActiveTint
+                        if (rowHover.hovered) return Theme.stateHoverBg
+                        return root.zebra && (rowDelegate.index % 2 === 1) ? Theme.bgCardHeader : "transparent"
                     }
-                    onDoubleClicked: root.rowDoubleClicked(rowDelegate.index, rowDelegate.rowData)
+
+                    HoverHandler { id: rowHover }
+
+                    //: See `rowAccent`'s own doc comment — `null` means no
+                    //: overlay, computed once per row rather than inline in a
+                    //: `visible`/`color` binding pair so `rowAccent()` is only
+                    //: ever called once per row per model change.
+                    readonly property var _accentColor: root.rowAccent
+                        ? root.rowAccent(rowDelegate.rowData)
+                        : null
+
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: band._accentColor !== null
+                        color: band._accentColor || "transparent"
+                        opacity: 0.18
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root._userSelected = true
+                            rows.currentIndex = rowDelegate.index
+                            root.rowClicked(rowDelegate.index, rowDelegate.rowData)
+                            if (rowDelegate._expandable) {
+                                root.expandedRowKey = rowDelegate._isExpanded
+                                    ? null
+                                    : rowDelegate.rowData[root.rowIdKey]
+                            }
+                        }
+                        onDoubleClicked: root.rowDoubleClicked(rowDelegate.index, rowDelegate.rowData)
+                    }
+
+                    Row {
+                        id: cellsRow
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+
+                        Repeater {
+                            model: root.columns
+                            delegate: Text {
+                                required property var modelData
+                                required property int index
+                                readonly property var cellValue: rowDelegate.rowData[modelData.key]
+
+                                width: root._effectiveColumnWidths()[index] || 0
+                                height: cellsRow.height
+                                verticalAlignment: Text.AlignVCenter
+                                horizontalAlignment: modelData.align !== undefined ? modelData.align : Text.AlignLeft
+                                text: modelData.formatter ? modelData.formatter(cellValue) : String(cellValue)
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontSizeMd * root.zoomFactor
+                                // Security & UI Injection Defense (qml-rule.md
+                                // §3.3): cell content can be arbitrary data.
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
                 }
 
-                Row {
-                    id: cellsRow
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
+                Loader {
+                    id: expansionLoader
+                    objectName: "appDataTableExpansion"
+                    width: rowDelegate.width
+                    active: rowDelegate._isExpanded
+                    sourceComponent: root.expandedDelegate
 
-                    Repeater {
-                        model: root.columns
-                        delegate: Text {
-                            required property var modelData
-                            required property int index
-                            readonly property var cellValue: rowDelegate.rowData[modelData.key]
-
-                            width: root._effectiveColumnWidths()[index] || 0
-                            height: cellsRow.height
-                            verticalAlignment: Text.AlignVCenter
-                            horizontalAlignment: modelData.align !== undefined ? modelData.align : Text.AlignLeft
-                            text: modelData.formatter ? modelData.formatter(cellValue) : String(cellValue)
-                            color: Theme.textPrimary
-                            font.pixelSize: Theme.fontSizeMd * root.zoomFactor
-                            // Security & UI Injection Defense (qml-rule.md
-                            // §3.3): cell content can be arbitrary data.
-                            textFormat: Text.PlainText
-                            elide: Text.ElideRight
-                        }
+                    //: A live binding, not a one-shot assignment in
+                    //: `onLoaded` — the expanded row's own data keeps
+                    //: refreshing on every snapshot tick the same as every
+                    //: closed row's cells do (`reference/handoff.md` §8's
+                    //: "without losing... expansion" also implies its
+                    //: *content* stays live, not frozen at the moment it
+                    //: opened).
+                    Binding {
+                        target: expansionLoader.item
+                        property: "rowData"
+                        value: rowDelegate.rowData
+                        when: expansionLoader.status === Loader.Ready
                     }
                 }
             }
