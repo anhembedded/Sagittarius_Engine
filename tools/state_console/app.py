@@ -25,13 +25,15 @@ from tools.state_console.infrastructure.console_connection_extension import (
 
 
 def build_console_app(
-    uri: str, *, extra_extensions: list | None = None, boot: bool = True
+    uri: str | None = None, *, extra_extensions: list | None = None, boot: bool = True
 ) -> App:
     """
     @brief Wires — and, by default, boots — the console's own `App`. No
     database, no persistence, nothing this tool needs beyond a container, a
     bus, and the websocket connection.
 
+    @param uri `None` boots cold (`EPIC-008B` §3's connect flow is how a
+    target then gets chosen from inside the running tool).
     @param extra_extensions Registered after `ConsoleConnectionExtension`,
     before `app.boot()` — `main.py` passes `[ConsoleMvcExtension()]` here.
     @param boot `False` to wire everything (extensions registered, the

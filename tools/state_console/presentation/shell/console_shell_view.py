@@ -1,13 +1,16 @@
 """`ConsoleShellView` — `EPIC-007E` §3's navigation shell, rebuilt on the
-new kit by `EPIC-008B` §2.
+new kit by `EPIC-008B` §§2-3.
 
 The sidebar and status band are QML now (`AppRail`/`LiveConnectionBand`,
 hosted by `RailView`/`ConnectionBandView`), driven by `ShellPresenter` —
 the same "screen content is QML, wired through a QmlHostView" shape
 `OverviewView` etc. already use, just for shell-wide chrome instead of one
-screen. `ConsoleShellView` itself stays a plain `QWidget`: it only lays the
-pieces out and exposes the `bind_band`/`bind_rail`/`navigate_to` surface
-`ShellPresenter` needs — see that class's own docstring.
+screen. The connect flow (`ConnectFlowView`) overlays the section body the
+same way, toggled by `set_connect_flow_visible()`. `ConsoleShellView`
+itself stays a plain `QWidget`: it only lays the pieces out and exposes the
+`bind_band`/`bind_rail`/`bind_connect_flow`/`set_connect_flow_visible`/
+`navigate_to` surface `ShellPresenter` needs — see that class's own
+docstring.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ from typing import Any
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QStackedLayout,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -25,10 +29,14 @@ from sagittarius_engine.extensions.pyside_mvc.mvc.presenter_manager import (
     PresenterManager,
 )
 from sagittarius_engine.interfaces import IContainer
+from tools.state_console.presentation.shell.connect_flow_view import ConnectFlowView
 from tools.state_console.presentation.shell.connection_band_view import (
     ConnectionBandView,
 )
 from tools.state_console.presentation.shell.rail_view import RailView
+from tools.state_console.presentation.shell.recent_addresses_store import (
+    RecentAddressesStore,
+)
 from tools.state_console.presentation.shell.shell_presenter import ShellPresenter
 
 #: Route name -> rail label, in display order.
@@ -42,7 +50,13 @@ SCREENS: tuple[tuple[str, str], ...] = (
 
 
 class ConsoleShellView(QWidget):
-    def __init__(self, container: IContainer, parent=None) -> None:
+    def __init__(
+        self,
+        container: IContainer,
+        parent=None,
+        *,
+        recent_addresses: RecentAddressesStore | None = None,
+    ) -> None:
         super().__init__(parent)
 
         self._stack = QStackedWidget(self)
@@ -51,12 +65,27 @@ class ConsoleShellView(QWidget):
 
         self._band = ConnectionBandView(self)
         self._rail = RailView(self)
+        self._connect_flow = ConnectFlowView(self)
+
+        # The connect flow overlays the section body only -- never the rail
+        # or the band -- per reference/handoff.md §5 ("change…" opens "the
+        # same attach view over the section body"; "cancel returns to the
+        # data"). A QStackedLayout, not another QStackedWidget page: the
+        # underlying screen stays mounted (and its own presenter subscribed)
+        # while the overlay is up, so "cancel" needs no restore step.
+        body_content = QStackedLayout()
+        body_content.addWidget(self._stack)
+        body_content.addWidget(self._connect_flow)
+        body_content.setCurrentWidget(self._stack)
+        self._body_content = body_content
+        body_content_widget = QWidget(self)
+        body_content_widget.setLayout(body_content)
 
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
         body.addWidget(self._rail)
-        body.addWidget(self._stack, stretch=1)
+        body.addWidget(body_content_widget, stretch=1)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -64,7 +93,9 @@ class ConsoleShellView(QWidget):
         layout.addWidget(self._band)
         layout.addLayout(body, stretch=1)
 
-        self.shell_presenter = ShellPresenter(self, container, SCREENS)
+        self.shell_presenter = ShellPresenter(
+            self, container, SCREENS, recent_addresses
+        )
 
         self.navigate_to(SCREENS[0][0])
 
@@ -73,6 +104,14 @@ class ConsoleShellView(QWidget):
 
     def bind_rail(self, view_model: Any) -> None:
         self._rail.bind(view_model)
+
+    def bind_connect_flow(self, view_model: Any) -> None:
+        self._connect_flow.bind(view_model)
+
+    def set_connect_flow_visible(self, visible: bool) -> None:
+        self._body_content.setCurrentWidget(
+            self._connect_flow if visible else self._stack
+        )
 
     def _register_screens(self) -> None:
         # Imported here rather than at module scope: every presenter/view

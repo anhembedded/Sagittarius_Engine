@@ -1,17 +1,20 @@
-"""`ShellPresenter` — `EPIC-008B` §2.
+"""`ShellPresenter` — `EPIC-008B` §§2-3.
 
-Owns the shell-wide chrome (`ConnectionBandViewModel`/`RailViewModel`), as
-opposed to each screen's own Presenter (`OverviewPresenter` etc.), which
-only knows its own section. Subscribes to the full set of connection
-events through `self.subscribe()` — `BasePresenter`'s `QtEventBridge`-backed
-helper, the same one `OverviewPresenter` uses, so `SnapshotReceived`
-(which genuinely arrives on the websocket receive loop's thread) is
-already marshalled onto the Qt thread before any handler here runs.
+Owns the shell-wide chrome (`ConnectionBandViewModel`/`RailViewModel`/
+`ConnectFlowViewModel`), as opposed to each screen's own Presenter
+(`OverviewPresenter` etc.), which only knows its own section. Subscribes to
+the full set of connection events through `self.subscribe()` —
+`BasePresenter`'s `QtEventBridge`-backed helper, the same one
+`OverviewPresenter` uses, so `SnapshotReceived` (which genuinely arrives on
+the websocket receive loop's thread) is already marshalled onto the Qt
+thread before any handler here runs.
 
 Translates the five events into `reference/handoff.md` §4's 6-state
 display model (`COLD`/`CONNECTING`/`FAILED`/`IDLE`/`READING`/`STALE`) using
 its exact copy table, and into the rail's per-section badge counts
-(`signal_counts.count_signals`).
+(`signal_counts.count_signals`). Also owns opening/closing the connect flow
+overlay (§3) and turning a submitted address into a real
+`connect_to()` call plus a `RecentAddressesStore.record()`.
 """
 
 from __future__ import annotations
@@ -33,10 +36,17 @@ from tools.state_console.domain.events import (
 from tools.state_console.infrastructure.console_connection_extension import (
     ConsoleConnectionExtension,
 )
+from tools.state_console.presentation.shell.connect_flow_view_model import (
+    ConnectFlowViewModel,
+)
 from tools.state_console.presentation.shell.connection_band_view_model import (
     ConnectionBandViewModel,
 )
 from tools.state_console.presentation.shell.rail_view_model import RailViewModel
+from tools.state_console.presentation.shell.recent_addresses_store import (
+    RecentAddressesStore,
+    default_recent_addresses_settings,
+)
 from tools.state_console.presentation.shell.signal_counts import count_signals
 
 #: How often the live-ticking age/elapsed/stale clocks refresh -- same
@@ -65,11 +75,15 @@ def _format_mmss(seconds: float) -> str:
 
 class ShellPresenter(BasePresenter):
     """
-    @param view Must provide `bind_band(view_model)`, `bind_rail(view_model)`
-    and `navigate_to(section_id)` -- `ConsoleShellView` is the one real
+    @param view Must provide `bind_band(view_model)`, `bind_rail(view_model)`,
+    `bind_connect_flow(view_model)`, `set_connect_flow_visible(bool)` and
+    `navigate_to(section_id)` -- `ConsoleShellView` is the one real
     implementation.
     @param sections `(route_name, label)` pairs, in rail display order --
     `ConsoleShellView.SCREENS`.
+    @param recent_addresses Defaults to a real, persisted store
+    (`default_recent_addresses_settings()`); tests inject one backed by a
+    throwaway `QSettings` file instead.
     """
 
     def __init__(
@@ -77,15 +91,21 @@ class ShellPresenter(BasePresenter):
         view: Any,
         container: Any,
         sections: tuple[tuple[str, str], ...],
+        recent_addresses: RecentAddressesStore | None = None,
     ) -> None:
         super().__init__(view, container)
         self._connection = container.resolve(ConsoleConnectionExtension)
         self._sections = sections
+        self._recent_addresses = recent_addresses or RecentAddressesStore(
+            default_recent_addresses_settings()
+        )
 
         self.band_view_model = ConnectionBandViewModel()
         self.rail_view_model = RailViewModel()
+        self.connect_flow_view_model = ConnectFlowViewModel()
         self.view.bind_band(self.band_view_model)
         self.view.bind_rail(self.rail_view_model)
+        self.view.bind_connect_flow(self.connect_flow_view_model)
         self.rail_view_model.set_sections(
             [{"id": name, "label": label, "badgeCount": 0} for name, label in sections]
         )
@@ -95,6 +115,12 @@ class ShellPresenter(BasePresenter):
             self._on_change_target_requested
         )
         self.rail_view_model.navigateRequested.connect(self.view.navigate_to)
+        self.connect_flow_view_model.connectRequested.connect(
+            self._on_connect_flow_submitted
+        )
+        self.connect_flow_view_model.cancelRequested.connect(
+            self._on_connect_flow_cancelled
+        )
 
         self._state = "cold"
         self._uri = ""
@@ -124,6 +150,10 @@ class ShellPresenter(BasePresenter):
         self._uri = event.uri
         self._connecting_at = time.monotonic()
         self._heartbeat_ticks = []
+        # A fresh attempt is underway -- whatever opened the overlay
+        # (change…, Attach…, or the connect flow's own submit) is resolved;
+        # the band itself now shows CONNECTING.
+        self.view.set_connect_flow_visible(False)
         self._render()
 
     def _on_attached(self, _event: ConsoleAttached) -> None:
@@ -173,13 +203,41 @@ class ShellPresenter(BasePresenter):
             self._connection.detach()
         elif self._state in ("failed", "stale"):
             self._connection.connect_to(self._uri)
-        # else: COLD's "Attach…" -- EPIC-008B §3's connect flow is what
-        # will give this a target to attach to; nothing to do yet.
+        else:  # cold: "Attach…"
+            self._open_connect_flow(changing_target=False)
 
     def _on_change_target_requested(self) -> None:
-        # EPIC-008B §3: opens the "change target" attach view over the
-        # section body (reference/handoff.md §5). Not built yet.
-        pass
+        self._open_connect_flow(changing_target=True)
+
+    def _open_connect_flow(self, *, changing_target: bool) -> None:
+        vm = self.connect_flow_view_model
+        vm.set_changing_target(changing_target)
+        vm.set_current_target(self._uri)
+        # No "process · when last used" label yet: the store only tracks
+        # order, not timestamps or process identity (nothing to fabricate
+        # a label out of) -- see RecentAddressesStore's own docstring.
+        vm.set_recents(
+            [
+                {
+                    "address": address,
+                    "lastUsedLabel": "",
+                    "isCurrent": address == self._uri
+                    and self._state in ("idle", "reading"),
+                }
+                for address in self._recent_addresses.list()
+            ]
+        )
+        self.view.set_connect_flow_visible(True)
+
+    def _on_connect_flow_submitted(self, address: str) -> None:
+        self._recent_addresses.record(address)
+        self._connection.connect_to(address)
+        # The overlay closes for real once ConsoleConnecting actually
+        # fires (_on_connecting) -- connect_to() runs the attempt on a
+        # background task, so closing here would be premature.
+
+    def _on_connect_flow_cancelled(self) -> None:
+        self.view.set_connect_flow_visible(False)
 
     # ------------------------------------------------------------- render
 

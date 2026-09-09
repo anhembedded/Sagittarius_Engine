@@ -90,17 +90,38 @@ Verified against a real demo app + real shell, offscreen, not merely read by eye
 navigating screens self-heals each one's own connection-state display via the next
 `SnapshotReceived` (the same self-healing `OverviewPresenter`/`SignalsPresenter` already had).
 
-### 3. Connect flow: address entry + recents, composed from existing primitives
+### 3. Connect flow: address entry + recents, composed from existing primitives — ✅ done
 
-Not started. Per `EPIC-008A` §5's resolution: no new kit component. `TextField` +
-`FieldBackground` for the address field (already the gallery's own established pattern),
-`StatefulButton` for Connect/Cancel/Retry/Reconnect, plain `Rectangle`/`RowLayout` for each
-recent-address row. Recent-address persistence via `QSettings`, owned here (tier 3).
+Composed from existing kit primitives, per `EPIC-008A` §5's resolution — no new kit component:
+`TextField` + `FieldBackground` for the address field, `StatefulButton` for
+Connect/"Connect instead"/Cancel, plain `Rectangle`/`RowLayout` for each recent-address row
+(`presentation/shell/qml/ConnectFlow.qml`, bound to a data-only `ConnectFlowViewModel`).
 
-`main.py`'s `uri` CLI argument needs to become optional (`build_console_app(uri: str | None =
-None, ...)`) so the console can launch cold and the connect flow is how a target is chosen —
-deliberately not touched in this file's own first commit, to avoid shipping a half-wired state
-(CLI accepts no URI, but there is no UI yet to supply one).
+- `ShellPresenter` owns opening/closing the overlay (`ConsoleShellView.set_connect_flow_visible`,
+  a `QStackedLayout` over the section body only, per `reference/handoff.md` §5 — the rail and
+  band are never covered, and the underlying screen stays mounted so "cancel" needs no restore
+  step) and turning a submitted address into a real `connect_to()` call. The overlay closes for
+  real once `ConsoleConnecting` actually fires, not at submit time — `connect_to()` runs on a
+  background task.
+- Two open paths, both routed through the one `_open_connect_flow(changing_target=...)`: the
+  band's `Attach…` action (`COLD` only, `changing_target=False`) and `change…` (any attached
+  state, `changing_target=True`, pre-filled with the current target per §5's verbatim "Currently
+  attached to `<addr>`..." copy). `Cancel` (only shown when `changing_target`) just closes the
+  overlay — never touches the connection.
+- `RecentAddressesStore` (`presentation/shell/recent_addresses_store.py`) wraps an injected
+  `QSettings` rather than constructing its own, so tests never touch a developer's real recent-
+  address history; production wiring uses `default_recent_addresses_settings()`. Deliberately
+  has no "process · when last used" label yet (`reference/handoff.md` §5) — the store only
+  tracks order, and fabricating a label from data it doesn't have would be worse than omitting
+  it; the current target's row shows a disabled "attached" button instead of a real timestamp.
+- `main.py`'s `uri` CLI argument is now optional (`build_console_app(uri: str | None = None,
+  ...)`) — the console can launch cold and the connect flow is how a target gets chosen, closing
+  the gap this section's plan originally deferred once there was a UI to supply one.
+
+Verified against a real demo app, offscreen: `Attach…` from `COLD` opens the address entry with
+seeded recents, submitting a real address reaches `READING` and closes the overlay, and
+`change…` while attached shows the exact "Currently attached to..." copy with the current
+target's recents row disabled and marked `attached`.
 
 ### 4. Overview restyle
 
@@ -121,5 +142,15 @@ Not started — depends on §2's shell chrome existing first.
   (`examples/student_management -Console -DemoFaults`), attached, `READING`, then navigated to
   Signals and back to Overview — confirms the badge counts, the rail's active-row highlight,
   and every screen's own connection-state self-healing via the next `SnapshotReceived`.
-- §3-4: gallery/screenshot proof once implemented, per `EPIC-008`'s own milestone table
+- §3: `tests/tools/state_console/test_recent_addresses_store.py` (6 tests, a real throwaway
+  `QSettings` file — ordering, de-duplication-by-moving-to-front, trimming to 5, and the
+  single-remaining-entry `str`-vs-`list` round-trip quirk) and 6 new tests in
+  `test_console_shell_view.py` (cold → `Attach…` opens the overlay; a real `connect_to()` via
+  the flow's own `requestConnect()` reaches `READING`, closes the overlay, and records the
+  address; `change…` opens with the current target and `Cancel` leaves the connection
+  untouched; recents persist through an injected store) — 20 tests total in that file now.
+  Screenshots offscreen against a real demo app: cold `Attach…` view with seeded recents,
+  submitting a real address reaching `READING`, and `change…` while attached showing the
+  verbatim "Currently attached to..." copy with the current target's row disabled.
+- §4: gallery/screenshot proof once implemented, per `EPIC-008`'s own milestone table
   ("every subtask ends in a command a reader can run and a screenshot of what it produces").

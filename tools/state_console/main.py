@@ -17,7 +17,11 @@ import sys
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sagittarius-console")
     parser.add_argument(
-        "uri", help="ws://host:port[?token=...] of a running TraceServer"
+        "uri",
+        nargs="?",
+        default=None,
+        help="ws://host:port[?token=...] of a running TraceServer. Omit to "
+        "launch cold and pick a target from the connect flow (EPIC-008B §3).",
     )
     args = parser.parse_args(argv)
 
@@ -44,14 +48,15 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     shell = ConsoleShellView(app.container)
-    shell.setWindowTitle(f"Runtime State Console — {args.uri}")
+    title_target = args.uri if args.uri is not None else "not attached"
+    shell.setWindowTitle(f"Runtime State Console — {title_target}")
     shell.resize(1100, 700)
 
     app.boot()
     shell.show()
 
     exit_code = qt_app.exec()
-    shell.manager.shutdown()
+    shell.shutdown()
     app.stop()
 
     # Same QML/Theme teardown-race precedent as gui.py: give any in-flight
