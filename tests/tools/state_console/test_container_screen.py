@@ -158,10 +158,16 @@ def test_sub_tabs_show_real_counts(qtbot):
     all_items: list = []
     _collect_all(root, all_items)
 
-    (registrations_tab,) = _by_object_name(all_items, "containerTabRegistrations")
-    (never_built_tab,) = _by_object_name(all_items, "containerTabNeverBuilt")
-    assert registrations_tab.property("text") == "Registrations (2)"
-    assert never_built_tab.property("text") == "Never built (1)"
+    (registrations_tab,) = _by_object_name(all_items, "subTab_registrations")
+    (never_built_tab,) = _by_object_name(all_items, "subTab_neverBuilt")
+    registrations_label = _find_child(registrations_tab, "subTabLabel")
+    registrations_count = _find_child(registrations_tab, "subTabCount")
+    never_built_label = _find_child(never_built_tab, "subTabLabel")
+    never_built_count = _find_child(never_built_tab, "subTabCount")
+    assert registrations_label.property("text") == "Registrations"
+    assert registrations_count.property("text") == "2"
+    assert never_built_label.property("text") == "Never built"
+    assert never_built_count.property("text") == "1"
 
 
 def test_open_scopes_plate_turns_fault_above_the_threshold(qtbot):

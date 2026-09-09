@@ -197,7 +197,13 @@ def test_undeclared_sub_tab_shows_the_real_count(qtbot):
     all_items: list = []
     _collect_all(root, all_items)
 
-    (all_tab,) = _by_object_name(all_items, "eventsTabAll")
-    (undeclared_tab,) = _by_object_name(all_items, "eventsTabUndeclared")
-    assert all_tab.property("text") == "All (3)"
-    assert undeclared_tab.property("text") == "Undeclared (2)"
+    (all_tab,) = _by_object_name(all_items, "subTab_all")
+    (undeclared_tab,) = _by_object_name(all_items, "subTab_undeclared")
+    all_label = _find_child(all_tab, "subTabLabel")
+    all_count = _find_child(all_tab, "subTabCount")
+    undeclared_label = _find_child(undeclared_tab, "subTabLabel")
+    undeclared_count = _find_child(undeclared_tab, "subTabCount")
+    assert all_label.property("text") == "All"
+    assert all_count.property("text") == "3"
+    assert undeclared_label.property("text") == "Undeclared"
+    assert undeclared_count.property("text") == "2"

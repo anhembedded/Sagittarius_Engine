@@ -60,59 +60,15 @@ Rectangle {
             textFormat: Text.PlainText
         }
 
-        RowLayout {
+        SectionSubTabs {
             Layout.fillWidth: true
-            spacing: Theme.spaceLg
-
-            Text {
-                objectName: "containerTabRegistrations"
-                text: "Registrations (" + root.allRegistrations.length + ")"
-                color: root.activeTab === "registrations" ? Theme.accent900 : Theme.muted
-                font.bold: true
-                font.pixelSize: Theme.fontSizeMd
-                textFormat: Text.PlainText
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activeTab = "registrations"
-                }
-            }
-            Text {
-                objectName: "containerTabNeverBuilt"
-                text: "Never built (" + root.neverBuiltRegistrations.length + ")"
-                color: root.activeTab === "neverBuilt" ? Theme.accent900 : Theme.muted
-                font.bold: true
-                font.pixelSize: Theme.fontSizeMd
-                textFormat: Text.PlainText
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activeTab = "neverBuilt"
-                }
-            }
-            Text {
-                objectName: "containerTabOpenScopes"
-                text: "Open scopes (" + (viewModel ? viewModel.openScopes : 0) + ")"
-                color: root.activeTab === "openScopes" ? Theme.accent900 : Theme.muted
-                font.bold: true
-                font.pixelSize: Theme.fontSizeMd
-                textFormat: Text.PlainText
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activeTab = "openScopes"
-                }
-            }
-            Item { Layout.fillWidth: true }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            height: 1
-            color: Theme.border
+            activeTabId: root.activeTab
+            tabs: [
+                { id: "registrations", label: "Registrations", count: root.allRegistrations.length },
+                { id: "neverBuilt", label: "Never built", count: root.neverBuiltRegistrations.length },
+                { id: "openScopes", label: "Open scopes", count: viewModel ? viewModel.openScopes : 0 }
+            ]
+            onTabSelected: (id) => root.activeTab = id
         }
 
         AppDataTable {

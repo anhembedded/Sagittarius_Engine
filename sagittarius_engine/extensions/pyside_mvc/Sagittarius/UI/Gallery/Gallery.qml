@@ -205,6 +205,25 @@ Rectangle {
                 }
             }
 
+            // ---- Section sub-tabs -----------------------------------------
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spaceXl
+                Layout.rightMargin: Theme.spaceXl
+                spacing: Theme.spaceMd
+
+                SectionLabel { text: "SECTION SUB-TABS — active underline, mono counts (EPIC-008B)" }
+                SectionSubTabs {
+                    Layout.fillWidth: true
+                    activeTabId: "undeclared"
+                    tabs: [
+                        { id: "all", label: "All", count: 25 },
+                        { id: "undeclared", label: "Undeclared", count: 2 },
+                        { id: "withFailures", label: "With failures", count: 0 }
+                    ]
+                }
+            }
+
             // ---- Buttons -------------------------------------------------
             ColumnLayout {
                 Layout.fillWidth: true

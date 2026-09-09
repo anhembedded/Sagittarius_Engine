@@ -246,8 +246,11 @@ def test_module_grid_and_modules_tab_reflect_ready_state(qtbot):
     all_items: list = []
     _collect_all(root, all_items)
 
-    (tab,) = _by_object_name(all_items, "overviewTabModules")
-    assert tab.property("text") == "Modules (2)"
+    (tab,) = _by_object_name(all_items, "subTab_modules")
+    tab_label = _find_child(tab, "subTabLabel")
+    tab_count = _find_child(tab, "subTabCount")
+    assert tab_label.property("text") == "Modules"
+    assert tab_count.property("text") == "2"
 
     names = [
         item.property("text")

@@ -1,6 +1,6 @@
 # EPIC-008: Runtime State Console — UI Redesign
 
-- **Status**: 🟡 In Progress (1/6 subtasks done)
+- **Status**: 🟡 In Progress (4/6 subtasks done)
 - **Created**: 2026-09-09
 - **Priority**: P2
 - **Category**: UI Engine (`pyside_mvc`) / Tooling
@@ -83,6 +83,12 @@ that it looks right.
 **Order: A → B → C → D → E → F**, same reasoning as `EPIC-007`: A is shared infrastructure
 every other subtask depends on (the status band and rail exist on every screen); B doubles as
 A's proving ground before touching the other four screens in any order convenient.
+
+A post-D design review found B, C, and D had each independently built the identical sub-tab row
+`reference/handoff.md` §6 specifies — this repo's own two-consumer promotion rule
+(`ActionCard/NOTES.md`), declined in A §5 with only one consumer, is satisfied for real with
+three. Extracted into a new kit component, `SectionSubTabs`, and migrated all three consumers —
+see [`EPIC-008X_section_sub_tabs_extracted.md`](completed/EPIC-008X_section_sub_tabs_extracted.md).
 
 ## 4. What is deliberately not in this epic
 

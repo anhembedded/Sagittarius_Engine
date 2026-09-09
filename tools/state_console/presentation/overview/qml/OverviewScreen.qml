@@ -67,47 +67,14 @@ Rectangle {
         anchors.margins: Theme.spaceLg
         spacing: Theme.spaceLg
 
-        RowLayout {
+        SectionSubTabs {
             Layout.fillWidth: true
-            spacing: Theme.spaceLg
-
-            Text {
-                objectName: "overviewTabStatus"
-                text: "Status"
-                color: root.activeTab === "status" ? Theme.accent900 : Theme.muted
-                font.bold: true
-                font.pixelSize: Theme.fontSizeMd
-                textFormat: Text.PlainText
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activeTab = "status"
-                }
-            }
-
-            Text {
-                objectName: "overviewTabModules"
-                text: "Modules (" + (viewModel ? viewModel.modules.length : 0) + ")"
-                color: root.activeTab === "modules" ? Theme.accent900 : Theme.muted
-                font.bold: true
-                font.pixelSize: Theme.fontSizeMd
-                textFormat: Text.PlainText
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activeTab = "modules"
-                }
-            }
-
-            Item { Layout.fillWidth: true }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            height: 1
-            color: Theme.border
+            activeTabId: root.activeTab
+            tabs: [
+                { id: "status", label: "Status" },
+                { id: "modules", label: "Modules", count: viewModel ? viewModel.modules.length : 0 }
+            ]
+            onTabSelected: (id) => root.activeTab = id
         }
 
         // -------------------------------------------------------- Status tab

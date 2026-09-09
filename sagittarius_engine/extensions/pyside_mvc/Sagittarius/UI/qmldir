@@ -10,3 +10,4 @@ DateTimePicker 1.0 DateTimePicker/DateTimePicker.qml
 AppModal 1.0 AppModal/AppModal.qml
 LiveConnectionBand 1.0 LiveConnectionBand/LiveConnectionBand.qml
 AppRail 1.0 AppRail/AppRail.qml
+SectionSubTabs 1.0 SectionSubTabs/SectionSubTabs.qml

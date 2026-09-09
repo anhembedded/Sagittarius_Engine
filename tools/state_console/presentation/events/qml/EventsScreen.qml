@@ -93,45 +93,14 @@ Rectangle {
             textFormat: Text.PlainText
         }
 
-        RowLayout {
+        SectionSubTabs {
             Layout.fillWidth: true
-            spacing: Theme.spaceLg
-
-            Text {
-                objectName: "eventsTabAll"
-                text: "All (" + root.allEvents.length + ")"
-                color: root.activeTab === "all" ? Theme.accent900 : Theme.muted
-                font.bold: true
-                font.pixelSize: Theme.fontSizeMd
-                textFormat: Text.PlainText
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activeTab = "all"
-                }
-            }
-            Text {
-                objectName: "eventsTabUndeclared"
-                text: "Undeclared (" + root.undeclaredEvents.length + ")"
-                color: root.activeTab === "undeclared" ? Theme.accent900 : Theme.muted
-                font.bold: true
-                font.pixelSize: Theme.fontSizeMd
-                textFormat: Text.PlainText
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activeTab = "undeclared"
-                }
-            }
-            Item { Layout.fillWidth: true }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            height: 1
-            color: Theme.border
+            activeTabId: root.activeTab
+            tabs: [
+                { id: "all", label: "All", count: root.allEvents.length },
+                { id: "undeclared", label: "Undeclared", count: root.undeclaredEvents.length }
+            ]
+            onTabSelected: (id) => root.activeTab = id
         }
 
         Rectangle {
