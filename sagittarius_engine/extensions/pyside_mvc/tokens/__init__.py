@@ -13,6 +13,7 @@ from .defaults import (
     DEFAULT_TYPOGRAPHY_TOKENS,
     with_token_defaults,
 )
+from .derived import derive_shade_tokens, derive_structural_tokens
 from .qml_literal_guard import LiteralColorFinding, find_literal_colors
 from .state_tokens import DEFAULT_STATE_TOKENS, with_state_token_defaults
 from .theme_bridge import get_theme_bridge, register_theme
@@ -35,6 +36,8 @@ __all__ = [
     "LiteralColorFinding",
     "MissingRequiredTokensError",
     "TokenSpec",
+    "derive_shade_tokens",
+    "derive_structural_tokens",
     "find_literal_colors",
     "get_theme_bridge",
     "missing_required_tokens",

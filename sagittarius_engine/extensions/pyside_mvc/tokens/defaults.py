@@ -19,6 +19,7 @@ call, no separate registration path per category.
 
 from __future__ import annotations
 
+from .derived import derive_shade_tokens, derive_structural_tokens
 from .state_tokens import with_state_token_defaults
 
 #: 4/8/12/16/24 scale — the smallest unit is named, the rest are named
@@ -69,6 +70,13 @@ def with_token_defaults(palette: dict[str, str] | None) -> dict[str, str | float
     engine default by design (see `vocabulary.py`) and are validated, not
     defaulted, at `configure_app_qml()`. This function only fills the
     categories that are allowed to degrade to a generic default.
+
+    `EPIC-008A`'s derived colour tokens (shade ramps off `accent`/`success`/
+    `warning`/`danger`, plus `surface`/`chrome`/`divider`/`hatch`/`gridLine`/
+    `ink*` off `bg`/`textPrimary`/`danger`/`accent`) are computed from
+    `palette` here, last, so an app can still override any individual
+    derived key by naming it directly in its own palette — app values win
+    on every category, derived tokens included.
     """
     merged: dict[str, str | float] = {}
     merged.update(DEFAULT_SPACING_TOKENS)
@@ -81,4 +89,12 @@ def with_token_defaults(palette: dict[str, str] | None) -> dict[str, str | float
     # underneath its result so app values still win across every category.
     state_merged = with_state_token_defaults(palette)
     merged.update(state_merged)
+
+    source = palette or {}
+    merged.update(derive_shade_tokens(source))
+    merged.update(derive_structural_tokens(source))
+    # Derived tokens are computed from `palette`'s own colours, but an app
+    # is still allowed to name one of these keys directly and override the
+    # computed value — same "app wins" contract as every other category.
+    merged.update(palette or {})
     return merged
