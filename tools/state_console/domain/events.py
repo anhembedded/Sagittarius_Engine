@@ -39,12 +39,52 @@ class ConsoleAttached(BaseEvent):
 
 
 class ConsoleDetached(BaseEvent):
-    """@brief The connection dropped, was refused, or was never established
-    — an ordinary, expected state, never raised as an exception past this
-    point."""
+    """@brief A connection that WAS attached (reached `ConsoleAttached` at
+    least once) has since stopped — dropped, or cooperatively cancelled.
+    Never emitted for an attempt that failed before ever attaching; that is
+    `ConsoleFailed` (`EPIC-008B`) — an ordinary, expected state either way,
+    never raised as an exception past this point."""
 
     event_name = "console.detached"
 
     def __init__(self, reason: str = "") -> None:
         super().__init__()
         self.reason = reason
+
+
+class ConsoleConnecting(BaseEvent):
+    """@brief A connection attempt to `uri` has started. No snapshot has
+    ever been received from it — distinct from `ConsoleAttached`, which
+    means the handshake actually succeeded (`EPIC-008B`)."""
+
+    event_name = "console.connecting"
+
+    def __init__(self, uri: str = "") -> None:
+        super().__init__()
+        self.uri = uri
+
+
+class ConsoleFailed(BaseEvent):
+    """@brief A connection attempt to `uri` failed outright — no snapshot
+    was ever received from this address, which is what distinguishes this
+    from `ConsoleDetached` (a connection that WAS working and then
+    dropped). `kind` is one of `"malformed"` (the address itself does not
+    parse — no socket was ever opened), `"refused"` (nothing is listening),
+    `"rejected"` (the handshake was reached and refused, e.g. a bad/missing
+    `?token=`), or `"unknown"` (a failure this extension can classify by
+    *when* it happened — before ever attaching — but not by a more specific
+    kind). `code` is a short machine-readable label
+    (`"EINVAL"`/`"ECONNREFUSED"`/`"HTTP 401"`/...); `detail` is the
+    human-readable exception text (`EPIC-008B`, `reference/handoff.md`
+    §5)."""
+
+    event_name = "console.failed"
+
+    def __init__(
+        self, *, kind: str = "unknown", code: str = "", detail: str = "", uri: str = ""
+    ) -> None:
+        super().__init__()
+        self.kind = kind
+        self.code = code
+        self.detail = detail
+        self.uri = uri
