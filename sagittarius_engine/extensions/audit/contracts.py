@@ -981,6 +981,14 @@ class StateMachineTransition:
         inline with accepted transitions, in `danger` — "the panel this
         section justifies is still worth building... a rejected transition
         is caught, logged once, and otherwise lost."
+    @param reason `str(InvalidStateTransitionError)` for a rejected
+        transition, empty for an accepted one — `EPIC-008F`.
+        `reference/handoff.md` §7.6's own transition-log row
+        ("age · ACCEPTED|REJECTED · from → to · reason") needs a real reason,
+        not a re-derivation of "from -> to" it already shows; the exception
+        already carries a real, specific message at the point it is caught
+        (`_StateMachineWatcher._record_rejection`), so this is exposing data
+        already sitting right there, not inventing new tracking.
     """
 
     from_state: str
@@ -988,6 +996,7 @@ class StateMachineTransition:
     event: str = ""
     rejected: bool = False
     at_ns: int = 0
+    reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -996,6 +1005,7 @@ class StateMachineTransition:
             "event": self.event,
             "rejected": self.rejected,
             "at_ns": self.at_ns,
+            "reason": self.reason,
         }
 
     @classmethod
@@ -1006,6 +1016,7 @@ class StateMachineTransition:
             event=data.get("event", ""),
             rejected=data.get("rejected", False),
             at_ns=data.get("at_ns", 0),
+            reason=data.get("reason", ""),
         )
 
 
@@ -1023,12 +1034,24 @@ class StateMachineState:
     @param rejected_count A first-class number, not something a reader
         derives by filtering `transitions` — "the count of rejections is a
         first-class number on the panel."
+    @param attempted_count Every transition attempt, accepted and rejected
+        alike — `EPIC-008F`'s own `reference/handoff.md` §7.6 "attempts"
+        figure. First-class for the same reason `rejected_count` is: once
+        `transitions` truncates past its cap, `len(transitions)` would
+        silently undercount.
+    @param declared_states Every state the watched machine's own state enum
+        declares, not only ones it has actually visited — `EPIC-008F`'s
+        chip row. `BaseStateMachine[T: Enum]` is generic over exactly one
+        state enum, so `type(machine.current_state)` already *is* that
+        complete, real declaration; nothing new needs tracking to expose it.
     """
 
     name: str
     current_state: str = ""
     transitions: tuple[StateMachineTransition, ...] = ()
     rejected_count: int = 0
+    attempted_count: int = 0
+    declared_states: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -1036,6 +1059,8 @@ class StateMachineState:
             "current_state": self.current_state,
             "transitions": [t.to_dict() for t in self.transitions],
             "rejected_count": self.rejected_count,
+            "attempted_count": self.attempted_count,
+            "declared_states": list(self.declared_states),
         }
 
     @classmethod
@@ -1043,6 +1068,8 @@ class StateMachineState:
         return cls(
             name=data["name"],
             current_state=data.get("current_state", ""),
+            attempted_count=data.get("attempted_count", 0),
+            declared_states=tuple(data.get("declared_states", ())),
             transitions=tuple(
                 StateMachineTransition.from_dict(t) for t in data.get("transitions", ())
             ),

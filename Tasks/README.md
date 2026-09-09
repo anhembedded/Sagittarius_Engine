@@ -87,7 +87,7 @@ link is kept here; content is not duplicated.
 | **[EPIC-005](epics/EPIC-005_audit_telemetry_rebuild/README.md)** | Audit Telemetry Teardown & Trace Recorder — both dashboard clients are 100% non-functional; delete them and the server, rebuild the recorder half of SystemView, export to Perfetto/OpenTelemetry rather than building a timeline UI. Supersedes `TASK-002` | ✅ Complete 2026-08-26 — all four milestones; `sagittarius-trace` ships, the dashboard is deleted |
 | **[EPIC-006](epics/EPIC-006_wiring_and_readiness_diagnostics/README.md)** | Wiring & Readiness Diagnostics — join `EventRegistry` (declared) against `IEventBus` (subscribed) to catch mis-wiring at boot, plus an explicit `app.ready` milestone. Catches the silent-typo class nothing else can | 🟡 In Progress (5/6 subtasks done) |
 | **[EPIC-007](epics/EPIC-007_runtime_state_console/README.md)** | Runtime State Console — attach to a running app and see what is wired, registered and alive. Decided by [ADR-001](decisions/ADR-001_runtime_state_console_scope_and_transport.md)/[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md); every milestone ends in a runnable command, demoed through `examples/student_management` | ✅ 6/6 subtasks done |
-| **[EPIC-008](epics/EPIC-008_runtime_state_console_ui_redesign/README.md)** | Runtime State Console — UI Redesign — new visual language and shared shell chrome for the console `EPIC-007` shipped, from an external UX handoff | 🟡 In Progress (5/6 subtasks done) |
+| **[EPIC-008](epics/EPIC-008_runtime_state_console_ui_redesign/README.md)** | Runtime State Console — UI Redesign — new visual language and shared shell chrome for the console `EPIC-007` shipped, from an external UX handoff | ✅ 6/6 subtasks done |
 
 ---
 

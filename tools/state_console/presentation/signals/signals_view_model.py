@@ -30,7 +30,6 @@ class SignalsViewModel(BaseQmlViewModel):
     detachReasonChanged = Signal()
     deadLettersChanged = Signal()
     stateMachinesChanged = Signal()
-    transitionsChanged = Signal()
     uiThreadChanged = Signal()
 
     def __init__(self, parent=None) -> None:
@@ -38,8 +37,13 @@ class SignalsViewModel(BaseQmlViewModel):
         self._connection_state = NOT_ATTACHED
         self._detach_reason = ""
         self._dead_letters: list[dict] = []
+        #: One entry per watched machine -- `EPIC-008F`'s own "one plate per
+        #: machine" restyle, replacing the earlier flat, cross-machine
+        #: `transitions` list this property used to sit alongside. Each
+        #: entry now carries its own nested `transitions` (see
+        #: `SignalsPresenter._state_machine_row`), so a plate's transition
+        #: log is a plain lookup, not a client-side filter by machine name.
         self._state_machines: list[dict] = []
-        self._transitions: list[dict] = []
         self._has_ui_thread = False
         self._freeze_count = 0
         self._worst_freeze_ms = 0.0
@@ -96,20 +100,9 @@ class SignalsViewModel(BaseQmlViewModel):
         notify=stateMachinesChanged,
     )
 
-    def _get_transitions(self) -> list:
-        return self._transitions
-
-    transitions = Property(
-        "QVariantList",  # type: ignore[arg-type]
-        _get_transitions,
-        notify=transitionsChanged,
-    )
-
-    def set_state_machines(self, machines: list[dict], transitions: list[dict]) -> None:
+    def set_state_machines(self, machines: list[dict]) -> None:
         self._state_machines = machines
-        self._transitions = transitions
         self.stateMachinesChanged.emit()
-        self.transitionsChanged.emit()
 
     def _get_has_ui_thread(self) -> bool:
         return self._has_ui_thread

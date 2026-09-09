@@ -140,3 +140,67 @@ def test_watching_two_machines_keeps_their_logs_independent():
 
     assert len(watcher_a.collect().transitions) == 1
     assert len(watcher_b.collect().transitions) == 0
+
+
+# --------------------------------------------------------------- EPIC-008F
+
+
+def test_declared_states_is_the_complete_enum_not_just_visited_states():
+    door = _door()
+    watcher = _StateMachineWatcher("Door", door)
+
+    door.transition_to(_Door.OPEN)  # LOCKED is never visited
+
+    state = watcher.collect()
+    assert set(state.declared_states) == {"CLOSED", "OPEN", "LOCKED"}
+
+
+def test_attempted_count_includes_both_accepted_and_rejected():
+    door = _door()
+    watcher = _StateMachineWatcher("Door", door)
+
+    door.transition_to(_Door.OPEN)
+    with pytest.raises(InvalidStateTransitionError):
+        door.transition_to(_Door.LOCKED)
+    door.transition_to(_Door.CLOSED)
+
+    state = watcher.collect()
+    assert state.attempted_count == 3
+    assert state.rejected_count == 1
+
+
+def test_attempted_count_survives_the_transitions_cap():
+    """`attempted_count` must not undercount once `transitions` truncates --
+    the same reasoning `rejected_count`'s own docstring already states."""
+    door = _door()
+    watcher = _StateMachineWatcher("Door", door)
+
+    for i in range(_MAX_TRANSITIONS + 10):
+        door.transition_to(_Door.OPEN if i % 2 == 0 else _Door.CLOSED)
+
+    state = watcher.collect()
+    assert state.attempted_count == _MAX_TRANSITIONS + 10
+    assert len(state.transitions) == _MAX_TRANSITIONS
+
+
+def test_a_rejected_transition_carries_a_real_reason():
+    door = _door()
+    watcher = _StateMachineWatcher("Door", door)
+
+    with pytest.raises(InvalidStateTransitionError):
+        door.transition_to(_Door.LOCKED)
+
+    (transition,) = watcher.collect().transitions
+    assert transition.reason != ""
+    assert "CLOSED" in transition.reason
+    assert "LOCKED" in transition.reason
+
+
+def test_an_accepted_transition_carries_no_reason():
+    door = _door()
+    watcher = _StateMachineWatcher("Door", door)
+
+    door.transition_to(_Door.OPEN)
+
+    (transition,) = watcher.collect().transitions
+    assert transition.reason == ""

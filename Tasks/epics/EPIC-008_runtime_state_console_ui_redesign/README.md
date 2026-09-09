@@ -1,6 +1,6 @@
 # EPIC-008: Runtime State Console — UI Redesign
 
-- **Status**: 🟡 In Progress (5/6 subtasks done)
+- **Status**: ✅ Done (6/6 subtasks done)
 - **Created**: 2026-09-09
 - **Priority**: P2
 - **Category**: UI Engine (`pyside_mvc`) / Tooling
@@ -78,7 +78,7 @@ that it looks right.
 | **[C](completed/EPIC-008C_events_and_wiring_restyled.md)** ✅ | Events & wiring restyled: sortable columns, undeclared-event banner | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — sort persists across a snapshot refresh (free from `AppDataTable`); undeclared rows tinted and named in a real `WIRING BUG` banner, with a real "did you mean" suggestion via `difflib` |
 | **[D](completed/EPIC-008D_container_restyled.md)** ✅ | Container restyled: registrations/never-built tables, open-scope leak emphasis | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — leak threshold styling verified against a live seeded-fault demo (`DemoFaultsExtension` gained a real 30-scope leak seed); sort persists on the shared Registrations/Never-built table |
 | **[E](completed/EPIC-008E_tasks_and_threads_restyled.md)** ✅ | Tasks & threads restyled: expandable failed-task rows, limits panels | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — a failed task's stack is genuinely readable after a click (`TaskManager` now captures a real `traceback.format_exc()`/worker thread at the moment of failure, reversing an earlier `EPIC-007B` decision that traceback stayed log-only); a real per-job Limits table backed by a new `LifecycleState.jobs` field |
-| **F** | Signals restyled: dead-letter cards, watched-machine transition log, UI-thread health cards | `.\scripts\run-console.ps1 -Demo` | Same real dead-letter/rejected-transition demo `EPIC-007F` used, now rendered in the new visual language |
+| **[F](completed/EPIC-008F_signals_restyled.md)** ✅ | Signals restyled: dead-letter cards, watched-machine transition log, UI-thread health cards | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — the same real dead-letter/rejected-transition demo `EPIC-007F` used, now a real blueprint card and a real per-machine plate (declared-states chip row, attempts/rejected figures, its own transition log with a real rejection reason) — three small, honest wire extensions (`StateMachineState.attempted_count`/`declared_states`, `StateMachineTransition.reason`), no new instrumentation |
 
 **Order: A → B → C → D → E → F**, same reasoning as `EPIC-007`: A is shared infrastructure
 every other subtask depends on (the status band and rail exist on every screen); B doubles as

@@ -39,44 +39,38 @@ class SignalsPresenter(BasePresenter):
 
     def _on_snapshot(self, event: SnapshotReceived) -> None:
         self.view_model.set_connection_state(ATTACHED_READING)
-        signals = event.snapshot.signals
+        snapshot = event.snapshot
+        signals = snapshot.signals
         if signals is None:
             return
 
+        now_ns = snapshot.t
         self.view_model.set_dead_letters(
             [
                 {
+                    # A positional label ("dl-0", "dl-1", ...), not a
+                    # fabricated business identifier -- this engine assigns
+                    # no id to a parked event; the ordinal position is the
+                    # only real, honest "id" a card in this list can carry.
+                    "id": f"dl-{index}",
                     "eventName": d.event_name,
                     "handler": d.handler,
                     "exceptionType": d.exception_type,
                     "exceptionMessage": d.exception_message,
                     "payloadRepr": d.payload_repr,
                     "retries": d.retries,
+                    # `parked_at_ns` is the same monotonic clock as
+                    # `StateSnapshot.t` (its own docstring) -- a real elapsed
+                    # duration, not a re-derived guess.
+                    "agoSeconds": (now_ns - d.parked_at_ns) / 1_000_000_000,
                 }
-                for d in signals.dead_letters
+                for index, d in enumerate(signals.dead_letters)
             ]
         )
 
-        machines = [
-            {
-                "name": m.name,
-                "currentState": m.current_state,
-                "rejectedCount": m.rejected_count,
-            }
-            for m in signals.state_machines
-        ]
-        transitions = [
-            {
-                "machine": m.name,
-                "fromState": t.from_state,
-                "toState": t.to_state,
-                "event": t.event,
-                "rejected": t.rejected,
-            }
-            for m in signals.state_machines
-            for t in m.transitions
-        ]
-        self.view_model.set_state_machines(machines, transitions)
+        self.view_model.set_state_machines(
+            [self._state_machine_row(m, now_ns) for m in signals.state_machines]
+        )
 
         if signals.ui_thread is not None:
             self.view_model.set_ui_thread_health(
@@ -86,3 +80,28 @@ class SignalsPresenter(BasePresenter):
             )
         else:
             self.view_model.clear_ui_thread_health()
+
+    @staticmethod
+    def _state_machine_row(machine: Any, now_ns: int) -> dict:
+        return {
+            "name": machine.name,
+            "currentState": machine.current_state,
+            "rejectedCount": machine.rejected_count,
+            "attemptedCount": machine.attempted_count,
+            "declaredStates": list(machine.declared_states),
+            # Newest-first for the transition log -- `machine.transitions`
+            # itself is newest-*last* (its own docstring, a plain append
+            # log); `reference/handoff.md` §7.6 wants the log read newest
+            # first, so the reversal happens once here rather than in QML.
+            "transitions": [
+                {
+                    "fromState": t.from_state,
+                    "toState": t.to_state,
+                    "event": t.event,
+                    "rejected": t.rejected,
+                    "reason": t.reason,
+                    "ageSeconds": (now_ns - t.at_ns) / 1_000_000_000,
+                }
+                for t in reversed(machine.transitions)
+            ],
+        }

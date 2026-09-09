@@ -49,6 +49,7 @@ class _StateMachineWatcher:
             maxlen=_MAX_TRANSITIONS
         )
         self._rejected_count = 0
+        self._attempted_count = 0
 
         machine.add_global_callback(self._on_transition)
         self._wrap_rejecting_methods()
@@ -76,6 +77,7 @@ class _StateMachineWatcher:
 
     def _on_transition(self, old_state: Any, new_state: Any) -> None:
         with self._lock:
+            self._attempted_count += 1
             self._transitions.append(
                 StateMachineTransition(
                     from_state=old_state.name,
@@ -87,6 +89,7 @@ class _StateMachineWatcher:
     def _record_rejection(self, exc: InvalidStateTransitionError) -> None:
         with self._lock:
             self._rejected_count += 1
+            self._attempted_count += 1
             self._transitions.append(
                 StateMachineTransition(
                     from_state=exc.from_state,
@@ -94,6 +97,12 @@ class _StateMachineWatcher:
                     event=exc.event or "",
                     rejected=True,
                     at_ns=time.perf_counter_ns(),
+                    # `str(exc)` -- a real, specific message already
+                    # generated at the exact point of rejection
+                    # (`InvalidStateTransitionError.__init__`), not a
+                    # generic re-statement of the from/to this row already
+                    # shows in its own columns.
+                    reason=str(exc),
                 )
             )
 
@@ -103,9 +112,17 @@ class _StateMachineWatcher:
         with self._lock:
             transitions = tuple(self._transitions)
             rejected_count = self._rejected_count
+            attempted_count = self._attempted_count
+        current_state = self._machine.current_state
         return StateMachineState(
             name=self.name,
-            current_state=self._machine.current_state.name,
+            current_state=current_state.name,
             transitions=transitions,
             rejected_count=rejected_count,
+            attempted_count=attempted_count,
+            # `type(current_state)` is the machine's own state enum class --
+            # a generic `BaseStateMachine[T: Enum]` declares exactly one, so
+            # iterating it is the complete, real set of declared states, not
+            # an approximation from what has merely been visited so far.
+            declared_states=tuple(s.name for s in type(current_state)),
         )
