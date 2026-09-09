@@ -22,17 +22,28 @@ class TaskSnapshot:
     (`COMPLETED`/`FAILED`/`CANCELLED`), without handing out the manager's own live,
     lock-protected task dict — a structure that can mutate mid-read from a pool thread.
 
-    @details No `thread` field. Which OS thread a submission actually ran on is not
-    tracked anywhere in this engine — `ThreadPoolExecutor` does not expose it through its
-    `Future`, and adding that tracking is not what this snapshot exists to do. `critical`
-    is the honest substitute: it says which of the two pools (`EPIC-007B` §
-    `ITaskManager.pool_stats()`) the task ran in, which is real, not which thread.
+    @details `thread` is the real OS thread name a *failed* task's worker executed on
+    (`threading.current_thread().name`, captured at the moment it raised) — `None` for a
+    task that never failed, or for a failed async task, which runs on the shared
+    event-loop thread rather than a worker of its own; naming that thread as if it were
+    the task's own "owner" would be misleading, not merely incomplete. **Corrected
+    2026-09-09, `EPIC-008E`**: this originally said no thread field existed anywhere, on
+    the reasoning that `ThreadPoolExecutor` does not expose it through its `Future` — true
+    for a *running* task's own future, but the worker thread is trivially available from
+    inside the callable running on it, which is exactly where a task's `error`/`error_type`/
+    `stack` are also captured. `critical` (which of the two pools ran it) is unaffected by
+    this and remains real regardless of outcome.
 
     @param state The engine's own `TaskState` enum, not a string — this is the domain
         type; a wire-format consumer (`extensions/audit/contracts.py`) stringifies it.
     @param error `str(exception)`, not the exception object — a snapshot is a plain value
-        that may cross a thread or a wire; the traceback stays in the log line the
-        failure already produced.
+        that may cross a thread or a wire.
+    @param error_type `type(exception).__name__` — `None` unless `error` is set.
+    @param stack `traceback.format_exc()` captured at the moment `error` was set, not
+        reconstructed later — **Corrected 2026-09-09, `EPIC-008E`**: this field did not
+        exist before; the traceback used to go only to the log line the failure already
+        produced. `EPIC-008E`'s own requirement ("a failed task's stack is readable after
+        a click") needs the real stack on the wire, not a re-derived approximation of it.
     """
 
     id: str
@@ -43,6 +54,9 @@ class TaskSnapshot:
     started_at: datetime | None
     ended_at: datetime | None
     error: str | None
+    error_type: str | None = None
+    stack: str | None = None
+    thread: str | None = None
 
 
 class ITaskHandle(ABC):

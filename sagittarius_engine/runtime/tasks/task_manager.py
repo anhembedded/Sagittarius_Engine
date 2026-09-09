@@ -1,6 +1,7 @@
 import inspect
 import logging
 import threading
+import traceback
 from collections import deque
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -164,6 +165,8 @@ class TaskManager(ITaskManager):
             except Exception as e:
                 bg_task.status = TaskState.FAILED
                 bg_task.error = e
+                bg_task.error_stack = traceback.format_exc()
+                bg_task.thread_name = threading.current_thread().name
                 self._logger.error(f"Task '{bg_task.name}' failed: {e}")
                 self._emit(
                     TaskFailed.event_name,
@@ -196,6 +199,7 @@ class TaskManager(ITaskManager):
         except Exception as e:
             bg_task.status = TaskState.FAILED
             bg_task.error = e
+            bg_task.error_stack = traceback.format_exc()
             self._logger.error(f"Async task '{bg_task.name}' failed: {e}")
             self._emit(TaskFailed.event_name, TaskFailed(bg_task.id, bg_task.name, e))
             raise e
@@ -259,6 +263,7 @@ class TaskManager(ITaskManager):
             except Exception as e:
                 bg_task.status = TaskState.FAILED
                 bg_task.error = e
+                bg_task.error_stack = traceback.format_exc()
                 self._emit(TaskFailed.event_name, TaskFailed(bg_task.id, task_name, e))
                 with self._lock:
                     self._finished_task_ids.append(bg_task.id)
@@ -299,6 +304,7 @@ class TaskManager(ITaskManager):
             except Exception as e:
                 bg_task.status = TaskState.FAILED
                 bg_task.error = e
+                bg_task.error_stack = traceback.format_exc()
                 self._emit(TaskFailed.event_name, TaskFailed(bg_task.id, task_name, e))
                 with self._lock:
                     self._finished_task_ids.append(bg_task.id)
@@ -397,6 +403,11 @@ class TaskManager(ITaskManager):
                 started_at=task.start_time,
                 ended_at=task.end_time,
                 error=str(task.error) if task.error is not None else None,
+                error_type=type(task.error).__name__
+                if task.error is not None
+                else None,
+                stack=task.error_stack or None,
+                thread=task.thread_name or None,
             )
             for task in reversed(tasks)
         )

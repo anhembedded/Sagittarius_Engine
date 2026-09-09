@@ -514,6 +514,42 @@ class ModuleState:
 
 
 @dataclass(frozen=True, slots=True)
+class JobRecord:
+    """
+    @brief One registered scheduler job, as `Scheduler.jobs` reports it --
+    `EPIC-008E`'s Tasks & threads "Limits" jobs table.
+
+    @param next_fire_seconds Seconds from the moment of collection until this
+        job's next run -- a duration, the same "not a wall clock" convention
+        `TaskRecord.age_ns` already follows, rather than exposing the
+        scheduler's own naive `datetime.now()`-based timestamp across the
+        wire. `None` means this job has no next run at all -- the same
+        `next_run is None` condition `WiringInspector`'s own D3 check and
+        `LifecycleState.scheduler_jobs_without_next_run` already name as
+        "broken": still registered, will never fire again.
+    """
+
+    name: str = ""
+    trigger: str = ""
+    next_fire_seconds: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "trigger": self.trigger,
+            "next_fire_seconds": self.next_fire_seconds,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> JobRecord:
+        return cls(
+            name=data.get("name", ""),
+            trigger=data.get("trigger", ""),
+            next_fire_seconds=data.get("next_fire_seconds"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class LifecycleState:
     """
     @brief Where the engine got to, and how long each step took.
@@ -526,6 +562,10 @@ class LifecycleState:
         (`reference/handoff.md` §7.1/§7.2's module grid and table), which
         `extensions_registered`/`extensions_initialized`'s aggregate counts
         alone cannot answer ("5/5 initialized" doesn't say *which* five).
+    @param jobs Every registered scheduler job by name, trigger, and time to
+        next fire -- `EPIC-008E`'s Limits jobs table, for the same reason
+        `modules` exists: `scheduler_jobs`/`scheduler_jobs_without_next_run`'s
+        aggregate counts cannot answer *which* job is broken.
     """
 
     state: str = ""
@@ -537,6 +577,7 @@ class LifecycleState:
     scheduler_jobs: int = 0
     scheduler_jobs_without_next_run: int = 0
     modules: tuple[ModuleState, ...] = ()
+    jobs: tuple[JobRecord, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -549,6 +590,7 @@ class LifecycleState:
             "scheduler_jobs": self.scheduler_jobs,
             "scheduler_jobs_without_next_run": self.scheduler_jobs_without_next_run,
             "modules": [m.to_dict() for m in self.modules],
+            "jobs": [j.to_dict() for j in self.jobs],
         }
 
     @classmethod
@@ -567,6 +609,7 @@ class LifecycleState:
                 "scheduler_jobs_without_next_run", 0
             ),
             modules=tuple(ModuleState.from_dict(m) for m in data.get("modules", ())),
+            jobs=tuple(JobRecord.from_dict(j) for j in data.get("jobs", ())),
         )
 
 
@@ -694,6 +737,15 @@ class TaskRecord:
         monotonic timestamp is its own change, not a silent assumption to carry
         here.
     @param error Terminal failure text for a `FAILED` task, empty otherwise.
+    @param error_type `type(exception).__name__` for a `FAILED` task, empty otherwise —
+        `EPIC-008E`.
+    @param stack The real `traceback.format_exc()` captured when the task failed, empty
+        otherwise — `EPIC-008E`'s own requirement ("a failed task's stack is readable
+        after a click"). Not reconstructed from `error`; the actual stack, or nothing.
+    @param thread The real OS thread name a failed *sync* task's worker executed on —
+        `EPIC-008E`. Always empty for a task that never failed, or for a failed async
+        task (see `TaskSnapshot`'s own docstring for why the shared event-loop thread is
+        not named here as if it were the task's own "owner").
     """
 
     id: str
@@ -703,6 +755,8 @@ class TaskRecord:
     age_ns: int = 0
     thread: str = ""
     error: str = ""
+    error_type: str = ""
+    stack: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -713,6 +767,8 @@ class TaskRecord:
             "age_ns": self.age_ns,
             "thread": self.thread,
             "error": self.error,
+            "error_type": self.error_type,
+            "stack": self.stack,
         }
 
     @classmethod
@@ -725,6 +781,8 @@ class TaskRecord:
             age_ns=data.get("age_ns", 0),
             thread=data.get("thread", ""),
             error=data.get("error", ""),
+            error_type=data.get("error_type", ""),
+            stack=data.get("stack", ""),
         )
 
 

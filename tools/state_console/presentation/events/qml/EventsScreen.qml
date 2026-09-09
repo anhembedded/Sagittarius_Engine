@@ -54,13 +54,23 @@ Rectangle {
     //: `expandedDelegate`'s contract: its root item must declare
     //: `property var rowData` -- AppDataTable keeps it live-bound to the
     //: expanded row's current data via an internal `Binding`.
-    component UndeclaredDetail: Rectangle {
+    //: `Item`, not `Rectangle` -- the tinted background and the detail text
+    //: are independent siblings, not parent/child: QML's `opacity` is
+    //: multiplicative onto every descendant, so nesting the text inside the
+    //: tinted `Rectangle` was making it render at its dim 8% opacity too.
+    //: Found via `EPIC-008E`'s own screenshot review of its own, near-
+    //: identical `FailedTaskDetail` -- the same mistake, shipped here first.
+    component UndeclaredDetail: Item {
         property var rowData: null
         implicitHeight: detailText.implicitHeight + Theme.spaceMd * 2
-        color: Theme.dangerFill
-        opacity: 0.08
-        border.color: Theme.danger
-        border.width: 1
+
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.dangerFill
+            opacity: 0.08
+            border.color: Theme.danger
+            border.width: 1
+        }
 
         Text {
             id: detailText
@@ -103,7 +113,7 @@ Rectangle {
             onTabSelected: (id) => root.activeTab = id
         }
 
-        Rectangle {
+        Item {
             objectName: "eventsWiringBugBanner"
             // reference/handoff.md §7.3: shown "when any undeclared name
             // exists and the tab is All or Undeclared" -- both of this
@@ -111,10 +121,17 @@ Rectangle {
             visible: root.undeclaredEvents.length > 0
             Layout.fillWidth: true
             implicitHeight: bannerText.implicitHeight + Theme.spaceMd * 2
-            color: Theme.dangerFill
-            opacity: 0.1
-            border.color: Theme.danger
-            border.width: 1
+
+            // `Item`, not `Rectangle` -- see `UndeclaredDetail`'s own
+            // comment above: the tint's opacity must not multiply onto
+            // `bannerText` too.
+            Rectangle {
+                anchors.fill: parent
+                color: Theme.dangerFill
+                opacity: 0.1
+                border.color: Theme.danger
+                border.width: 1
+            }
 
             RowLayout {
                 anchors.fill: parent

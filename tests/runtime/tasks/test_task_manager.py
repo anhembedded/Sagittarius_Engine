@@ -1,3 +1,5 @@
+import asyncio
+import threading
 import time
 from unittest.mock import Mock
 
@@ -221,9 +223,10 @@ def test_snapshot_includes_finished_tasks_get_active_tasks_omits():
 
 
 def test_snapshot_error_field_is_a_string_not_the_exception_object():
-    """A snapshot is a plain value that may cross a thread or a wire — the raw
-    exception (and its traceback) stays in the log line the failure already
-    produced, not in a value object handed to arbitrary callers."""
+    """A snapshot is a plain value that may cross a thread or a wire — `error`
+    is `str(exception)`, not the exception object itself. `EPIC-008E` gave
+    the *stack* its own real field (`entry.stack`, see the tests below) — it
+    no longer stays only in the log line the failure already produced."""
     from sagittarius_engine.runtime.tasks.background_task import (
         BackgroundTask,
         TaskState,
@@ -242,10 +245,10 @@ def test_snapshot_error_field_is_a_string_not_the_exception_object():
     assert isinstance(entry.error, str)
 
 
-def test_snapshot_reports_critical_not_a_fabricated_thread_name():
-    """No `thread` field: which OS thread ran a submission is not tracked
-    anywhere in this engine, and `critical` — which pool it ran in — is the
-    honest substitute, not a guess dressed up as a thread name."""
+def test_snapshot_reports_critical_for_a_running_task_with_no_thread_yet():
+    """`critical` — which pool a task runs in — is real regardless of
+    outcome; `thread` stays `None` for a task that has not (yet, or ever)
+    failed, per `TaskSnapshot.thread`'s own docstring."""
     from sagittarius_engine.runtime.tasks.background_task import (
         BackgroundTask,
         TaskState,
@@ -260,7 +263,62 @@ def test_snapshot_reports_critical_not_a_fabricated_thread_name():
 
     (entry,) = manager.snapshot()
     assert entry.critical is True
-    assert not hasattr(entry, "thread")
+    assert entry.thread is None
+
+
+# --------------------------------------------------- EPIC-008E: failure detail
+
+
+def test_snapshot_captures_the_real_stack_error_type_and_worker_thread_for_a_failed_sync_task():
+    """`EPIC-008E`'s own requirement ("a failed task's stack is readable
+    after a click") needs a real stack on the wire, captured at the moment
+    the task actually failed -- not reconstructed later from nothing. The
+    worker thread is real too: this failure ran on an executor thread, never
+    on the thread that called `spawn()` (this test's own)."""
+    context = MockContext()
+    manager = TaskManager(context)
+
+    def failing_task():
+        raise ValueError("boom")
+
+    task = manager.spawn(failing_task, name="FailingTask")
+    try:
+        task.future.result(timeout=2.0)
+    except ValueError:
+        pass
+
+    (entry,) = manager.snapshot()
+    assert entry.error == "boom"
+    assert entry.error_type == "ValueError"
+    assert entry.stack is not None
+    assert "ValueError: boom" in entry.stack
+    assert "failing_task" in entry.stack
+    assert entry.thread
+    assert entry.thread != threading.current_thread().name
+
+
+def test_wrap_coro_captures_the_stack_but_leaves_thread_empty_for_a_failed_async_task():
+    """An async failure runs on the shared event-loop thread, not a worker
+    of its own -- naming that thread as the task's "owner" the way a sync
+    failure's real worker thread is named would be misleading, not merely
+    incomplete (`TaskSnapshot.thread`'s own docstring)."""
+    from sagittarius_engine.runtime.tasks.background_task import BackgroundTask
+
+    context = MockContext()
+    manager = TaskManager(context)
+    t = BackgroundTask("async_boom")
+
+    async def failing_coro():
+        raise ValueError("async boom")
+
+    try:
+        asyncio.run(manager._wrap_coro(t, failing_coro()))
+    except ValueError:
+        pass
+
+    assert t.error_stack != ""
+    assert "ValueError: async boom" in t.error_stack
+    assert t.thread_name == ""
 
 
 def test_snapshot_of_an_empty_manager_is_an_empty_tuple():

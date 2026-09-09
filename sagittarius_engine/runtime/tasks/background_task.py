@@ -41,6 +41,16 @@ class BackgroundTask(ITaskHandle):
             on_progress_update
         )
         self.error: Exception | None = None
+        #: `traceback.format_exc()` at the moment `error` was set — empty
+        #: until then. `EPIC-008E`'s own requirement ("a failed task's stack
+        #: is readable after a click"), captured right where the exception is
+        #: already caught rather than reconstructed later from nothing.
+        self.error_stack: str = ""
+        #: `threading.current_thread().name` at the moment `error` was set —
+        #: only set for a sync task (the real worker thread that ran it); an
+        #: async task's failure leaves this empty rather than naming the
+        #: shared event-loop thread as if it were the task's own "owner".
+        self.thread_name: str = ""
         self.start_time: datetime | None = datetime.now(UTC)
         self.end_time: datetime | None = None
 

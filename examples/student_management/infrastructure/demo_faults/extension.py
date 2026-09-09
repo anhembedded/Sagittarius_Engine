@@ -111,6 +111,8 @@ class DemoFaultsExtension(IExtension[Any]):
         self.rejected_transition: Exception | None = None
         self.dead_scheduled_job: Any = None
         self.leaked_scopes: list[Any] = []
+        self.failed_task: Any = None
+        self.scheduled_job: Any = None
 
     def register(self, context: Any) -> None:
         pass
@@ -140,6 +142,8 @@ class DemoFaultsExtension(IExtension[Any]):
         self._seed_held_exclusive_slot(context)
         self._seed_illegal_fsm_transition()
         self._seed_leaked_scopes(context)
+        self._seed_failed_task(context)
+        self._seed_scheduled_job(context)
 
     def _seed_typo_subscription(self, context: Any) -> None:
         """@brief A2 — declared correctly, subscribed with a typo."""
@@ -252,3 +256,31 @@ class DemoFaultsExtension(IExtension[Any]):
             scope = context.container.create_scope()
             scope.__enter__()
             self.leaked_scopes.append(scope)
+
+    def _seed_failed_task(self, context: Any) -> None:
+        """@brief A real background task that actually fails -- `EPIC-008E`'s
+        Tasks & threads restyle needs one to verify its failed-row expansion
+        (error type, message, and a real stack) against, the same "one
+        instance of each condition" reasoning as every other seed here.
+        Raises immediately rather than after a delay, so it has finished
+        (and `TaskManager` has captured its real `traceback.format_exc()`
+        and worker thread name) well before any client's first snapshot."""
+
+        def _always_fails() -> None:
+            raise ValueError("demo: enrolment PDF template not found")
+
+        self.failed_task = context.tasks.spawn(_always_fails, name="export_roster_pdf")
+
+    def _seed_scheduled_job(self, context: Any) -> None:
+        """@brief A real, healthy job on the live `Scheduler` -- `EPIC-008E`'s
+        Limits jobs table needs at least one real row with a real trigger and
+        a genuine time to next fire. Deliberately *not* where the D3 "broken
+        job" condition is seeded (`_seed_dead_scheduled_job`'s own docstring
+        explains why a dead job on the live scheduler is dropped again on
+        the background thread's very next wake -- this job's own five-minute
+        interval is chosen so it stays comfortably `active` for the life of
+        a demo session instead)."""
+
+        def _noop() -> None: ...
+
+        self.scheduled_job = context.scheduler.every(minutes=5).do(_noop)

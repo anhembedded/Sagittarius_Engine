@@ -1,6 +1,6 @@
 # EPIC-008: Runtime State Console — UI Redesign
 
-- **Status**: 🟡 In Progress (4/6 subtasks done)
+- **Status**: 🟡 In Progress (5/6 subtasks done)
 - **Created**: 2026-09-09
 - **Priority**: P2
 - **Category**: UI Engine (`pyside_mvc`) / Tooling
@@ -77,7 +77,7 @@ that it looks right.
 | **[B](completed/EPIC-008B_shell_rebuilt_on_the_new_kit.md)** ✅ | `tools/state_console` shell rebuilt on A: `ConsoleConnectionExtension` extended with `CONNECTING`/classified-`FAILED` events and live re-target (`EPIC-008A`'s gaps 1-2); the connect flow itself composed from existing primitives (`EPIC-008A`'s gap 3 resolution) — address entry, recents, `LiveConnectionBand` wired to the real connection; `AppRail` badges wired to real signal counts; Overview restyled | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — Overview screen matches the reference (Connection/Lifecycle/Signals plates, a real module grid + table, backed by a new `LifecycleState.modules` wire field); shell chrome (band, rail, badges) on every screen; connecting to a different address (cold or while attached) works without restarting |
 | **[C](completed/EPIC-008C_events_and_wiring_restyled.md)** ✅ | Events & wiring restyled: sortable columns, undeclared-event banner | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — sort persists across a snapshot refresh (free from `AppDataTable`); undeclared rows tinted and named in a real `WIRING BUG` banner, with a real "did you mean" suggestion via `difflib` |
 | **[D](completed/EPIC-008D_container_restyled.md)** ✅ | Container restyled: registrations/never-built tables, open-scope leak emphasis | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — leak threshold styling verified against a live seeded-fault demo (`DemoFaultsExtension` gained a real 30-scope leak seed); sort persists on the shared Registrations/Never-built table |
-| **E** | Tasks & threads restyled: expandable failed-task rows, limits panels | `.\scripts\run-console.ps1 -Demo` | A failed task's stack is readable after a click, one at a time |
+| **[E](completed/EPIC-008E_tasks_and_threads_restyled.md)** ✅ | Tasks & threads restyled: expandable failed-task rows, limits panels | `.\scripts\run-console.ps1 -Demo` | **Done 2026-09-09** — a failed task's stack is genuinely readable after a click (`TaskManager` now captures a real `traceback.format_exc()`/worker thread at the moment of failure, reversing an earlier `EPIC-007B` decision that traceback stayed log-only); a real per-job Limits table backed by a new `LifecycleState.jobs` field |
 | **F** | Signals restyled: dead-letter cards, watched-machine transition log, UI-thread health cards | `.\scripts\run-console.ps1 -Demo` | Same real dead-letter/rejected-transition demo `EPIC-007F` used, now rendered in the new visual language |
 
 **Order: A → B → C → D → E → F**, same reasoning as `EPIC-007`: A is shared infrastructure

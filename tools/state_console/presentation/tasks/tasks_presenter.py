@@ -47,7 +47,10 @@ class TasksPresenter(BasePresenter):
                     "state": t.state,
                     "progress": t.progress,
                     "ageSeconds": t.age_ns / 1_000_000_000,
+                    "owner": t.thread,
                     "error": t.error,
+                    "errorType": t.error_type,
+                    "stack": t.stack,
                 }
                 for t in snapshot.tasks
             ]
@@ -61,6 +64,13 @@ class TasksPresenter(BasePresenter):
                     "queueDepth": pool.queue_depth,
                     "submitted": pool.submitted,
                     "completed": pool.completed,
+                    # reference/handoff.md §7.5: "the pools table plus an
+                    # `outstanding` column (submitted - completed)" -- derived
+                    # here, not in QML, matching OverviewPresenter's own
+                    # `_thread_pool_row` precedent for the same reason
+                    # (AppDataTable cells render one column's raw value,
+                    # with no per-cell arithmetic hook).
+                    "outstanding": pool.submitted - pool.completed,
                 }
                 for pool in snapshot.thread_pools
             ]
@@ -72,4 +82,21 @@ class TasksPresenter(BasePresenter):
             bounded.retained_task_limit if bounded is not None else 0,
             lifecycle.scheduler_jobs if lifecycle is not None else 0,
             lifecycle.scheduler_jobs_without_next_run if lifecycle is not None else 0,
+        )
+        self.view_model.set_jobs(
+            [
+                {
+                    "name": job.name,
+                    "trigger": job.trigger,
+                    "nextFireSeconds": job.next_fire_seconds,
+                    # Same "AppDataTable cells render one column's raw value"
+                    # reasoning as `_thread_pool_row`'s own `outstanding`:
+                    # `state` needs to know `nextFireSeconds is None`, which
+                    # only this dict-building step can see across both keys.
+                    "state": "no next fire"
+                    if job.next_fire_seconds is None
+                    else "active",
+                }
+                for job in (lifecycle.jobs if lifecycle is not None else ())
+            ]
         )

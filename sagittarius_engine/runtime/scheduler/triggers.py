@@ -14,6 +14,20 @@ class ITrigger(ABC):
         """
         pass
 
+    def describe(self) -> str:
+        """
+        @brief A short, human-readable description of this trigger's own
+        schedule -- `EPIC-008E`'s Tasks & threads "Limits" jobs table needs
+        one real per-job `trigger` column.
+
+        @details Concrete, not abstract, for the same reason as
+        `ITaskManager.snapshot()`/`pool_stats()`: a third-party `ITrigger`
+        predating this method must not fail to instantiate over it. The
+        class name is the honest default; the two triggers this engine ships
+        both override it with their own real schedule.
+        """
+        return self.__class__.__name__
+
 
 class IntervalTrigger(ITrigger):
     """
@@ -25,6 +39,9 @@ class IntervalTrigger(ITrigger):
 
     def get_next_run(self, from_time: datetime) -> datetime:
         return from_time + self.delta
+
+    def describe(self) -> str:
+        return f"every {self.delta}"
 
 
 class CronTrigger(ITrigger):
@@ -38,3 +55,6 @@ class CronTrigger(ITrigger):
     def get_next_run(self, from_time: datetime) -> datetime:
         # Align to the next minute boundary for basic simulation
         return from_time.replace(second=0, microsecond=0) + timedelta(minutes=1)
+
+    def describe(self) -> str:
+        return f"cron {self.cron_expr}"

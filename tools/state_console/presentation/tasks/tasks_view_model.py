@@ -21,6 +21,7 @@ class TasksViewModel(BaseQmlViewModel):
     tasksChanged = Signal()
     threadPoolsChanged = Signal()
     boundedChanged = Signal()
+    jobsChanged = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -32,6 +33,7 @@ class TasksViewModel(BaseQmlViewModel):
         self._retained_task_limit = 0
         self._scheduler_jobs = 0
         self._scheduler_jobs_without_next_run = 0
+        self._jobs: list[dict] = []
 
     def _get_connection_state(self) -> str:
         return self._connection_state
@@ -107,3 +109,12 @@ class TasksViewModel(BaseQmlViewModel):
         self._scheduler_jobs = scheduler_jobs
         self._scheduler_jobs_without_next_run = scheduler_jobs_without_next_run
         self.boundedChanged.emit()
+
+    def _get_jobs(self) -> list:
+        return self._jobs
+
+    jobs = Property("QVariantList", _get_jobs, notify=jobsChanged)  # type: ignore[arg-type]
+
+    def set_jobs(self, jobs: list[dict]) -> None:
+        self._jobs = jobs
+        self.jobsChanged.emit()

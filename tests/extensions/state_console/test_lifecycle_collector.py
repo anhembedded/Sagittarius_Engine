@@ -74,3 +74,51 @@ def test_modules_order_matches_registration_order():
     )
 
     assert [m.name for m in collector.collect().modules] == ["Third", "First"]
+
+
+# --------------------------------------------------- EPIC-008E: jobs
+
+
+def _job(name, trigger_description, next_run):
+    return SimpleNamespace(
+        fn=SimpleNamespace(__name__=name),
+        trigger=SimpleNamespace(describe=lambda: trigger_description),
+        next_run=next_run,
+    )
+
+
+def test_with_no_scheduler_jobs_is_empty():
+    collector = LifecycleCollector(_fake_lifecycle(EngineState.READY))
+
+    assert collector.collect().jobs == ()
+
+
+def test_jobs_reports_name_trigger_and_a_positive_time_to_next_fire():
+    from datetime import datetime, timedelta
+
+    scheduler = SimpleNamespace(
+        jobs=[
+            _job("sync_roster", "every 0:05:00", datetime.now() + timedelta(minutes=5))
+        ]
+    )
+    collector = LifecycleCollector(
+        _fake_lifecycle(EngineState.READY), scheduler=scheduler
+    )
+
+    (job,) = collector.collect().jobs
+    assert job.name == "sync_roster"
+    assert job.trigger == "every 0:05:00"
+    assert job.next_fire_seconds is not None
+    assert job.next_fire_seconds > 0
+
+
+def test_a_job_with_no_next_run_reports_next_fire_seconds_as_none():
+    """The same `next_run is None` condition `scheduler_jobs_without_next_run`
+    already names as broken -- WiringInspector's own D3 check."""
+    scheduler = SimpleNamespace(jobs=[_job("dead_job", "every 0:01:00", None)])
+    collector = LifecycleCollector(
+        _fake_lifecycle(EngineState.READY), scheduler=scheduler
+    )
+
+    (job,) = collector.collect().jobs
+    assert job.next_fire_seconds is None

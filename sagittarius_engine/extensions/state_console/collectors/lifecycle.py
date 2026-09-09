@@ -16,14 +16,22 @@ essentially immediate — which means this field can be non-zero for a real
 thread's next loop iteration. It is honest (never wrong), but is not a
 reliable way to observe this condition against this engine's own
 `Scheduler`. See `examples/student_management/infrastructure/demo_faults/`
-for how the demo seed works around it.
+for how the demo seed works around it. `jobs` (`EPIC-008E`) reads the exact
+same live list and inherits the identical fragility: a broken job's own row
+in the Limits jobs table can vanish between one snapshot and the next for
+the same reason the aggregate count can.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
-from sagittarius_engine.extensions.audit.contracts import LifecycleState, ModuleState
+from sagittarius_engine.extensions.audit.contracts import (
+    JobRecord,
+    LifecycleState,
+    ModuleState,
+)
 from sagittarius_engine.extensions.state_console.collector import ISnapshotSection
 from sagittarius_engine.kernel.lifecycle import EngineLifecycle
 
@@ -87,11 +95,25 @@ class LifecycleCollector(ISnapshotSection[LifecycleState]):
 
         scheduler_jobs = 0
         scheduler_jobs_without_next_run = 0
+        job_records: tuple[JobRecord, ...] = ()
         if self._scheduler is not None:
-            jobs = self._scheduler.jobs
-            scheduler_jobs = len(jobs)
+            scheduler_job_list = self._scheduler.jobs
+            scheduler_jobs = len(scheduler_job_list)
             scheduler_jobs_without_next_run = sum(
-                1 for job in jobs if getattr(job, "next_run", None) is None
+                1
+                for job in scheduler_job_list
+                if getattr(job, "next_run", None) is None
+            )
+            now = datetime.now()
+            job_records = tuple(
+                JobRecord(
+                    name=getattr(job.fn, "__name__", "job"),
+                    trigger=job.trigger.describe(),
+                    next_fire_seconds=(job.next_run - now).total_seconds()
+                    if job.next_run is not None
+                    else None,
+                )
+                for job in scheduler_job_list
             )
 
         return LifecycleState(
@@ -104,4 +126,5 @@ class LifecycleCollector(ISnapshotSection[LifecycleState]):
             scheduler_jobs=scheduler_jobs,
             scheduler_jobs_without_next_run=scheduler_jobs_without_next_run,
             modules=modules,
+            jobs=job_records,
         )

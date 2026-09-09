@@ -154,6 +154,37 @@ def test_seeds_a_real_open_scope_leak_past_the_fault_threshold(app, demo):
     assert app.context.container.open_scope_count() >= 30
 
 
+# ----------------------------------------------------------- EPIC-008B subtask E
+
+
+def test_seeds_a_real_failed_task_with_a_real_stack(app, demo):
+    """`EPIC-008E`'s own requirement ("a failed task's stack is readable
+    after a click") needs a real failure to verify against, not a hand-set
+    fixture -- this seed's task actually raises on a real worker thread."""
+    assert demo.failed_task is not None
+    try:
+        demo.failed_task.future.result(timeout=2.0)
+    except ValueError:
+        pass
+
+    # snapshot() -- what the console actually reads -- is the honest way to
+    # observe the same failure this test just waited for.
+    (entry,) = [t for t in app.context.tasks.snapshot() if t.id == demo.failed_task.id]
+    assert entry.state.value == "failed"
+    assert entry.error == "demo: enrolment PDF template not found"
+    assert entry.error_type == "ValueError"
+    assert entry.stack is not None and "ValueError" in entry.stack
+    assert entry.thread is not None and entry.thread != ""
+
+
+def test_seeds_a_real_active_scheduled_job(app, demo):
+    """`EPIC-008E`'s Limits jobs table needs at least one real row with a
+    real trigger and a genuine time to next fire."""
+    assert demo.scheduled_job is not None
+    assert demo.scheduled_job in app.context.scheduler.jobs
+    assert demo.scheduled_job.next_run is not None
+
+
 # ----------------------------------------------------------------- EPIC-007F
 
 
@@ -216,3 +247,5 @@ def test_every_seed_produced_something(app, demo):
     )
     assert demo.rejected_transition is not None
     assert len(demo.leaked_scopes) == 30
+    assert demo.failed_task is not None
+    assert demo.scheduled_job is not None and demo.scheduled_job.next_run is not None
