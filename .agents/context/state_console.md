@@ -56,20 +56,28 @@ sagittarius-trace snapshot ws://127.0.0.1:8781 --watch 1s
 ```console
 $ sagittarius-trace snapshot ws://127.0.0.1:8781
 snapshot @ 1543.349494s
-lifecycle: state=ready extensions=5/5 hosted=0/0 scheduler_jobs=0 (without_next_run=0)
+lifecycle: state=ready extensions=5/5 hosted=0/0 scheduler_jobs=1 (without_next_run=0)
 events: 20
   StudentEnrolled handlers=0 emits=0 failures=0
   ...
-container: 13 registration(s), open_scopes=0
+container: 13 registration(s), open_scopes=30
   IEventBus -> MemoryEventBus [singleton] instantiated
   ...
+tasks: 1
+  18df588d-... name='export_roster_pdf' state=failed progress=0% age=0.9s error='demo: enrolment PDF template not found'
 thread pools:
-  background: 0/20 in flight, queue_depth=0, submitted=0, completed=0
-bounded: ring=0/0 (dropped=0), tasks=0/50, subscriptions=2, gc_counts=[259, 11, 0]
+  background: 0/20 in flight, queue_depth=0, submitted=1, completed=1
+bounded: ring=0/0 (dropped=0), tasks=1/50, subscriptions=2, gc_counts=[259, 11, 0]
 config: 3 entries
   ...
 detached
 ```
+
+Captured against `examples/student_management --demo-faults` (`§6` below) — `extensions=5/5`
+and the non-zero `open_scopes`/`tasks`/`scheduler_jobs` are `DemoFaultsExtension`'s own seeds,
+not something a bare `StateConsoleExtension` attach produces; a correctly-wired app with
+nothing seeded reads `extensions=4/4`, `open_scopes=0`, and omits `tasks:` entirely (§4's own
+"absent means not observed" rule).
 
 Every section is its own line and an absent one is simply not there — a panel hiding a missing
 field behind blank space is exactly the trap `EPIC-005`'s `D1` names (the old dashboard's CLI
@@ -99,8 +107,8 @@ a `PresenterManager`-driven sidebar (`tools/state_console/presentation/shell/con
 | Overview | connection state, lifecycle, thread-pool occupancy — folds in the "not attached" state |
 | Events & wiring | the declared ⋈ subscribed join (`EventCollector`) |
 | Container | registrations, lifetimes, what is built |
-| Tasks & threads | the task table, thread-pool saturation, bounded-structures occupancy |
-| Signals | dead-letter queue, watched state machines, UI-thread health — §5 below |
+| Tasks & threads | the task table (a failed row expands to its real error type, message, and stack — `TaskManager` captures both at the moment of failure), thread-pool saturation, a Limits tab with a real per-job table |
+| Signals | dead-letter queue, one plate per watched state machine (declared-states chip row, attempts/rejected figures, its own transition log with a real rejection reason) — §5 below |
 
 The console supplies its **own** palette (`tools/state_console/presentation/theme/palette.py`)
 — it does not inherit the observed application's, since a diagnostic console that looks like

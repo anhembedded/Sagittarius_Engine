@@ -44,15 +44,19 @@ lifecycle: state=ready extensions=4/4 hosted=0/0 scheduler_jobs=0 (without_next_
 events: 17
 container: 12 registration(s), open_scopes=0
 thread pools:
+  background: 0/20 in flight, queue_depth=0, submitted=0, completed=0
+  critical: 0/10 in flight, queue_depth=0, submitted=0, completed=0
 bounded: ring=0/0 (dropped=0), tasks=0/50, subscriptions=0, gc_counts=[135, 11, 0]
 config: 3 entries
 detached
 ```
 
 **A section that never appears is not broken — it is absent because nothing filled it.**
-`thread pools:` prints with no rows when nothing is running through `ITaskManager`, and `tasks`
-is omitted entirely when there are none retained. Read this output for what changes between two
-runs, not for a fixed shape it must always have.
+`thread pools:` lists every pool the reference `TaskManager` owns (`background`/`critical`) with
+real, live counts — zero until something actually runs, but the pool lines themselves are always
+there once an `ITaskManager` exists. `tasks:`, by contrast, is omitted entirely when nothing has
+ever been retained — a genuinely absent section, not a present one showing zeroes. Read this
+output for what changes between two runs, not for a fixed shape every section must always have.
 
 ## 3. Open the actual dashboard
 

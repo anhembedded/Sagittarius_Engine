@@ -55,10 +55,11 @@ A fourth entry point, `console.py`, boots the app headlessly with `StateConsoleE
 attached instead of the GUI or CLI — see [`state_console.md`](state_console.md). Its
 `--demo-faults` flag additionally attaches `DemoFaultsExtension`
 (`infrastructure/demo_faults/`), which seeds one instance of every condition the engine's
-diagnostics claim to catch (a typo'd subscription, a dead-lettered event, an unbound
-dependency, a dead scheduled job, a held exclusive slot, a rejected state-machine transition)
-— opt-in, and never in `doctor_target.build()`'s own path, so it cannot regress the CI wiring
-gate. Full seed table and reasoning:
+diagnostics claim to catch (a typo'd subscription, an emit nobody heard, a dead-lettered event,
+an unbound dependency, a dead scheduled job, a held exclusive slot, a rejected state-machine
+transition, 30 leaked container scopes, a real failed background task, and a real healthy
+scheduled job) — opt-in, and never in `doctor_target.build()`'s own path, so it cannot regress
+the CI wiring gate. Full seed table and reasoning:
 [`docs/runtime_state_console_demo.md`](../../examples/student_management/docs/runtime_state_console_demo.md).
 
 ### Honest module coverage
@@ -95,5 +96,5 @@ default (`examples/student_management/run.ps1`'s own comment-based help has ever
 
 ### Tests
 
-`pytest examples/student_management/` — 64 tests, also collected automatically by the root
+`pytest examples/student_management/` — 67 tests, also collected automatically by the root
 suite (no special config needed; `pyproject.toml` sets no `testpaths` restriction).

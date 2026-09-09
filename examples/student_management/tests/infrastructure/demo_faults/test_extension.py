@@ -1,7 +1,10 @@
 """`DemoFaultsExtension` against a real, booted app — `EPIC-007D` §2.2/§4.
 
-Every one of the seven seeds is asserted on directly: the finding it is
-supposed to produce, or the object state it is supposed to leave behind.
+Every one of `DemoFaultsExtension._seed()`'s seeds is asserted on directly:
+the finding it is supposed to produce, or the object state it is supposed
+to leave behind. Not counted here by number on purpose — `EPIC-008B`/`E`
+already added three since this docstring's own original count went stale
+once; `_seed()`'s own body is the actual list.
 """
 
 from __future__ import annotations

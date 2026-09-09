@@ -5,6 +5,9 @@ Written 2026-08-27 while building `EPIC-007D`, at the point the whole thing was 
 terminal, and read back exactly what was seeded. **Updated 2026-08-27** once `EPIC-007E`
 (the QML dashboard) and `EPIC-007F` (the dead-letter/state-machine panel) both shipped —
 see "Seeing it in a window" below for the mode this doc originally had no answer for.
+**Updated 2026-09-09**: `EPIC-008B`/`E` added three more seeds (30 leaked container scopes, a
+real failed background task, a real healthy scheduled job) while restyling the dashboard —
+the seed table below now lists all ten, re-verified against a real run of this exact command.
 
 ## The two switches
 
@@ -71,6 +74,9 @@ plants one instance of each condition the engine's diagnostics claim to catch:
 | a scheduled `nightly_report` seeded with no next run time | D3 | `DemoFaultsExtension.dead_scheduled_job` directly — **not** the live `Scheduler`, see below |
 | an `ExclusiveAction` slot taken and never released | — | `DemoFaultsExtension.exclusive_action.held_slot()` directly — still not on the wire (`EPIC-007B` added the API, no collector reads it yet) |
 | an `EnrolmentFlow` state machine driven through one illegal move | — | `DemoFaultsExtension.rejected_transition` (an `InvalidStateTransitionError`, not a `False` return — `REF-005`) **and**, with a console attached, `sagittarius-trace snapshot`'s `signals` section — the rejected transition renders in `danger` on the Signals screen |
+| 30 container scopes entered and never exited | — (past `reference/handoff.md` §7.4's own `>24` fault threshold, `EPIC-008B`) | `DemoFaultsExtension.leaked_scopes` directly, and `sagittarius-trace snapshot`'s `container` section (`open_scopes=30`) — the QML dashboard's Container screen, Open scopes tab (fault-styled red) |
+| a real background task (`export_roster_pdf`) that raises `ValueError` immediately | — (`EPIC-008E`'s own "a failed task's stack is readable after a click") | `DemoFaultsExtension.failed_task` directly, and `sagittarius-trace snapshot`'s `tasks` section (a real `error`, captured `traceback.format_exc()`, and worker thread name) — the QML dashboard's Tasks & threads screen; click the failed row to expand its real stack |
+| a real, healthy job (`_noop`, every 5 minutes) on the **live** `Scheduler` | — (`EPIC-008E`'s Limits jobs table) | `DemoFaultsExtension.scheduled_job` directly, and `sagittarius-trace snapshot`'s `lifecycle` section (`scheduler_jobs=1`) — the QML dashboard's Tasks & threads → Limits jobs table. Deliberately not where D3's dead job is seeded — see below |
 
 Every row is independently asserted on in
 `examples/student_management/tests/infrastructure/demo_faults/` — the extension's own public
@@ -87,6 +93,12 @@ and its very next pass drops a `next_run=None` job from `.jobs` again — so the
 window in which anything could observe it there. `DemoFaultsExtension.dead_scheduled_job` is a
 real, standalone `ScheduledJob` instead, stable for the life of the extension, and what a test
 or `WiringInspector` should be pointed at directly.
+
+This is specific to the *dead* job — `DemoFaultsExtension.scheduled_job` (`EPIC-008E`, the row
+above) is a separate, genuinely healthy job that *is* on the live `Scheduler`, at a five-minute
+interval chosen so it stays comfortably `active` for the life of a demo session. Nothing about
+seeding a scheduler condition avoids the live scheduler in general — only this one dead-job
+condition specifically cannot be observed there.
 
 ## Why two of these still only reach a log line, not the console's wire format
 

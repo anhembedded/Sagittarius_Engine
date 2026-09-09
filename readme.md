@@ -358,15 +358,20 @@ actually asks for one, so a detached application pays nothing measurable for hav
 
 ### Read it as text, or open the dashboard
 
+Below, against `examples/student_management --demo-faults` — the sample app's own
+`DemoFaultsExtension`, not something a bare `StateConsoleExtension` attach produces on its own:
+
 ```console
 $ sagittarius-trace snapshot ws://127.0.0.1:8781
 snapshot @ 1543.349494s
-lifecycle: state=ready extensions=5/5 hosted=0/0 scheduler_jobs=0 (without_next_run=0)
+lifecycle: state=ready extensions=5/5 hosted=0/0 scheduler_jobs=1 (without_next_run=0)
 events: 20
-container: 13 registration(s), open_scopes=0
+container: 13 registration(s), open_scopes=30
+tasks: 1
+  18df588d-... name='export_roster_pdf' state=failed progress=0% age=0.9s error='demo: enrolment PDF template not found'
 thread pools:
-  background: 0/20 in flight, queue_depth=0, submitted=0, completed=0
-bounded: ring=0/0 (dropped=0), tasks=0/50, subscriptions=2, gc_counts=[259, 11, 0]
+  background: 0/20 in flight, queue_depth=0, submitted=1, completed=1
+bounded: ring=0/0 (dropped=0), tasks=1/50, subscriptions=2, gc_counts=[259, 11, 0]
 config: 3 entries
 detached
 ```
