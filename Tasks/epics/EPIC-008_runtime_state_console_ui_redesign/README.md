@@ -1,6 +1,6 @@
 # EPIC-008: Runtime State Console — UI Redesign
 
-- **Status**: 🟡 In Progress (0/6 subtasks done)
+- **Status**: 🟡 In Progress (1/6 subtasks done)
 - **Created**: 2026-09-09
 - **Priority**: P2
 - **Category**: UI Engine (`pyside_mvc`) / Tooling
@@ -73,8 +73,8 @@ that it looks right.
 
 | ID | Scope | Runs as | Done when |
 | :--- | :--- | :--- | :--- |
-| **[A](incomplete/EPIC-008A_design_tokens_and_shared_shell.md)** | Token derivation utility + new token names (§2.1); `LiveConnectionBand`, rail badges, `ConnectFlow`, sortable/expandable `AppDataTable` additions — all in `pyside_mvc`, all in the gallery | `scripts/show-gallery.ps1` | Every new/changed kit component renders in the gallery in both themes; anti-literal/anti-raw-primitive guards still pass |
-| **B** | `tools/state_console` shell rebuilt on A: status band wired to the real 3-state connection (extended toward the 6-state model as the transport allows — see `EPIC-008A`'s open question on `FAILED`/`CONNECTING`), rail badges wired to real signal counts, Overview restyled | `.\scripts\run-console.ps1 -Demo` | Overview screen matches the reference visually; shell chrome (band, rail, badges) present on every screen |
+| **[A](completed/EPIC-008A_design_tokens_and_shared_shell.md)** ✅ | Token derivation utility + new token names (§2.1); `LiveConnectionBand`, `AppRail` (badges), `AppDataTable` row expansion — all in `pyside_mvc`, all in the gallery | `scripts/show-gallery.ps1` | ✅ **Done 2026-09-09** — 4/5 planned items shipped as kit work (40 new tests); the 5th (connect-flow input primitives) resolved to "no new kit component" per this repo's own `ActionCard/NOTES.md` two-consumer promotion rule and is composed in B instead — see A's own Outcome section |
+| **B** | `tools/state_console` shell rebuilt on A: `ConsoleConnectionExtension` extended with `CONNECTING`/classified-`FAILED` events and live re-target (`EPIC-008A`'s gaps 1-2); the connect flow itself composed from existing primitives (`EPIC-008A`'s gap 3 resolution) — address entry, recents, `LiveConnectionBand` wired to the real connection; `AppRail` badges wired to real signal counts; Overview restyled | `.\scripts\run-console.ps1 -Demo` | Overview screen matches the reference visually; shell chrome (band, rail, badges) present on every screen; connecting to a different address works without restarting |
 | **C** | Events & wiring restyled: sortable columns, undeclared-event banner | `.\scripts\run-console.ps1 -Demo` | Sort persists across a snapshot refresh; undeclared rows visually unmissable |
 | **D** | Container restyled: registrations/never-built tables, open-scope leak emphasis | `.\scripts\run-console.ps1 -Demo` | Leak threshold styling verified against a live seeded-fault demo |
 | **E** | Tasks & threads restyled: expandable failed-task rows, limits panels | `.\scripts\run-console.ps1 -Demo` | A failed task's stack is readable after a click, one at a time |
@@ -86,9 +86,12 @@ A's proving ground before touching the other four screens in any order convenien
 
 ## 4. What is deliberately not in this epic
 
-- **Any change to the wire contract, collectors, or transport.** `StateSnapshot`, `TraceServer`,
-  `StateConsoleExtension` are unchanged. This epic is presentation plus the connect-flow UX
-  gap named in `EPIC-007`'s own follow-up conversation — not new backend capability.
+- **Any change to the wire contract or the server-side collectors.** `StateSnapshot`,
+  `TraceServer`, `StateConsoleExtension` (the extension attached to the *observed* app) are
+  unchanged. `ConsoleConnectionExtension` — the *client*'s own connection wrapper, not part of
+  the wire protocol — does change in `EPIC-008B` (new domain events, live re-target), which is
+  the connect-flow UX gap named in `EPIC-007`'s own follow-up conversation, not new backend
+  capability on the observed side.
 - **A literal 1:1 port of the `.dc.html` prototypes' markup.** `reference/handoff.md` §2 says
   so directly: recreate the design in Qt/PySide's own idiom, not the web structure it happened
   to be prototyped in.

@@ -1,8 +1,9 @@
 # EPIC-008A: Design tokens and shared shell primitives
 
-- **Status**: 🔄 In Progress
+- **Status**: ✅ Completed
 - **Category**: UI Engine (`pyside_mvc`)
 - **Started Date**: 2026-09-09
+- **Completed Date**: 2026-09-09
 
 ---
 
@@ -200,7 +201,32 @@ new type:
   (the visual tree) recursively instead, the same pattern
   `test_app_data_table_zoom_factor_scales_row_height` already used one level deep.
 
-### 5. Connect-flow input primitives
+### 5. Connect-flow input primitives — resolved: no new kit component
+
+**Correction to this file's own original plan.** The text below (kept for the record) proposed
+building a themed text field and a themed "row with trailing action" as new kit types. Re-read
+against `Sagittarius/UI/ActionCard/NOTES.md` — a real, already-written promotion rule in this
+codebase — that was wrong: *"this becomes a real [kit type] once **two** real cards in a
+consuming screen need this exact contract... one real case is not enough; it could still be a
+one-off, and a wrong shape here is expensive to walk back once other cards start depending on
+it."* `tools/state_console` is the only consumer with this need today. Building a new
+`Sagittarius/UI/` type for it now would be exactly the premature abstraction that rule exists to
+block — this file would have been the second time in one epic to reach for "promote it to the
+kit" as a default, right after `EPIC-008A` item 2 already used the *opposite* reasoning
+correctly (reusing `StatefulButton` instead of inventing a second button type, because a second
+type already existed and fit).
+
+**Resolution:** the connect flow is composed in `tools/state_console`'s own shell layer, from
+primitives that already exist — `TextField` + `FieldBackground` (already the established
+pattern; see the gallery's own `FIELDS` section) for the address entry, `StatefulButton` for
+actions, plain `Rectangle`/`RowLayout` for each recent-address row. Nothing here is kit work,
+so it does not belong in this subtask — `EPIC-008B` builds it as part of rebuilding the shell,
+where the connect flow actually lives. If a second `pyside_mvc` consumer later needs the same
+"type something, submit it, see recent submissions" shape, promote it then, following the exact
+rule `ActionCard/NOTES.md` already states — not preemptively.
+
+<details>
+<summary>Original plan text (superseded by the resolution above)</summary>
 
 No kit-level text field or "list with a trailing action button" component exists yet
 (`Sagittarius/UI/` currently has no `TextField`/`ComboBox`-shaped entry). The connect flow
@@ -211,6 +237,8 @@ something, submit it, see recent submissions" doesn't re-invent it — but the a
 validation regex, the three failure-kind copy blocks, and what counts as a "recent target" are
 `tools/state_console` domain knowledge (tier 3) and stay there, in the connect-flow's
 presenter/view-model, not in the kit component.
+
+</details>
 
 ## 🧩 Gaps to resolve — real, not cosmetic
 
@@ -252,3 +280,39 @@ rather than discovered mid-B:
 - `tools/state_console`'s existing palette (`STATE_CONSOLE_PALETTE`) still boots the console
   after any new required-token additions — a regression here would break the one real consumer
   this epic exists to improve.
+
+## ✅ Outcome
+
+4 of the 5 originally-planned items shipped as kit work; the 5th resolved to "no kit component
+needed" (§5, above) rather than being forced into existence — a correction, not a completion
+gap, per `design-discipline.md`'s "leave something undone and named over done and wrong."
+
+| # | Item | Result |
+| :-: | :--- | :--- |
+| 1 | Token derivation (`tokens/derived.py`) | ✅ Shipped — 21 tests |
+| 2 | `LiveConnectionBand` | ✅ Shipped — 8 tests |
+| 3 | `AppRail` | ✅ Shipped — 7 tests |
+| 4 | `AppDataTable` row expansion (sort already existed) | ✅ Shipped — 4 tests |
+| 5 | Connect-flow input primitives | ➖ No new kit component — composed from existing primitives in `EPIC-008B` instead |
+
+Every local CI gate run genuinely green (read from the log, not the summary line) before each
+push, per `commit-rule.md`. The one recurring flake (`tests/infrastructure/event_bus/
+test_ipc_queue_event_bus.py`'s `os.fork()` colliding with Qt-initialized threads,
+pre-existing and unrelated to this work) surfaced twice across this subtask's several CI runs
+and cleared on a single retry both times, consistent with `EPIC-007`'s own prior diagnosis of
+it as an environmental race, not a regression.
+
+**Two real, reusable findings that outlast this subtask:**
+1. `QObject.findChild()` cannot see a `Loader`- or `Repeater`-created item — confirmed for a
+   `ListView` delegate (`AppDataTable`'s row expansion) AND a plain `Repeater` outside any
+   `ListView` (`AppRail`'s section rows). Worse than "doesn't find it": *repeatedly* searching
+   such a tree can crash with "Internal C++ object already deleted" on the second search.
+   `tests/extensions/pyside_mvc/_standalone_qml_theme.py::collect_all_items()` is now the
+   documented, load-bearing fix for any future kit test in this position.
+2. The `ActionCard/NOTES.md` "two real consumers before promoting a kit type" rule caught this
+   file's own draft plan reaching for a new kit component with only one real consumer —
+   corrected before writing the throwaway code, not after.
+
+**Handed to `EPIC-008B`:** the two `ConsoleConnectionExtension` gaps (no `CONNECTING`/classified-
+`FAILED` events, no live re-target) and the connect-flow's actual composition, since both
+belong to rebuilding the shell, not to the kit.
