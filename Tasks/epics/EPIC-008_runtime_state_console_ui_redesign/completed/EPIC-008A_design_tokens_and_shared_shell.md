@@ -316,3 +316,33 @@ it as an environmental race, not a regression.
 **Handed to `EPIC-008B`:** the two `ConsoleConnectionExtension` gaps (no `CONNECTING`/classified-
 `FAILED` events, no live re-target) and the connect-flow's actual composition, since both
 belong to rebuilding the shell, not to the kit.
+
+### Post-completion design review (before starting B)
+
+A deliberate pass over the shipped code, requested before moving on, found two real issues —
+recorded here rather than silently folded into the commits above, per `design-discipline.md`'s
+"debt is allowed, silently is not":
+
+1. **`font.family: "monospace"` had crossed its own promotion threshold.** `LiveConnectionBand`'s
+   own comment said *"promote it to a token if a second consumer needs one"* — `AppRail` became
+   that second consumer (2 more call sites) without the promotion actually happening. Fixed:
+   `tokens/defaults.py::DEFAULT_TYPOGRAPHY_TOKENS["fontFamilyMono"]` (default-backed, value
+   `"monospace"`, overridable), both components updated to `Theme.fontFamilyMono`, one new test.
+2. **The same interaction shape solved two different ways.** `AppRail._selectRow(id)` — a plain
+   QML function invokable from a test with a `QVariant`, sidestepping `MouseArea.clicked(mouse)`'s
+   un-constructible-from-Python argument — was written *after* `LiveConnectionBand`'s "change
+   target" click, which shipped with the click path merely "reviewed by inspection" instead of
+   tested. Applied the same pattern retroactively (`_requestChangeTarget()`), converting an
+   inspection-only gap into a real, passing test.
+
+**Reviewed and deliberately left alone:** the `state → colour`/`state → pulse-duration` lookup
+tables (`LiveConnectionBand`) — each a 2-line JS-object-literal-plus-fallback idiom, appearing
+once each; not complex enough to be worth a shared abstraction at this size, and no second
+occurrence to justify one regardless. The `Qt.rgba(Theme.inkR / 255, Theme.inkG / 255,
+Theme.inkB / 255, alpha)` hover-tint expression (`AppRail`, one call site) — flagged as a likely
+second-occurrence candidate for a small QML helper once `EPIC-008B`/onward actually needs it a
+second time, not extracted preemptively on the strength of one use, for the same reason item 5's
+resolution gives above.
+
+Net +2 tests from this review pass (1 inspection-only test replaced by 2 real ones, plus 1 new
+token test); full `pyside_mvc` suite (199 tests) green; gallery renders clean.

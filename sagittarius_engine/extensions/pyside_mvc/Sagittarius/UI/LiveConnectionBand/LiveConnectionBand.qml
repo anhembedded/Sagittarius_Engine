@@ -57,6 +57,19 @@ Rectangle {
     signal actionRequested()
     signal changeTargetRequested()
 
+    //: Named so it is directly invokable (incl. from a test) with no
+    //: argument, the same reasoning `AppRail._selectRow(id)` documents —
+    //: a plain QML `function` is a far more permissive invocation target
+    //: than a C++ signal like `MouseArea.clicked(mouse)`, which needs a
+    //: real `QQuickMouseEvent` no test can construct. Applied here
+    //: retroactively: this component predates `AppRail`, so its own
+    //: change-target click shipped untested (see the "reviewed by
+    //: inspection" note this replaces in `test_live_connection_band.py`)
+    //: before that pattern existed.
+    function _requestChangeTarget() {
+        root.changeTargetRequested()
+    }
+
     readonly property var _stateColors: ({
         reading: Theme.accent,
         idle: Theme.accent700,
@@ -190,14 +203,7 @@ Rectangle {
                     objectName: "connectionTargetText"
                     text: root.targetText
                     color: Theme.textPrimary
-                    // No monospace token exists in the engine's typography
-                    // vocabulary yet (tokens/defaults.py::DEFAULT_TYPOGRAPHY_TOKENS
-                    // has size tiers only, no family) — a literal family
-                    // name here is a named, bounded simplification, not an
-                    // oversight; promote it to a token if a second consumer
-                    // needs one (ui-architecture.md's own "repeated escape"
-                    // rule).
-                    font.family: "monospace"
+                    font.family: Theme.fontFamilyMono
                     font.pixelSize: Theme.fontSizeSm
                     textFormat: Text.PlainText
                     elide: Text.ElideMiddle
@@ -210,22 +216,11 @@ Rectangle {
                     font.pixelSize: Theme.fontSizeSm
                     textFormat: Text.PlainText
 
-                    //: Not covered by a simulated-click test (see
-                    //: `test_live_connection_band.py`'s own note): every
-                    //: interactive signal QtQuick ships here —
-                    //: `MouseArea.clicked(mouse)`, `TapHandler.tapped
-                    //: (point, button)` — takes an argument that cannot be
-                    //: constructed from Python, unlike `Button.clicked()`
-                    //: (verified zero-arg, and what `connectionActionButton`
-                    //: is tested through). This one-line binding is reviewed
-                    //: by inspection instead, the same class of gap
-                    //: `test_app_data_table_resized_column_...` already
-                    //: names for `AppDataTable`'s own drag-to-resize.
                     MouseArea {
                         objectName: "connectionChangeTargetArea"
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.changeTargetRequested()
+                        onClicked: root._requestChangeTarget()
                     }
                 }
             }

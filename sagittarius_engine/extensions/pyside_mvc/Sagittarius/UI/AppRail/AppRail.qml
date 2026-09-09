@@ -117,7 +117,7 @@ Rectangle {
                         objectName: "railRowIndex"
                         text: String(row.index + 1).padStart(2, "0")
                         color: Theme.muted
-                        font.family: "monospace"
+                        font.family: Theme.fontFamilyMono
                         font.pixelSize: Theme.fontSizeSm
                         textFormat: Text.PlainText
                     }
@@ -144,7 +144,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: String(row.badgeCount)
                             color: Theme.onDanger
-                            font.family: "monospace"
+                            font.family: Theme.fontFamilyMono
                             font.pixelSize: Theme.fontSizeSm
                             font.bold: true
                             textFormat: Text.PlainText

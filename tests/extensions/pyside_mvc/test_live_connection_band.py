@@ -104,16 +104,7 @@ def test_action_button_click_emits_action_requested(qtbot):
     assert recorder.action_count == 1
 
 
-def test_change_target_link_has_a_clickable_area_wired_to_the_signal(qtbot):
-    """Not a click simulation — `MouseArea.clicked(mouse)` needs a real
-    `QQuickMouseEvent`, which cannot be constructed from Python (unlike
-    `Button.clicked()`, verified zero-arg in
-    `test_action_button_click_emits_action_requested`, above). This only
-    proves the area exists over the link and is connectable; the one-line
-    `onClicked: root.changeTargetRequested()` binding itself is reviewed by
-    inspection, the same class of gap
-    `test_app_data_table_resized_column_keeps_others_and_last_absorbs_rest`
-    already names for `AppDataTable`'s own drag-to-resize."""
+def test_change_target_link_has_a_clickable_area(qtbot):
     engine, theme, merged = _standalone_theme_engine()
     band = _load_band(engine)
     qtbot.wait(1)
@@ -121,7 +112,25 @@ def test_change_target_link_has_a_clickable_area_wired_to_the_signal(qtbot):
     area = band.findChild(QObject, "connectionChangeTargetArea")
     assert area is not None
     assert area.property("cursorShape") == Qt.PointingHandCursor
-    assert hasattr(band, "changeTargetRequested")
+
+
+def test_change_target_click_emits_change_target_requested(qtbot):
+    """Via `_requestChangeTarget()` — invokable with no argument from
+    Python the way `MouseArea.clicked(mouse)` cannot be (that needs a real
+    `QQuickMouseEvent`; `Button.clicked()`, used for the action button
+    above, happens to be the one QtQuick signal that is zero-arg). Added
+    retroactively, matching the pattern `AppRail._selectRow(id)` used from
+    the start — this component predates that discovery, so its own
+    `onClicked` binding shipped tested only by inspection until now."""
+    engine, theme, merged = _standalone_theme_engine()
+    band = _load_band(engine)
+    qtbot.wait(1)
+    recorder = _Recorder()
+    band.changeTargetRequested.connect(recorder.on_action)
+
+    assert QMetaObject.invokeMethod(band, "_requestChangeTarget")
+
+    assert recorder.action_count == 1
 
 
 def _heartbeat_ticks(ribbon):

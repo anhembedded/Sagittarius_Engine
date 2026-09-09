@@ -140,3 +140,16 @@ def test_with_token_defaults_falls_back_to_engine_defaults_when_app_omits_a_cate
     assert merged["radiusMd"] == DEFAULT_RADIUS_TOKENS["radiusMd"]
     assert merged["fontSizeMd"] == DEFAULT_TYPOGRAPHY_TOKENS["fontSizeMd"]
     assert merged["motionFast"] == DEFAULT_MOTION_TOKENS["motionFast"]
+
+
+def test_font_family_mono_defaults_to_the_generic_qt_family_and_is_overridable():
+    """`EPIC-008A`: promoted from a literal repeated in 3 call sites across
+    2 kit components (`LiveConnectionBand`, `AppRail`) to a real typography
+    token, per `ui-architecture.md` §1.1's "a repeated escape is a signal
+    to promote it" threshold."""
+    assert with_token_defaults(_COMPLETE_PALETTE)["fontFamilyMono"] == "monospace"
+
+    overridden = with_token_defaults(
+        {**_COMPLETE_PALETTE, "fontFamilyMono": "Consolas"}
+    )
+    assert overridden["fontFamilyMono"] == "Consolas"

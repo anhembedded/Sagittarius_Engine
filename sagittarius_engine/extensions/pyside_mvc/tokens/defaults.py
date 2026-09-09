@@ -39,7 +39,7 @@ DEFAULT_RADIUS_TOKENS: dict[str, float] = {
     "radiusLg": 10,
 }
 
-DEFAULT_TYPOGRAPHY_TOKENS: dict[str, float] = {
+DEFAULT_TYPOGRAPHY_TOKENS: dict[str, str | float] = {
     "fontSizeSm": 11,
     "fontSizeMd": 13,
     "fontSizeLg": 16,
@@ -49,6 +49,16 @@ DEFAULT_TYPOGRAPHY_TOKENS: dict[str, float] = {
     #: rendered at the widget default (9pt), because the scale stopped at
     #: `fontSizeLg` and there was no tier to name.
     "fontSizeXl": 20,
+    #: `EPIC-008A`: a literal `font.family: "monospace"` recurred in 3 call
+    #: sites across 2 kit components (`LiveConnectionBand`'s target address,
+    #: `AppRail`'s row index and badge count) before this token existed —
+    #: `ui-architecture.md` §1.1's "a repeated escape is a signal to promote
+    #: it" threshold, crossed. `"monospace"` is itself a valid Qt generic
+    #: family name (resolved to the platform's actual monospace face), not
+    #: a placeholder — a real family name is a colour-equivalent visual
+    #: choice an app may still override via its own palette, same as any
+    #: other default-backed token.
+    "fontFamilyMono": "monospace",
 }
 
 #: Durations in milliseconds — matches the 150-250ms micro-animation range
