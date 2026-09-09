@@ -2,30 +2,83 @@ import QtQuick
 import QtQuick.Layouts
 import Sagittarius.UI 1.0
 
-// Events & wiring -- EPIC-007E section 3. The declared <-> subscribed join
-// EventCollector (EPIC-007A/C) already computes server-side; this screen
-// only renders it.
+// Events & wiring -- EPIC-007E section 3, restyled by EPIC-008B subtask C
+// onto reference/handoff.md §7.3: a sortable table (free from AppDataTable
+// -- sortKey/sortAscending live on the one persistent instance below, so a
+// sort survives both a snapshot refresh and a tab switch), undeclared rows
+// tinted via the already-shipped rowAccent hook (no new per-cell colour
+// feature -- same reasoning as EPIC-008B §4's Overview restyle), and a
+// WIRING BUG banner.
+//
+// Only two sub-tabs are built (All / Undeclared), not the four
+// reference/handoff.md §7 names ("With failures", "Never emitted" too):
+// EventCollector's own docstring says `emits`/`failures` are always 0 --
+// nothing in this engine counts them per event yet (a RuntimeMonitor gap,
+// named there, not invented here). Building tabs against data that can
+// never vary would be decoration, not information; this screen's own
+// acceptance criteria (sort persistence, undeclared visibility) need
+// neither.
 Rectangle {
     id: root
     color: Theme.bg
 
     readonly property bool notAttached: !viewModel || viewModel.connectionState === "not_attached"
+    readonly property var allEvents: viewModel ? viewModel.events : []
+    readonly property var undeclaredEvents: root.allEvents.filter(function(e) { return !e.registered })
 
-    // "registered" placed before the right-aligned numeric columns rather
-    // than after -- BUG-013: AppDataTable renders a right-aligned column
-    // immediately followed by a left-aligned one with zero gap between
-    // them, fusing the two values into one string.
+    property string activeTab: "all"
+    readonly property var filteredEvents: root.activeTab === "undeclared" ? root.undeclaredEvents : root.allEvents
+
+    // "declaration" placed before the right-aligned numeric columns rather
+    // than after -- BUG-013 (the original screen's own finding, reproduced
+    // here the same way it originally fixed it for "registered"):
+    // AppDataTable renders a right-aligned column immediately followed by
+    // a left-aligned one with zero gap between them, fusing the two
+    // values (and their headers) into one string.
     readonly property var eventColumns: [
         { key: "name", title: "Event", weight: 3 },
-        { key: "module", title: "Module", weight: 3 },
         {
-            key: "registered", title: "Registered", weight: 1,
-            formatter: function(v) { return v ? "yes" : "NO" }
+            key: "module", title: "Declared by", weight: 2,
+            formatter: function(v) { return v ? v : "—" }
         },
+        { key: "declaration", title: "Declaration", weight: 1 },
         { key: "handlerCount", title: "Handlers", weight: 1, align: Text.AlignRight },
-        { key: "emits", title: "Emits", weight: 1, align: Text.AlignRight },
-        { key: "failures", title: "Failures", weight: 1, align: Text.AlignRight }
+        { key: "emits", title: "Emitted", weight: 1, align: Text.AlignRight },
+        { key: "failures", title: "Failed", weight: 1, align: Text.AlignRight }
     ]
+
+    function eventRowAccent(row) {
+        return row.registered ? null : Theme.danger
+    }
+
+    //: `expandedDelegate`'s contract: its root item must declare
+    //: `property var rowData` -- AppDataTable keeps it live-bound to the
+    //: expanded row's current data via an internal `Binding`.
+    component UndeclaredDetail: Rectangle {
+        property var rowData: null
+        implicitHeight: detailText.implicitHeight + Theme.spaceMd * 2
+        color: Theme.dangerFill
+        opacity: 0.08
+        border.color: Theme.danger
+        border.width: 1
+
+        Text {
+            id: detailText
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: Theme.spaceMd
+            text: rowData
+                ? "subscribed by " + (rowData.handlers.length > 0 ? rowData.handlers.join(", ") : "—")
+                    + " · never declared"
+                    + (rowData.nearMatch ? " · did you mean “" + rowData.nearMatch + "”?" : "")
+                : ""
+            color: Theme.textPrimary
+            font.pixelSize: Theme.fontSizeSm
+            wrapMode: Text.Wrap
+            textFormat: Text.PlainText
+        }
+    }
+    readonly property Component undeclaredDetailComponent: Component { UndeclaredDetail {} }
 
     ColumnLayout {
         anchors.fill: parent
@@ -40,14 +93,117 @@ Rectangle {
             textFormat: Text.PlainText
         }
 
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Theme.spaceLg
+
+            Text {
+                objectName: "eventsTabAll"
+                text: "All (" + root.allEvents.length + ")"
+                color: root.activeTab === "all" ? Theme.accent900 : Theme.muted
+                font.bold: true
+                font.pixelSize: Theme.fontSizeMd
+                textFormat: Text.PlainText
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.activeTab = "all"
+                }
+            }
+            Text {
+                objectName: "eventsTabUndeclared"
+                text: "Undeclared (" + root.undeclaredEvents.length + ")"
+                color: root.activeTab === "undeclared" ? Theme.accent900 : Theme.muted
+                font.bold: true
+                font.pixelSize: Theme.fontSizeMd
+                textFormat: Text.PlainText
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.activeTab = "undeclared"
+                }
+            }
+            Item { Layout.fillWidth: true }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: Theme.border
+        }
+
+        Rectangle {
+            objectName: "eventsWiringBugBanner"
+            // reference/handoff.md §7.3: shown "when any undeclared name
+            // exists and the tab is All or Undeclared" -- both of this
+            // screen's two tabs, so just the first half of that condition.
+            visible: root.undeclaredEvents.length > 0
+            Layout.fillWidth: true
+            implicitHeight: bannerText.implicitHeight + Theme.spaceMd * 2
+            color: Theme.dangerFill
+            opacity: 0.1
+            border.color: Theme.danger
+            border.width: 1
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.spaceMd
+                spacing: Theme.spaceSm
+
+                Rectangle {
+                    Layout.alignment: Qt.AlignTop
+                    radius: 2
+                    color: Theme.dangerFill
+                    implicitWidth: stampLabel.implicitWidth + 10
+                    implicitHeight: stampLabel.implicitHeight + 6
+
+                    Text {
+                        id: stampLabel
+                        anchors.centerIn: parent
+                        text: "WIRING BUG"
+                        color: Theme.onDanger
+                        font.bold: true
+                        font.pixelSize: Theme.fontSizeSm
+                        textFormat: Text.PlainText
+                    }
+                }
+                Text {
+                    id: bannerText
+                    Layout.fillWidth: true
+                    text: root.undeclaredEvents.length + " subscription"
+                        + (root.undeclaredEvents.length === 1 ? "" : "s") + " point"
+                        + (root.undeclaredEvents.length === 1 ? "s" : "") + " at names that were never"
+                        + " declared: " + root.undeclaredEvents.map(function(e) { return e.name }).join(", ")
+                        + ". No module ever declared these names, so nothing will ever emit them."
+                        + " The subscription is legal, silent, and dead — no error, no log line,"
+                        + " just a handler that never runs."
+                    color: Theme.textPrimary
+                    font.pixelSize: Theme.fontSizeSm
+                    wrapMode: Text.Wrap
+                    textFormat: Text.PlainText
+                }
+            }
+        }
+
         AppDataTable {
+            objectName: "eventsTable"
             Layout.fillWidth: true
             Layout.fillHeight: true
             title: "Declared <-> subscribed"
             icon: "git-branch"
-            columns: eventColumns
-            model: viewModel ? viewModel.events : null
-            emptyText: root.notAttached ? "Not attached — nothing to show" : "No events reported"
+            columns: root.eventColumns
+            model: root.filteredEvents
+            rowIdKey: "name"
+            rowAccent: root.eventRowAccent
+            expandedDelegate: root.undeclaredDetailComponent
+            expandPredicate: function(row) { return !row.registered }
+            emptyText: root.notAttached
+                ? "Not attached — nothing to show"
+                : (root.activeTab === "undeclared"
+                    ? "Every subscribed name is declared"
+                    : "No events reported")
         }
     }
 }

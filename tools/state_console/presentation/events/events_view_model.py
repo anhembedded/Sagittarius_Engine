@@ -1,5 +1,11 @@
 """`EventsViewModel` — `EPIC-007E` §3, "Events & wiring": the declared ⋈
-subscribed join `EventCollector` (`EPIC-007A`/`C`) already computes."""
+subscribed join `EventCollector` (`EPIC-007A`/`C`) already computes.
+
+`EPIC-008B` subtask C adds nothing new to this class's own shape (still
+just `events`, a list of row dicts) — the restyle (sub-tabs, the WIRING BUG
+banner, sortable columns, undeclared-row tinting) is all `EventsScreen.qml`
+computing from data `EventsPresenter` already puts in each row (`handlers`,
+`declaration`, `nearMatch`)."""
 
 from __future__ import annotations
 

@@ -81,10 +81,13 @@ def test_events_table_renders_a_snapshot_row(qtbot):
             {
                 "name": "student.enrolled",
                 "module": "examples.student_management",
-                "handlerCount": 2,
+                "handlers": ["RosterPresenter.on_enrolled"],
+                "handlerCount": 1,
                 "emits": 0,
                 "failures": 0,
                 "registered": True,
+                "declaration": "declared",
+                "nearMatch": "",
             }
         ]
     )
@@ -93,3 +96,108 @@ def test_events_table_renders_a_snapshot_row(qtbot):
 
     root = view.quick_widget.rootObject()
     assert root is not None
+
+
+# --------------------------------------------------------- EPIC-008B subtask C
+
+
+def _find_child(item, object_name):
+    """Same `Loader`/`Repeater`-blind-spot workaround
+    `test_overview_screen.py::_find_child` documents -- safe for exactly
+    one search per tree."""
+    if item.objectName() == object_name:
+        return item
+    for child in item.childItems():
+        found = _find_child(child, object_name)
+        if found is not None:
+            return found
+    return None
+
+
+def _collect_all(item, out):
+    """@brief Same one-walk-keep-it-alive discipline
+    `test_overview_screen.py::_collect_all` documents -- needed whenever a
+    test wants more than one object out of a tree containing
+    `AppDataTable`'s own `ListView`."""
+    out.append(item)
+    for child in item.childItems():
+        _collect_all(child, out)
+
+
+def _by_object_name(items, object_name):
+    return [item for item in items if item.objectName() == object_name]
+
+
+_DECLARED_ROW = {
+    "name": "student.enrolled",
+    "module": "examples.student_management",
+    "handlers": ["RosterPresenter.on_enrolled"],
+    "handlerCount": 1,
+    "emits": 0,
+    "failures": 0,
+    "registered": True,
+    "declaration": "declared",
+    "nearMatch": "",
+}
+
+_UNDECLARED_ROW = {
+    "name": "student.updatd",
+    "module": "",
+    "handlers": ["RosterPresenter.on_updated"],
+    "handlerCount": 1,
+    "emits": 0,
+    "failures": 0,
+    "registered": False,
+    "declaration": "undeclared",
+    "nearMatch": "student.updated",
+}
+
+
+def test_wiring_bug_banner_shows_only_when_something_is_undeclared(qtbot):
+    view = EventsView()
+    qtbot.addWidget(view)
+    vm = EventsViewModel()
+    view.bind(vm)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    vm.set_events([_DECLARED_ROW])
+    for _ in range(5):
+        qtbot.wait(1)
+    root = view.quick_widget.rootObject()
+    # One search, kept alive for the rest of the test -- searching this
+    # tree a second time (it contains AppDataTable's own ListView) risks
+    # the "Internal C++ object already deleted" crash
+    # test_overview_screen.py::_collect_all's own docstring documents; the
+    # banner's `visible` binding updates on the same object either way.
+    banner = _find_child(root, "eventsWiringBugBanner")
+    assert banner.property("visible") is False
+
+    vm.set_events([_DECLARED_ROW, _UNDECLARED_ROW])
+    for _ in range(5):
+        qtbot.wait(1)
+    assert banner.property("visible") is True
+
+
+def test_undeclared_sub_tab_shows_the_real_count(qtbot):
+    view = EventsView()
+    qtbot.addWidget(view)
+    vm = EventsViewModel()
+    view.bind(vm)
+    view.show()
+    for _ in range(5):
+        qtbot.wait(1)
+
+    vm.set_events([_DECLARED_ROW, _UNDECLARED_ROW, _UNDECLARED_ROW])
+    for _ in range(5):
+        qtbot.wait(1)
+
+    root = view.quick_widget.rootObject()
+    all_items: list = []
+    _collect_all(root, all_items)
+
+    (all_tab,) = _by_object_name(all_items, "eventsTabAll")
+    (undeclared_tab,) = _by_object_name(all_items, "eventsTabUndeclared")
+    assert all_tab.property("text") == "All (3)"
+    assert undeclared_tab.property("text") == "Undeclared (2)"
