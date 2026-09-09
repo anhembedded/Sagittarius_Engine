@@ -134,6 +134,47 @@ Rectangle {
                 Caption { text: "Widget Kit Gallery — every component, real tokens, zero hand-authored pixels" }
             }
 
+            // ---- Live connection band --------------------------------
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: Theme.spaceXl
+                Layout.rightMargin: Theme.spaceXl
+                spacing: Theme.spaceMd
+
+                SectionLabel { text: "LIVE CONNECTION BAND — every state (EPIC-008A)" }
+                LiveConnectionBand {
+                    Layout.fillWidth: true
+                    state: "reading"
+                    stateLabel: "Attached · reading"
+                    stateNote: "snapshot stream live · ~1/s"
+                    ageLabel: "last snapshot"
+                    ageValue: "00:01 ago"
+                    targetText: "ws://127.0.0.1:8781"
+                    actionLabel: "Detach"
+                    heartbeatTicks: [0.3, 0.5, 0.8, 0.4, 0.6, 0.9, 0.5, 0.7, 1.0]
+                }
+                LiveConnectionBand {
+                    Layout.fillWidth: true
+                    state: "connecting"
+                    stateLabel: "Connecting"
+                    stateNote: "opening socket · ws://127.0.0.1:8781"
+                    ageLabel: "elapsed"
+                    ageValue: "00:02"
+                    targetText: "ws://127.0.0.1:8781"
+                    actionLabel: "Cancel"
+                }
+                LiveConnectionBand {
+                    Layout.fillWidth: true
+                    state: "stale"
+                    stateLabel: "Not attached"
+                    stateNote: "showing last-known data"
+                    ageLabel: "stale for"
+                    ageValue: "00:47"
+                    targetText: "ws://127.0.0.1:8781"
+                    actionLabel: "Reconnect"
+                }
+            }
+
             // ---- Buttons -------------------------------------------------
             ColumnLayout {
                 Layout.fillWidth: true

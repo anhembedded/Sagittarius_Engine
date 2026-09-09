@@ -75,28 +75,52 @@ top-level `pyside_mvc` package (the only supported import surface, `ui-architect
 `tests/extensions/pyside_mvc/` suite (179 tests) still green; `ruff`/`ruff format`/`mypy`
 clean on the changed files.
 
-### 2. `LiveConnectionBand` — new kit component
+### 2. `LiveConnectionBand` — new kit component — ✅ done
 
 The status band (`reference/handoff.md` §4): stripe + pulsing state dot + label/note + a
-heartbeat ribbon + an age block + a target/`change…` slot + a primary action button. Tiered
-per `ui-architecture.md` §1.2:
+heartbeat ribbon + an age block + a target/`change…` slot + a primary action button. Landed as
+`Sagittarius/UI/LiveConnectionBand/LiveConnectionBand.qml`, built directly on `Rectangle`/
+`RowLayout` (the kit's own components, like `StatefulButton`, are built directly on Qt Quick
+primitives — `ui-architecture.md` §1.1's escape-hatch restriction governs a *consumer* reaching
+past the kit, not the kit's own composition). Tiered per §1.2 as planned:
 
-- **Tier 1 (inside the component):** the rendering mechanics for a `state` enum → colour/pulse
-  mapping, the heartbeat ribbon's tick-append/fade mechanism (generic: "a rolling activity
-  strip", not "snapshot" specific), the stripe/dot/layout geometry.
-- **Tier 2 (parameters):** which states exist and their colours are a fixed enum the component
-  owns (tier 1) — but the *label/note/age text* and the *button label* the mock's own table
-  specifies per-state are supplied by the consumer, not hardcoded, since a different `pyside_mvc`
-  consumer attaching this band to a different kind of live connection would need different copy.
-- **Tier 3 (never enters):** no knowledge of "backend", "snapshot", or WebSockets. The
-  component knows `connected | connecting | idle | failed | stale | cold`-shaped states (or
-  fewer — see Gap 1 below) and strings to show; it does not know what is on the other end of
-  the connection.
+- **Tier 1 (inside the component):** `state` (one of `reading`/`idle`/`connecting`/`failed`/
+  `stale`/`cold`) → colour mapping (`accent` in reading; `accent700` in idle/connecting;
+  `danger` in failed/stale/cold — matching `reference/handoff.md` §4's own table exactly, which
+  is a satisfying confirmation that the ramp-token naming chosen in item 1 above lines up with
+  the design's own vocabulary) and → pulse-duration mapping (1000/1600/700ms; none for the
+  other three); the heartbeat ribbon's tick-render/fade mechanism (a generic "rolling activity
+  strip" — the component knows nothing about snapshots, only numbers in `[0, 1]`, newest last).
+  An unrecognized `state` string falls back to `Theme.muted` rather than raising, so a
+  consumer's typo reads as "obviously wrong grey" instead of a crash.
+- **Tier 2 (parameters):** `stateLabel`/`stateNote`/`ageLabel`/`ageValue`/`targetText`/
+  `actionLabel`/`heartbeatTicks` — every piece of text and the tick data itself, since a
+  different `pyside_mvc` consumer attaching this band to a different kind of live connection
+  needs different copy.
+- **Tier 3 (never enters):** confirmed — no reference to "backend", "snapshot", or "socket"
+  anywhere in the component; it renders exactly the `state` enum plus whatever strings/numbers
+  it is handed.
 
-Heartbeat ribbon may ship as this component's internal implementation detail rather than a
-separately registered kit type — decide based on whether anything else plausibly reuses a
-bare activity ribbon without the rest of the band; if unsure, keep it internal (cheaper to
-extract later than to deprecate a public type early).
+Heartbeat ribbon shipped as an internal implementation detail (not a separately registered kit
+type) — nothing else in this epic plausibly needs a bare activity ribbon without the rest of
+the band, and it is cheap to extract later if that changes.
+
+Reused `StatefulButton` for the primary action rather than inventing a second button type.
+`font.family: "monospace"` for the target address is a named, bounded literal — the engine's
+typography vocabulary has size tiers only, no family token yet; promotable if a second consumer
+needs one.
+
+Demonstrated in the gallery across three states (reading/connecting/stale). 8 new tests in
+`tests/extensions/pyside_mvc/test_live_connection_band.py`, against a **standalone** `QQmlEngine`
+with its own directly-injected `Theme` (not the shared `get_theme_bridge()` singleton every
+other kit test uses) — that singleton is first-call-wins for the whole pytest process and every
+existing fixture locks it to an all-`#000000` placeholder palette, which cannot distinguish
+`accent`/`accent700`/`danger`/`muted` from one another and so cannot actually prove the colour
+mapping is correct, only that it's internally consistent. One click-path gap named honestly
+rather than faked: `MouseArea.clicked(mouse)` (the "change…" link) cannot be invoked from
+Python the way `Button.clicked()` (zero-arg, used for the action button) can — no `QQuickMouseEvent`
+constructor is available from Python — so that one binding is verified by code review, the same
+class of gap `AppDataTable`'s own drag-to-resize test already discloses.
 
 ### 3. Rail navigation with signal-count badges — new kit component
 
