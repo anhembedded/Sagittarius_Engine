@@ -24,14 +24,26 @@ from tools.state_console.infrastructure.console_connection_extension import (
 )
 
 
-def build_console_app(uri: str, *, extra_extensions: list | None = None) -> App:
+def build_console_app(
+    uri: str, *, extra_extensions: list | None = None, boot: bool = True
+) -> App:
     """
-    @brief Wires and boots the console's own `App` — no database, no
-    persistence, nothing this tool needs beyond a container, a bus, and the
-    websocket connection.
+    @brief Wires — and, by default, boots — the console's own `App`. No
+    database, no persistence, nothing this tool needs beyond a container, a
+    bus, and the websocket connection.
 
     @param extra_extensions Registered after `ConsoleConnectionExtension`,
     before `app.boot()` — `main.py` passes `[ConsoleMvcExtension()]` here.
+    @param boot `False` to wire everything (extensions registered, the
+    container populated) without calling `app.boot()` yet. `main.py` needs
+    this: `ConsoleConnectionExtension.boot()` starts the one-shot connection
+    attempt immediately, with no automatic retry
+    (`ConsoleConnectionExtension`'s own docstring) — booting before
+    `ConsoleShellView` exists would let a fast failure fire and vanish
+    before `ShellPresenter` has subscribed to anything, leaving the status
+    band stuck at `COLD` forever despite a real attempt having happened.
+    Callers that pass `boot=False` must call `app.boot()` themselves once
+    every presenter that needs to observe the connection has subscribed.
     """
     config = ConfigManager()
     container = StdLibContainer()
@@ -39,10 +51,19 @@ def build_console_app(uri: str, *, extra_extensions: list | None = None) -> App:
     container.singleton(IConfig, config)
     container.singleton(IEventBus, event_bus)
 
+    connection = ConsoleConnectionExtension(uri)
+    # Registered by concrete type, not an interface: this extension has no
+    # interface of its own (EPIC-007E never gave it one), and it's the
+    # presentation layer's only way to reach connect_to()/detach() -- see
+    # ShellPresenter, which resolves it the same way BasePresenter already
+    # resolves IEventBus/ILogger/etc.
+    container.singleton(ConsoleConnectionExtension, connection)
+
     app = App(container, event_bus)
     app.use(LoggerExtension())
-    app.use(ConsoleConnectionExtension(uri))
+    app.use(connection)
     for extension in extra_extensions or []:
         app.use(extension)
-    app.boot()
+    if boot:
+        app.boot()
     return app

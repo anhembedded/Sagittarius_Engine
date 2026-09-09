@@ -33,11 +33,21 @@ def main(argv: list[str] | None = None) -> int:
 
     qt_app = QApplication(sys.argv[:1])
 
-    app = build_console_app(args.uri, extra_extensions=[ConsoleMvcExtension()])
+    # boot=False: ShellPresenter (and the Overview screen, first navigated
+    # to inside ConsoleShellView's own constructor) must subscribe to the
+    # connection's events before ConsoleConnectionExtension.boot() fires
+    # the one-shot, non-retrying connection attempt -- see
+    # build_console_app()'s own docstring for why a booted-then-shelled
+    # order can silently lose a fast failure.
+    app = build_console_app(
+        args.uri, extra_extensions=[ConsoleMvcExtension()], boot=False
+    )
 
     shell = ConsoleShellView(app.container)
     shell.setWindowTitle(f"Runtime State Console — {args.uri}")
     shell.resize(1100, 700)
+
+    app.boot()
     shell.show()
 
     exit_code = qt_app.exec()

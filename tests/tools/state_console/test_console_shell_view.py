@@ -14,6 +14,16 @@ pytest.importorskip("PySide6")
 pytest.importorskip("websockets")
 
 from sagittarius_engine.extensions.pyside_mvc import configure_app_qml  # noqa: E402
+from sagittarius_engine.extensions.state_console import (  # noqa: E402
+    StateConsoleExtension,
+)
+from sagittarius_engine.infrastructure.container.std_container import (  # noqa: E402
+    StdLibContainer,
+)
+from sagittarius_engine.infrastructure.event_bus.memory_event_bus import (  # noqa: E402
+    MemoryEventBus,
+)
+from sagittarius_engine.kernel import App  # noqa: E402
 from tools.state_console.app import build_console_app  # noqa: E402
 from tools.state_console.infrastructure.console_mvc_extension import (  # noqa: E402
     ConsoleMvcExtension,
@@ -31,8 +41,8 @@ from tools.state_console.presentation.theme.palette import (  # noqa: E402
 )
 
 #: A closed local port -- ConsoleConnectionExtension fails fast against it
-#: (OSError on connect) and emits ConsoleDetached rather than hanging, so
-#: the shell can be built and torn down without a real server.
+#: (OSError on connect) and emits ConsoleFailed rather than hanging, so the
+#: shell can be built and torn down without a real server.
 _UNREACHABLE_URI = "ws://127.0.0.1:1"
 
 
@@ -45,25 +55,58 @@ def _configure_theme():
 
 @pytest.fixture
 def app():
+    # boot=False: see build_console_app()'s own docstring -- the shell (and
+    # ShellPresenter's subscription to the connection's events) must exist
+    # before boot() fires the one-shot connection attempt, or a fast
+    # failure fires and vanishes unseen. _make_shell() below is every
+    # test's way of doing that in the right order.
     application = build_console_app(
-        _UNREACHABLE_URI, extra_extensions=[ConsoleMvcExtension()]
+        _UNREACHABLE_URI, extra_extensions=[ConsoleMvcExtension()], boot=False
+    )
+    yield application
+    application.stop()
+
+
+def _make_shell(app) -> ConsoleShellView:
+    """@brief Builds the shell and boots the app, in the order `main.py`
+    itself now uses -- see `build_console_app()`'s docstring."""
+    shell = ConsoleShellView(app.container)
+    app.boot()
+    return shell
+
+
+@pytest.fixture
+def server_app():
+    server_ext = StateConsoleExtension(port=0)
+    server = App(StdLibContainer(), MemoryEventBus())
+    server.use(server_ext)
+    server.boot()
+    assert server_ext._server is not None  # noqa: SLF001
+    assert server_ext._server.ready_event.wait(timeout=3.0)  # noqa: SLF001
+    yield server_ext
+    server.stop()
+
+
+@pytest.fixture
+def reachable_app(server_app):
+    uri = f"ws://{server_app.host}:{server_app._server.port}"  # noqa: SLF001
+    application = build_console_app(
+        uri, extra_extensions=[ConsoleMvcExtension()], boot=False
     )
     yield application
     application.stop()
 
 
 def test_shell_registers_all_five_screens_and_defaults_to_overview(qtbot, app):
-    shell = ConsoleShellView(app.container)
+    shell = _make_shell(app)
     qtbot.addWidget(shell)
 
     assert set(shell.manager._registry.keys()) == {name for name, _ in SCREENS}  # noqa: SLF001
-    assert shell._buttons["overview"].isChecked()  # noqa: SLF001
-    for name, _ in SCREENS[1:]:
-        assert not shell._buttons[name].isChecked()  # noqa: SLF001
+    assert shell.shell_presenter.rail_view_model.activeSectionId == "overview"
 
 
 def test_navigating_lazily_instantiates_and_switches_screens(qtbot, app):
-    shell = ConsoleShellView(app.container)
+    shell = _make_shell(app)
     qtbot.addWidget(shell)
     shell.show()
 
@@ -77,18 +120,17 @@ def test_navigating_lazily_instantiates_and_switches_screens(qtbot, app):
         qtbot.wait(1)
 
     assert registry["events"]["presenter_instance"] is not None
-    assert shell._buttons["events"].isChecked()  # noqa: SLF001
-    assert not shell._buttons["overview"].isChecked()  # noqa: SLF001
+    assert shell.shell_presenter.rail_view_model.activeSectionId == "events"
 
     shell.navigate_to("tasks")
     for _ in range(5):
         qtbot.wait(1)
     assert registry["tasks"]["presenter_instance"] is not None
-    assert shell._buttons["tasks"].isChecked()  # noqa: SLF001
+    assert shell.shell_presenter.rail_view_model.activeSectionId == "tasks"
 
 
 def test_shell_shutdown_disposes_every_instantiated_presenter(qtbot, app):
-    shell = ConsoleShellView(app.container)
+    shell = _make_shell(app)
     qtbot.addWidget(shell)
     shell.navigate_to("container")
     shell.navigate_to("signals")
@@ -105,3 +147,91 @@ def test_shell_shutdown_disposes_every_instantiated_presenter(qtbot, app):
 
     for presenter in instantiated:
         assert presenter._disposed is True  # noqa: SLF001
+    assert shell.shell_presenter._disposed is True  # noqa: SLF001
+
+
+def test_rail_sections_match_screens_in_order(qtbot, app):
+    shell = _make_shell(app)
+    qtbot.addWidget(shell)
+
+    sections = shell.shell_presenter.rail_view_model.sections
+    assert [(s["id"], s["label"]) for s in sections] == list(SCREENS)
+
+
+def test_band_reaches_failed_against_an_unreachable_target(qtbot, app):
+    """`EPIC-008B` §2's connection band, driven end to end: a real
+    `ConsoleConnectionExtension` attempt against `_UNREACHABLE_URI` reaches
+    `ConsoleFailed`, and `ShellPresenter` reflects that as the `FAILED`
+    state with a `Retry` action -- `reference/handoff.md` §4's copy table."""
+    shell = _make_shell(app)
+    qtbot.addWidget(shell)
+
+    band = shell.shell_presenter.band_view_model
+    qtbot.waitUntil(lambda: band.state == "failed", timeout=3000)
+
+    assert band.actionLabel == "Retry"
+    assert band.targetText == _UNREACHABLE_URI
+    assert "ECONNREFUSED" in band.stateNote
+
+
+def test_band_reaches_reading_against_a_real_server(qtbot, reachable_app):
+    shell = _make_shell(reachable_app)
+    qtbot.addWidget(shell)
+
+    band = shell.shell_presenter.band_view_model
+    qtbot.waitUntil(lambda: band.state == "reading", timeout=3000)
+
+    assert band.actionLabel == "Detach"
+    assert band.heartbeatTicks
+
+
+def test_detach_action_on_the_band_moves_the_connection_to_stale(qtbot, reachable_app):
+    """`ShellPresenter._on_action_requested()`'s READING/IDLE branch: the
+    band's own `Detach` button, not a test calling the extension directly."""
+    shell = _make_shell(reachable_app)
+    qtbot.addWidget(shell)
+
+    band = shell.shell_presenter.band_view_model
+    qtbot.waitUntil(lambda: band.state == "reading", timeout=3000)
+
+    band.requestAction()
+
+    qtbot.waitUntil(lambda: band.state == "stale", timeout=3000)
+    assert band.actionLabel == "Reconnect"
+
+
+def test_retry_action_on_the_band_reconnects_to_the_same_target(qtbot, reachable_app):
+    """`ShellPresenter._on_action_requested()`'s FAILED/STALE branch: after
+    detaching, the band's own `Reconnect` button re-attaches without a new
+    address -- `connect_to()` reusing the last `uri`."""
+    shell = _make_shell(reachable_app)
+    qtbot.addWidget(shell)
+
+    band = shell.shell_presenter.band_view_model
+    qtbot.waitUntil(lambda: band.state == "reading", timeout=3000)
+
+    band.requestAction()  # Detach
+    qtbot.waitUntil(lambda: band.state == "stale", timeout=3000)
+
+    band.requestAction()  # Reconnect
+    qtbot.waitUntil(lambda: band.state == "reading", timeout=3000)
+
+
+def test_rail_badges_reflect_signal_counts_from_a_real_snapshot(qtbot, reachable_app):
+    shell = _make_shell(reachable_app)
+    qtbot.addWidget(shell)
+
+    band = shell.shell_presenter.band_view_model
+    qtbot.waitUntil(lambda: band.state == "reading", timeout=3000)
+
+    sections = {
+        s["id"]: s["badgeCount"] for s in shell.shell_presenter.rail_view_model.sections
+    }
+    # A vanilla server with no seeded faults: every badge starts at zero.
+    assert sections == {
+        "overview": 0,
+        "events": 0,
+        "container": 0,
+        "tasks": 0,
+        "signals": 0,
+    }

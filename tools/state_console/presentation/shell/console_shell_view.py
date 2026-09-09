@@ -1,17 +1,21 @@
-"""`ConsoleShellView` — `EPIC-007E` §3's navigation shell.
+"""`ConsoleShellView` — `EPIC-007E` §3's navigation shell, rebuilt on the
+new kit by `EPIC-008B` §2.
 
-Plain `QWidget`/`QPushButton` sidebar, not QML: `kit.raw_primitive_guard`
-only scans `.qml` files for raw `Button`/`CheckBox` use, and nothing here
-needs a themed component more elaborate than a push button choosing which
-screen is on top of the `QStackedWidget`. Screen content itself is still
-QML, wired the same way `OverviewView` etc. already are.
+The sidebar and status band are QML now (`AppRail`/`LiveConnectionBand`,
+hosted by `RailView`/`ConnectionBandView`), driven by `ShellPresenter` —
+the same "screen content is QML, wired through a QmlHostView" shape
+`OverviewView` etc. already use, just for shell-wide chrome instead of one
+screen. `ConsoleShellView` itself stays a plain `QWidget`: it only lays the
+pieces out and exposes the `bind_band`/`bind_rail`/`navigate_to` surface
+`ShellPresenter` needs — see that class's own docstring.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QPushButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -21,8 +25,13 @@ from sagittarius_engine.extensions.pyside_mvc.mvc.presenter_manager import (
     PresenterManager,
 )
 from sagittarius_engine.interfaces import IContainer
+from tools.state_console.presentation.shell.connection_band_view import (
+    ConnectionBandView,
+)
+from tools.state_console.presentation.shell.rail_view import RailView
+from tools.state_console.presentation.shell.shell_presenter import ShellPresenter
 
-#: Route name -> sidebar label, in display order.
+#: Route name -> rail label, in display order.
 SCREENS: tuple[tuple[str, str], ...] = (
     ("overview", "Overview"),
     ("events", "Events && wiring"),
@@ -40,24 +49,30 @@ class ConsoleShellView(QWidget):
         self.manager = PresenterManager(container, self._stack)
         self._register_screens()
 
-        sidebar = QVBoxLayout()
-        sidebar.setContentsMargins(0, 0, 0, 0)
-        self._buttons: dict[str, QPushButton] = {}
-        for name, label in SCREENS:
-            button = QPushButton(label, self)
-            button.setCheckable(True)
-            button.clicked.connect(lambda _checked, n=name: self.navigate_to(n))
-            sidebar.addWidget(button)
-            self._buttons[name] = button
-        sidebar.addStretch(1)
+        self._band = ConnectionBandView(self)
+        self._rail = RailView(self)
 
-        layout = QHBoxLayout(self)
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        body.addWidget(self._rail)
+        body.addWidget(self._stack, stretch=1)
+
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addLayout(sidebar)
-        layout.addWidget(self._stack, stretch=1)
+        layout.addWidget(self._band)
+        layout.addLayout(body, stretch=1)
+
+        self.shell_presenter = ShellPresenter(self, container, SCREENS)
 
         self.navigate_to(SCREENS[0][0])
+
+    def bind_band(self, view_model: Any) -> None:
+        self._band.bind(view_model)
+
+    def bind_rail(self, view_model: Any) -> None:
+        self._rail.bind(view_model)
 
     def _register_screens(self) -> None:
         # Imported here rather than at module scope: every presenter/view
@@ -97,8 +112,8 @@ class ConsoleShellView(QWidget):
 
     def navigate_to(self, name: str) -> None:
         self.manager.navigate_to(name)
-        for key, button in self._buttons.items():
-            button.setChecked(key == name)
+        self.shell_presenter.rail_view_model.set_active_section_id(name)
 
     def shutdown(self) -> None:
+        self.shell_presenter.dispose()
         self.manager.shutdown()

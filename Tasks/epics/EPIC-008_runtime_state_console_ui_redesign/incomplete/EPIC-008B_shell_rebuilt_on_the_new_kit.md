@@ -54,26 +54,41 @@ all against a real `TraceServer` — no state faked. Existing
 extended) to assert `ConsoleFailed`, since the old assertion encoded exactly the defect being
 fixed.
 
-### 2. Shell chrome: `AppRail` + `LiveConnectionBand` wired into `ConsoleShellView`
+### 2. Shell chrome: `AppRail` + `LiveConnectionBand` wired into `ConsoleShellView` — ✅ done
 
-Not started. `ConsoleShellView` (`tools/state_console/presentation/shell/
-console_shell_view.py`) is currently a plain `QWidget`/`QPushButton` sidebar with no status
-band at all. Plan:
+`ConsoleShellView` no longer has a `QPushButton` sidebar: `RailView`/`ConnectionBandView`
+(`presentation/shell/`) host `AppRail`/`LiveConnectionBand` in two small QML wrapper files,
+each bound to its own data-only ViewModel (`RailViewModel`/`ConnectionBandViewModel`) by a new
+`ShellPresenter` — the shell-wide counterpart to `OverviewPresenter`, owning chrome every
+screen shares rather than one screen's own state.
 
-- Replace the `QPushButton` sidebar with a `QmlHostView`-hosted `AppRail`, fed `sections` from
-  `SCREENS` (already a route-name/label list) plus a badge count per route — the badge counts
-  themselves need a source; likely a small aggregation the shell (or a new shell-level
-  view-model) computes per screen from whatever signal-count each screen's own view-model
-  already tracks, not a new snapshot field.
-- Add a `LiveConnectionBand`-hosted status strip above the stack, driven by a new shell-level
-  presenter subscribing to `ConsoleConnecting`/`ConsoleAttached`/`ConsoleFailed`/
-  `ConsoleDetached`/`SnapshotReceived` — this is genuinely new (today only `OverviewPresenter`
-  subscribes to connection events, and only for its own three-state summary, not for shell-wide
-  chrome every screen must show).
-- `OverviewViewModel`'s 3-state model (`ATTACHED_IDLE`/`ATTACHED_READING`/`NOT_ATTACHED`) needs
-  to grow to the 6 states `ConsoleFailed`/`ConsoleConnecting` now make representable
-  (`COLD`/`CONNECTING`/`FAILED`/`IDLE`/`READING`/`STALE`) — likely lives on the new shell-level
-  presenter instead of duplicating onto every screen's own view-model.
+- `ShellPresenter` subscribes to `ConsoleConnecting`/`ConsoleAttached`/`ConsoleFailed`/
+  `ConsoleDetached`/`SnapshotReceived` and drives `reference/handoff.md` §4's exact 6-state copy
+  table (`COLD`/`CONNECTING`/`FAILED`/`IDLE`/`READING`/`STALE` — state name, note, age
+  label/value, button label, all reproduced verbatim). The band's `Detach`/`Cancel` and
+  `Retry`/`Reconnect` actions call straight through to `ConsoleConnectionExtension.detach()`/
+  `.connect_to(self._uri)`, now resolvable off the container (`build_console_app` registers it
+  by concrete type — it had no other way to reach the presentation layer). `Attach…` (COLD) and
+  `change…` are deliberately no-ops for now: they need §3's connect flow, not built yet.
+- Rail badge counts come from `signal_counts.count_signals()`, a pure function over a
+  `StateSnapshot` (own test file, no server or Qt needed) — undeclared events, failed
+  tasks + broken scheduler jobs, dead letters + rejected transitions, mirroring the exact
+  pairings `reference/handoff.md` §7.1/§7.3/§7.5/§7.6 already state for the same data.
+  `container`'s own badge is deliberately `0`: "scope leak suspected" needs a trend a single
+  snapshot can't show — real detection is subtask D's job, once there's a place to keep history
+  across snapshots.
+- **A real ordering bug found and fixed, not just plumbing:** `ConsoleConnectionExtension.boot()`
+  fires its one-shot, non-retrying connection attempt immediately. `build_console_app()` used
+  to boot before `ConsoleShellView` (and therefore `ShellPresenter`) existed to subscribe — a
+  fast failure (or a fast attach) would fire and vanish unseen, leaving the band stuck at `COLD`
+  forever despite a real attempt having happened. Fixed with `build_console_app(..., boot=False)`
+  plus an explicit `app.boot()` call after the shell is constructed, in both `main.py` and every
+  test that builds a real shell — see `build_console_app()`'s own docstring.
+
+Verified against a real demo app + real shell, offscreen, not merely read by eye: reaches
+`READING` with live badges (4/2/0/0/2), Detach → `STALE` → Reconnect → `READING` again, and
+navigating screens self-heals each one's own connection-state display via the next
+`SnapshotReceived` (the same self-healing `OverviewPresenter`/`SignalsPresenter` already had).
 
 ### 3. Connect flow: address entry + recents, composed from existing primitives
 
@@ -97,5 +112,14 @@ Not started — depends on §2's shell chrome existing first.
   real `TraceServer` (including a real authed one for the `rejected` classification — no
   simulated close code). Full `pytest tests/tools/`, `tests/extensions/state_console/`,
   `tests/extensions/audit/` (182 passed) and the full local CI gate green before pushing.
-- §2-4: gallery/screenshot proof once implemented, per `EPIC-008`'s own milestone table
+- §2: `tests/tools/state_console/test_signal_counts.py` (7 tests, pure Python — no server, no
+  Qt) and `tests/tools/state_console/test_console_shell_view.py` (14 tests, up from 3: the
+  original three rewritten off the removed `_buttons` dict, plus new coverage against both a
+  real unreachable target — `FAILED`/`Retry` — and a real `TraceServer` — `READING`, badge
+  counts, the band's own `Detach`/`Reconnect` buttons end to end, not the extension called
+  directly). Screenshots taken offscreen against a real demo app with seeded faults
+  (`examples/student_management -Console -DemoFaults`), attached, `READING`, then navigated to
+  Signals and back to Overview — confirms the badge counts, the rail's active-row highlight,
+  and every screen's own connection-state self-healing via the next `SnapshotReceived`.
+- §3-4: gallery/screenshot proof once implemented, per `EPIC-008`'s own milestone table
   ("every subtask ends in a command a reader can run and a screenshot of what it produces").
