@@ -23,6 +23,11 @@ class ContainerPresenter(BasePresenter):
         super().__init__(view, container)
         self.view_model = ContainerViewModel()
         self.view.bind(self.view_model)
+        # reference/handoff.md §7.4's "climbing since attach" vs "steady"
+        # note needs a reference point -- the open-scope count as it stood
+        # right after attaching, not before (a stale reading from a
+        # previous, unrelated connection would make the comparison a lie).
+        self._baseline_open_scopes: int | None = None
         self._connect_engine_events()
 
     def _connect_engine_events(self) -> None:
@@ -32,6 +37,7 @@ class ContainerPresenter(BasePresenter):
 
     def _on_attached(self, _event: ConsoleAttached) -> None:
         self.view_model.set_connection_state(ATTACHED_IDLE)
+        self._baseline_open_scopes = None
 
     def _on_detached(self, event: ConsoleDetached) -> None:
         self.view_model.set_connection_state(NOT_ATTACHED)
@@ -41,8 +47,12 @@ class ContainerPresenter(BasePresenter):
         self.view_model.set_connection_state(ATTACHED_READING)
         state = event.snapshot.container
         if state is None:
-            self.view_model.set_container_state([], 0)
+            self.view_model.set_container_state([], 0, False)
             return
+
+        if self._baseline_open_scopes is None:
+            self._baseline_open_scopes = state.open_scopes
+
         self.view_model.set_container_state(
             [
                 {
@@ -54,4 +64,5 @@ class ContainerPresenter(BasePresenter):
                 for r in state.registrations
             ],
             state.open_scopes,
+            state.open_scopes > self._baseline_open_scopes,
         )

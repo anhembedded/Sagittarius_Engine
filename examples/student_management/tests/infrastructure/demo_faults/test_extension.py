@@ -142,6 +142,18 @@ def test_seeds_one_illegal_fsm_transition(app, demo):
     assert isinstance(demo.rejected_transition, InvalidStateTransitionError)
 
 
+# ----------------------------------------------------------- EPIC-008B subtask D
+
+
+def test_seeds_a_real_open_scope_leak_past_the_fault_threshold(app, demo):
+    """`reference/handoff.md` §7.4's own ">24" fault threshold for the
+    Container screen's open-scopes plate -- this seed exists so that
+    styling has something real to trigger against, not a hand-set number
+    in a test fixture."""
+    assert len(demo.leaked_scopes) == 30
+    assert app.context.container.open_scope_count() >= 30
+
+
 # ----------------------------------------------------------------- EPIC-007F
 
 
@@ -203,3 +215,4 @@ def test_every_seed_produced_something(app, demo):
         and demo.exclusive_action.held_slot() is not None
     )
     assert demo.rejected_transition is not None
+    assert len(demo.leaked_scopes) == 30

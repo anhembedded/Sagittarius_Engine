@@ -23,6 +23,7 @@ class ContainerViewModel(BaseQmlViewModel):
     detachReasonChanged = Signal()
     registrationsChanged = Signal()
     openScopesChanged = Signal()
+    openScopesClimbingChanged = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -30,6 +31,7 @@ class ContainerViewModel(BaseQmlViewModel):
         self._detach_reason = ""
         self._registrations: list[dict] = []
         self._open_scopes = 0
+        self._open_scopes_climbing = False
 
     def _get_connection_state(self) -> str:
         return self._connection_state
@@ -67,8 +69,22 @@ class ContainerViewModel(BaseQmlViewModel):
 
     openScopes = Property(int, _get_open_scopes, notify=openScopesChanged)
 
-    def set_container_state(self, registrations: list[dict], open_scopes: int) -> None:
+    def _get_open_scopes_climbing(self) -> bool:
+        return self._open_scopes_climbing
+
+    #: `reference/handoff.md` §7.4's "climbing since attach" vs "steady"
+    #: note -- a real comparison against the count `ContainerPresenter`
+    #: itself saw right after attaching, not a fabricated trend.
+    openScopesClimbing = Property(
+        bool, _get_open_scopes_climbing, notify=openScopesClimbingChanged
+    )
+
+    def set_container_state(
+        self, registrations: list[dict], open_scopes: int, open_scopes_climbing: bool
+    ) -> None:
         self._registrations = registrations
         self._open_scopes = open_scopes
+        self._open_scopes_climbing = open_scopes_climbing
         self.registrationsChanged.emit()
         self.openScopesChanged.emit()
+        self.openScopesClimbingChanged.emit()

@@ -61,6 +61,11 @@ _FAILING_EVENT_NAME = "demo.student_deleted"
 # since this job is never scheduled (see _seed_dead_scheduled_job()).
 _ONE_DAY = timedelta(hours=24)
 
+# EPIC-008B subtask D: comfortably past reference/handoff.md §7.4's own
+# ">24" fault threshold for the open-scopes plate, so the seeded leak
+# actually exercises that styling rather than sitting just under it.
+_LEAKED_SCOPE_COUNT = 30
+
 
 class _ReportSystemClock:
     """@brief A plain, concrete, deliberately unregistered dependency -- C2's
@@ -105,6 +110,7 @@ class DemoFaultsExtension(IExtension[Any]):
         self.enrolment_flow: EnrolmentFlow | None = None
         self.rejected_transition: Exception | None = None
         self.dead_scheduled_job: Any = None
+        self.leaked_scopes: list[Any] = []
 
     def register(self, context: Any) -> None:
         pass
@@ -133,6 +139,7 @@ class DemoFaultsExtension(IExtension[Any]):
         self._seed_dead_scheduled_job()
         self._seed_held_exclusive_slot(context)
         self._seed_illegal_fsm_transition()
+        self._seed_leaked_scopes(context)
 
     def _seed_typo_subscription(self, context: Any) -> None:
         """@brief A2 — declared correctly, subscribed with a typo."""
@@ -229,3 +236,19 @@ class DemoFaultsExtension(IExtension[Any]):
         logging.getLogger("App").info(
             "DemoFaultsExtension: rejected transition %s", self.rejected_transition
         )
+
+    def _seed_leaked_scopes(self, context: Any) -> None:
+        """@brief A real container scope leak -- `EPIC-008B` subtask D's
+        Container restyle needs one to verify its fault-threshold styling
+        against, the same "one instance of each condition" reasoning as
+        every other seed here. Each `ScopeContext` is entered and never
+        exited -- opened and never closed is exactly what a real leak looks
+        like, counted the same way `StdLibContainer.open_scope_count()`
+        counts a real one (`on_enter`/`on_exit` hooks, not object lifetime).
+        Held on `self.leaked_scopes` only so this seed stays independently
+        verifiable, same as every other public attribute here -- nothing
+        about the count depends on the list itself."""
+        for _ in range(_LEAKED_SCOPE_COUNT):
+            scope = context.container.create_scope()
+            scope.__enter__()
+            self.leaked_scopes.append(scope)
