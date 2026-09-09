@@ -20,6 +20,7 @@ overlay (§3) and turning a submitted address into a real
 from __future__ import annotations
 
 import time
+from enum import Enum
 from typing import Any
 
 from PySide6.QtCore import QTimer
@@ -73,6 +74,25 @@ def _format_mmss(seconds: float) -> str:
     return f"{whole // 60:02d}:{whole % 60:02d}"
 
 
+class ConnectionDisplayState(Enum):
+    """@brief `reference/handoff.md` §4's 6-state display model. Same
+    reasoning as `ConsoleFailureKind` (`domain/events.py`): a small, fixed
+    vocabulary compared in several places (`_on_action_requested`'s two
+    tuple memberships, `_render()`'s six-way dispatch) is an `Enum` here,
+    not a bare `str` a call site could misspell with nothing to catch it.
+    `LiveConnectionBand.qml`'s own `state` property still receives the
+    plain `.value` string -- a QML property can't hold a Python `Enum` --
+    so this stays a purely internal type, never crossing the QML boundary
+    itself."""
+
+    COLD = "cold"
+    CONNECTING = "connecting"
+    FAILED = "failed"
+    IDLE = "idle"
+    READING = "reading"
+    STALE = "stale"
+
+
 class ShellPresenter(BasePresenter):
     """
     @param view Must provide `bind_band(view_model)`, `bind_rail(view_model)`,
@@ -122,7 +142,7 @@ class ShellPresenter(BasePresenter):
             self._on_connect_flow_cancelled
         )
 
-        self._state = "cold"
+        self._state = ConnectionDisplayState.COLD
         self._uri = ""
         self._failure_note = ""
         self._connecting_at: float | None = None
@@ -146,7 +166,7 @@ class ShellPresenter(BasePresenter):
     # ------------------------------------------------------- engine events
 
     def _on_connecting(self, event: ConsoleConnecting) -> None:
-        self._state = "connecting"
+        self._state = ConnectionDisplayState.CONNECTING
         self._uri = event.uri
         self._connecting_at = time.monotonic()
         self._heartbeat_ticks = []
@@ -157,13 +177,13 @@ class ShellPresenter(BasePresenter):
         self._render()
 
     def _on_attached(self, _event: ConsoleAttached) -> None:
-        self._state = "idle"
+        self._state = ConnectionDisplayState.IDLE
         self._attached_at = time.monotonic()
         self._heartbeat_ticks = []
         self._render()
 
     def _on_failed(self, event: ConsoleFailed) -> None:
-        self._state = "failed"
+        self._state = ConnectionDisplayState.FAILED
         self._uri = event.uri
         title = _FAILURE_TITLE_BY_KIND.get(event.kind, "connection failed")
         self._failure_note = f"{title} · {event.code}"
@@ -176,13 +196,13 @@ class ShellPresenter(BasePresenter):
         # own docstring) -- an attempt that never attached is ConsoleFailed
         # instead. STALE ("was reading, connection dropped") is therefore
         # always the right transition here, never FAILED.
-        self._state = "stale"
+        self._state = ConnectionDisplayState.STALE
         self._stale_since = time.monotonic()
         self._heartbeat_ticks = []
         self._render()
 
     def _on_snapshot(self, event: SnapshotReceived) -> None:
-        self._state = "reading"
+        self._state = ConnectionDisplayState.READING
         self._last_snapshot_at = time.monotonic()
         self._heartbeat_ticks.append(1.0)
         del self._heartbeat_ticks[:-_MAX_HEARTBEAT_TICKS]
@@ -199,11 +219,18 @@ class ShellPresenter(BasePresenter):
     # ------------------------------------------------------------ actions
 
     def _on_action_requested(self) -> None:
-        if self._state in ("reading", "idle", "connecting"):
+        if self._state in (
+            ConnectionDisplayState.READING,
+            ConnectionDisplayState.IDLE,
+            ConnectionDisplayState.CONNECTING,
+        ):
             self._connection.detach()
-        elif self._state in ("failed", "stale"):
+        elif self._state in (
+            ConnectionDisplayState.FAILED,
+            ConnectionDisplayState.STALE,
+        ):
             self._connection.connect_to(self._uri)
-        else:  # cold: "Attach…"
+        else:  # COLD: "Attach…"
             self._open_connect_flow(changing_target=False)
 
     def _on_change_target_requested(self) -> None:
@@ -222,7 +249,8 @@ class ShellPresenter(BasePresenter):
                     "address": address,
                     "lastUsedLabel": "",
                     "isCurrent": address == self._uri
-                    and self._state in ("idle", "reading"),
+                    and self._state
+                    in (ConnectionDisplayState.IDLE, ConnectionDisplayState.READING),
                 }
                 for address in self._recent_addresses.list()
             ]
@@ -243,41 +271,41 @@ class ShellPresenter(BasePresenter):
 
     def _render(self) -> None:
         vm = self.band_view_model
-        vm.set_state(self._state)
+        vm.set_state(self._state.value)
         vm.set_target_text(self._uri)
         vm.set_heartbeat_ticks(list(self._heartbeat_ticks))
 
-        if self._state == "reading":
+        if self._state is ConnectionDisplayState.READING:
             vm.set_state_label("Attached · reading")
             vm.set_state_note("snapshot stream live · ~1/s")
             vm.set_age_label("last snapshot")
             vm.set_age_value(f"{self._elapsed(self._last_snapshot_at)} ago")
             vm.set_action_label("Detach")
-        elif self._state == "idle":
+        elif self._state is ConnectionDisplayState.IDLE:
             vm.set_state_label("Attached · idle")
             vm.set_state_note("handshake complete · no snapshot yet")
             vm.set_age_label("waiting for")
             vm.set_age_value(self._elapsed(self._attached_at))
             vm.set_action_label("Detach")
-        elif self._state == "connecting":
+        elif self._state is ConnectionDisplayState.CONNECTING:
             vm.set_state_label("Connecting")
             vm.set_state_note(f"opening socket · {self._uri}")
             vm.set_age_label("elapsed")
             vm.set_age_value(self._elapsed(self._connecting_at))
             vm.set_action_label("Cancel")
-        elif self._state == "failed":
+        elif self._state is ConnectionDisplayState.FAILED:
             vm.set_state_label("Connection failed")
             vm.set_state_note(self._failure_note)
             vm.set_age_label("last attempt")
             vm.set_age_value("failed")
             vm.set_action_label("Retry")
-        elif self._state == "stale":
+        elif self._state is ConnectionDisplayState.STALE:
             vm.set_state_label("Not attached")
             vm.set_state_note("showing last-known data")
             vm.set_age_label("stale for")
             vm.set_age_value(self._elapsed(self._stale_since))
             vm.set_action_label("Reconnect")
-        else:  # cold
+        else:  # COLD
             vm.set_state_label("Not attached")
             vm.set_state_note("no target attached")
             vm.set_age_label("last contact")

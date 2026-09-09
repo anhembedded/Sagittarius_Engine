@@ -169,6 +169,25 @@ Connection/Lifecycle/Signals plates (3 snapshots received, 5/5 modules, 4 open s
 undeclared events + 2 dead-letter/rejections) and a real, populated pools table; Modules tab
 lists all five real extensions by name, each tagged `initialized`.
 
+### Post-completion design review
+
+Two real findings, fixed:
+
+- `ShellPresenter._state` was a bare `str` ("cold"/"connecting"/.../"stale") compared at 15+
+  call sites across `_on_action_requested`'s two tuple memberships and `_render()`'s six-way
+  dispatch — exactly the "small fixed vocabulary, multiple comparison sites" shape this epic
+  already promoted `ConsoleFailed.kind` out of a bare string for (`EPIC-008B`'s own design
+  review, first commit). Promoted to a `ConnectionDisplayState(Enum)`, internal only —
+  `LiveConnectionBand.qml`'s `state` property still receives the plain `.value` string at the
+  QML boundary, where a Python `Enum` can't cross anyway.
+- `OverviewViewModel._signal_counts`'s default value hand-typed the same five keys
+  `count_signals()` already owns the shape of — a second, hardcoded copy of that shape that
+  could silently drift if the function's keys ever changed. Simplified to `{}`; every QML read
+  already falls back to `|| 0` for a missing key, so nothing depended on the default being
+  fully populated.
+
+Full local CI still green (1474 passed) after both fixes.
+
 ## 🧪 Verification & Test Coverage
 
 - §1: `tests/tools/state_console/test_console_connection_extension.py`, all 12 tests against a

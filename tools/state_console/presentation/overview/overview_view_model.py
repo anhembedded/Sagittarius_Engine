@@ -39,13 +39,12 @@ class OverviewViewModel(BaseQmlViewModel):
         self._thread_pools: list[dict] = []
         self._snapshot_age_seconds = -1.0
         self._snapshots_received = 0
-        self._signal_counts = {
-            "events": 0,
-            "container": 0,
-            "tasks": 0,
-            "signals": 0,
-            "overview": 0,
-        }
+        # {} rather than a hand-typed 5-key default: count_signals() owns
+        # that shape, and every QML read of a key already falls back to 0
+        # (e.g. "viewModel.signalCounts.events || 0") for the moment before
+        # the first snapshot -- keeping a second, hardcoded copy of the same
+        # keys here would just be one more place for the two to drift apart.
+        self._signal_counts: dict = {}
 
     def _get_connection_state(self) -> str:
         return self._connection_state
