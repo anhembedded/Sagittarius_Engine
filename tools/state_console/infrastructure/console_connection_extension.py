@@ -25,6 +25,7 @@ from tools.state_console.domain.events import (
     ConsoleConnecting,
     ConsoleDetached,
     ConsoleFailed,
+    ConsoleFailureKind,
     SnapshotReceived,
 )
 
@@ -156,10 +157,10 @@ class ConsoleConnectionExtension(IExtension[Any]):
             # A malformed URI is never attempted as a socket — the design
             # this class satisfies (`reference/handoff.md` §5) says exactly
             # that: "no connection was attempted."
-            self._emit_failed("malformed", "EINVAL", str(exc), uri)
+            self._emit_failed(ConsoleFailureKind.MALFORMED, str(exc), uri)
             return
         except OSError as exc:
-            self._emit_failed("refused", "ECONNREFUSED", str(exc), uri)
+            self._emit_failed(ConsoleFailureKind.REFUSED, str(exc), uri)
             return
 
         try:
@@ -167,14 +168,19 @@ class ConsoleConnectionExtension(IExtension[Any]):
                 try:
                     hello = self._recv_envelope(connection)
                 except ProtocolMismatch as exc:
-                    self._emit_failed("unknown", "PROTOCOL_MISMATCH", str(exc), uri)
+                    self._emit_failed(
+                        ConsoleFailureKind.UNKNOWN,
+                        str(exc),
+                        uri,
+                        code="PROTOCOL_MISMATCH",
+                    )
                     return
                 if hello.type is not MessageType.HELLO:
                     self._emit_failed(
-                        "unknown",
-                        "UNEXPECTED_MESSAGE",
+                        ConsoleFailureKind.UNKNOWN,
                         f"expected 'hello' first, got {hello.type.value!r}",
                         uri,
+                        code="UNEXPECTED_MESSAGE",
                     )
                     return
 
@@ -182,7 +188,7 @@ class ConsoleConnectionExtension(IExtension[Any]):
                 self._request_loop(connection, token)
         except ConnectionClosed as exc:
             if self._close_code(exc) == _UNAUTHORIZED_CLOSE_CODE:
-                self._emit_failed("rejected", "HTTP 401", str(exc), uri)
+                self._emit_failed(ConsoleFailureKind.REJECTED, str(exc), uri)
             else:
                 self._emit_detached(f"connection lost: {exc}")
             return
@@ -244,5 +250,12 @@ class ConsoleConnectionExtension(IExtension[Any]):
     def _emit_detached(self, reason: str) -> None:
         self._emit(ConsoleDetached(reason=reason))
 
-    def _emit_failed(self, kind: str, code: str, detail: str, uri: str) -> None:
+    def _emit_failed(
+        self,
+        kind: ConsoleFailureKind,
+        detail: str,
+        uri: str,
+        *,
+        code: str | None = None,
+    ) -> None:
         self._emit(ConsoleFailed(kind=kind, code=code, detail=detail, uri=uri))

@@ -28,6 +28,7 @@ from tools.state_console.domain.events import (  # noqa: E402
     ConsoleConnecting,
     ConsoleDetached,
     ConsoleFailed,
+    ConsoleFailureKind,
     SnapshotReceived,
 )
 from tools.state_console.infrastructure.console_connection_extension import (  # noqa: E402
@@ -97,7 +98,7 @@ def test_connecting_to_nothing_emits_console_failed_not_console_detached():
     client_app.boot()
     try:
         assert _wait_until(lambda: len(events) > 0)
-        assert events[0].kind == "refused"
+        assert events[0].kind is ConsoleFailureKind.REFUSED
         assert events[0].code == "ECONNREFUSED"
         assert events[0].uri == "ws://127.0.0.1:1"
     finally:
@@ -133,7 +134,7 @@ def test_a_malformed_uri_emits_console_failed_with_kind_malformed():
     client_app.boot()
     try:
         assert _wait_until(lambda: len(events) > 0)
-        assert events[0].kind == "malformed"
+        assert events[0].kind is ConsoleFailureKind.MALFORMED
         assert events[0].code == "EINVAL"
     finally:
         client_app.stop()
@@ -165,7 +166,7 @@ def test_a_bad_token_emits_console_failed_with_kind_rejected(server_app):
         client_app.boot()
         try:
             assert _wait_until(lambda: len(events) > 0)
-            assert events[0].kind == "rejected"
+            assert events[0].kind is ConsoleFailureKind.REJECTED
             assert events[0].code == "HTTP 401"
         finally:
             client_app.stop()

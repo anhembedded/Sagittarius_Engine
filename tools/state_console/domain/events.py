@@ -9,6 +9,7 @@ this console's own `build_app()` reports on them like any other application
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 from sagittarius_engine.domain.base_event import BaseEvent
 from sagittarius_engine.extensions.audit.contracts import StateSnapshot
@@ -64,26 +65,68 @@ class ConsoleConnecting(BaseEvent):
         self.uri = uri
 
 
+class ConsoleFailureKind(Enum):
+    """@brief The closed set of ways a connection attempt can fail outright
+    — same shape, same reasoning, as `runtime.tasks.background_task
+    .TaskState`: a small fixed vocabulary is an `Enum` in this codebase,
+    not a bare `str` a call site could misspell with nothing to catch it.
+    """
+
+    #: The address itself does not parse — no socket was ever opened.
+    MALFORMED = "malformed"
+    #: Nothing is listening at a syntactically valid address.
+    REFUSED = "refused"
+    #: The handshake was reached and refused (e.g. a bad/missing `?token=`).
+    REJECTED = "rejected"
+    #: Classifiable by *when* it happened (before ever attaching), not by a
+    #: more specific kind — `code` carries the actual reason in this case.
+    UNKNOWN = "unknown"
+
+
+#: One default, machine-readable `code` per kind that has exactly one real
+#: cause — `UNKNOWN` deliberately has none here, since its whole reason for
+#: existing is that a single `code` can't be assumed; a caller emitting
+#: `UNKNOWN` always supplies its own.
+_DEFAULT_CODE_BY_KIND: dict[ConsoleFailureKind, str] = {
+    ConsoleFailureKind.MALFORMED: "EINVAL",
+    ConsoleFailureKind.REFUSED: "ECONNREFUSED",
+    ConsoleFailureKind.REJECTED: "HTTP 401",
+}
+
+
 class ConsoleFailed(BaseEvent):
     """@brief A connection attempt to `uri` failed outright — no snapshot
     was ever received from this address, which is what distinguishes this
     from `ConsoleDetached` (a connection that WAS working and then
-    dropped). `kind` is one of `"malformed"` (the address itself does not
-    parse — no socket was ever opened), `"refused"` (nothing is listening),
-    `"rejected"` (the handshake was reached and refused, e.g. a bad/missing
-    `?token=`), or `"unknown"` (a failure this extension can classify by
-    *when* it happened — before ever attaching — but not by a more specific
-    kind). `code` is a short machine-readable label
-    (`"EINVAL"`/`"ECONNREFUSED"`/`"HTTP 401"`/...); `detail` is the
-    human-readable exception text (`EPIC-008B`, `reference/handoff.md`
-    §5)."""
+    dropped). `detail` is the human-readable exception text (`EPIC-008B`,
+    `reference/handoff.md` §5).
+
+    @param code A short machine-readable label
+    (`"EINVAL"`/`"ECONNREFUSED"`/`"HTTP 401"`/...). Omit it for
+    `MALFORMED`/`REFUSED`/`REJECTED` — each has exactly one real cause, so
+    the code is filled in from `kind` and cannot drift from it by a
+    copy-paste mistake at the call site. `UNKNOWN` has no such default and
+    must always be given an explicit `code`.
+    """
 
     event_name = "console.failed"
 
     def __init__(
-        self, *, kind: str = "unknown", code: str = "", detail: str = "", uri: str = ""
+        self,
+        *,
+        kind: ConsoleFailureKind = ConsoleFailureKind.UNKNOWN,
+        code: str | None = None,
+        detail: str = "",
+        uri: str = "",
     ) -> None:
         super().__init__()
+        if code is None:
+            if kind not in _DEFAULT_CODE_BY_KIND:
+                raise ValueError(
+                    f"ConsoleFailed(kind={kind!r}) has no default code — "
+                    "pass code= explicitly."
+                )
+            code = _DEFAULT_CODE_BY_KIND[kind]
         self.kind = kind
         self.code = code
         self.detail = detail
