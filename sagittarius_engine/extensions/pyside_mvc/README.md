@@ -88,7 +88,11 @@ classDiagram
     class qml_host_view["runtime.qml_host_view"] {
       -_app_qml_config: AppQmlConfig
       +configure_app_qml(ui_palette, icon_loader, icon_palette)
-      +create_quick_widget() QQuickWidget
+      +create_quick_widget(background) QQuickWidget
+    }
+    class quick_background["runtime.quick_background"] {
+      +DEFAULT_BACKGROUND = "bg"
+      +resolve_opaque_background(token) QColor
     }
     class OverlayHost {
       +load_content(source, context_properties)
@@ -112,6 +116,8 @@ classDiagram
     qml_host_view ..> vocabulary : validates via
     qml_host_view ..> AppQmlConfig : stores
     theme_bridge ..> defaults : merges via
+    qml_host_view ..> quick_background : clears to an opaque token
+    quick_background ..> theme_bridge : reads
     QmlHostView --> qml_host_view : create_quick_widget()
     OverlayHost --> qml_host_view : create_quick_widget()
 
@@ -277,6 +283,7 @@ extensions/pyside_mvc/
 │   └── log_list_model.py          Real impl moved to runtime/; DeprecationWarning on import
 ├── runtime/                       Screen-hosting / bootstrap — seeds EPIC-001D
 │   ├── qml_host_view.py           configure_app_qml() / QmlHostView / create_quick_widget()
+│   ├── quick_background.py        the opaque, token-driven clear colour every QQuickWidget gets (TASK-042)
 │   ├── overlay_host.py + OverlayHost.qml   Full-window modal host (BOT-087)
 │   ├── icon_image_provider.py     `image://icons/<name>/<tint>` provider
 │   ├── qml_style.py               Pins Qt Quick Controls to the customizable style

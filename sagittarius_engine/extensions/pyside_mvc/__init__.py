@@ -29,6 +29,7 @@ else:
         QtEventBridge,
     )
     from .runtime import (
+        DEFAULT_BACKGROUND,
         ICON_PROVIDER_ID,
         AppQmlConfig,
         BaseQmlViewModel,
@@ -41,6 +42,7 @@ else:
         create_quick_widget,
         ensure_qml_style,
         from_qml,
+        resolve_opaque_background,
     )
     from .safety import (
         CrossThreadUiMutationError,

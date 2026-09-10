@@ -7,6 +7,22 @@ their history is in `git log`.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **`create_quick_widget(background="bg")` clears every `QQuickWidget` to an opaque,
+  token-driven colour** (`TASK-042`, new `runtime/quick_background.py`). Previously the widget
+  kept Qt's default clear colour (opaque white), and the reference consumer worked around
+  that with `setClearColor(Qt::transparent)` in ten hand-rolled hosts — which only "shows
+  the parent through" on the software rendering path (`offscreen`, `widget.grab()`); on a
+  real desktop session the texture path renders those regions black (X11) or see-through
+  (Wayland). `resolve_opaque_background()` refuses an unknown or non-opaque token at
+  construction. Not breaking: the new parameter has a default; `QmlHostView`/`OverlayHost`
+  callers change from clearing to white to clearing to the app's `bg` token.
+
+---
+
 ## [2.3.0] — 2026-08-23
 
 Makes `DatabaseExtension` able to own more than one database (`EPIC-003`), then absorbs a

@@ -25,8 +25,10 @@ from .qml_host_view import (
 )
 from .qml_style import ensure_qml_style
 from .qml_value_normalizer import from_qml
+from .quick_background import DEFAULT_BACKGROUND, resolve_opaque_background
 
 __all__ = [
+    "DEFAULT_BACKGROUND",
     "ICON_PROVIDER_ID",
     "AppQmlConfig",
     "BaseQmlViewModel",
@@ -39,4 +41,5 @@ __all__ = [
     "create_quick_widget",
     "ensure_qml_style",
     "from_qml",
+    "resolve_opaque_background",
 ]
