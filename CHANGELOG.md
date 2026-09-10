@@ -7,19 +7,58 @@ their history is in `git log`.
 
 ---
 
-## [Unreleased]
+## [2.4.0] — 2026-09-10
 
-### Changed
+Version component `b`, per `rules/release.md` §2: the published API changed (`create_quick_widget`
+is in `sagittarius_engine.__all__` and gained a parameter). Not a feature change, not a bug fix
+only.
 
-- **`create_quick_widget(background="bg")` clears every `QQuickWidget` to an opaque,
-  token-driven colour** (`TASK-042`, new `runtime/quick_background.py`). Previously the widget
-  kept Qt's default clear colour (opaque white), and the reference consumer worked around
-  that with `setClearColor(Qt::transparent)` in ten hand-rolled hosts — which only "shows
-  the parent through" on the software rendering path (`offscreen`, `widget.grab()`); on a
-  real desktop session the texture path renders those regions black (X11) or see-through
-  (Wayland). `resolve_opaque_background()` refuses an unknown or non-opaque token at
-  construction. Not breaking: the new parameter has a default; `QmlHostView`/`OverlayHost`
-  callers change from clearing to white to clearing to the app's `bg` token.
+### Added
+
+- **`runtime/quick_background.py`** (`TASK-042`) — `DEFAULT_BACKGROUND` and
+  `resolve_opaque_background(token)`, which resolve a colour token through the shared theme bridge
+  and refuse anything that is not an opaque colour. An unknown token raises `KeyError`; a
+  translucent or non-colour one raises `ValueError`, at construction rather than on a user's
+  screen.
+
+### Changed — behaviour
+
+- **`create_quick_widget(background="bg")` now clears every `QQuickWidget` to an opaque,
+  token-driven colour** instead of leaving Qt's default (opaque white). Consumers that relied on
+  the white default will see the app's `bg` token instead; consumers embedding a scene inside a
+  card pass that surface's own token.
+
+  Why this is a behaviour change worth reading: `QQuickWidget` has two rendering paths that
+  disagree about a transparent clear colour. On the software path (`offscreen`,
+  `QT_QUICK_BACKEND=software`, every `QWidget.grab()`) an unpainted region shows the parent
+  widget's background. On the texture path — every real desktop session — `QWidgetPrivate::drawWidget`
+  punches a hole in the backing store under the widget and the compositor draws the scene
+  unblended over a clear of `Qt::black`, so that region renders **black on X11 and see-through on
+  Wayland**. The reference consumer had worked around the white default with
+  `setClearColor(Qt::transparent)` in ten hosts and shipped ten broken screens behind a fully
+  green headless suite (`Sagittarius_Elite_Warrior` `BUG-102`, `BUG-115`). Making the opaque
+  token background a property of the factory removes the reason to reach for that workaround.
+
+### Upgrade checklist
+
+- Nothing to change in consumer code: the parameter has a default. But a consumer whose **source**
+  already passes `background=` needs this build installed — `pip show` cannot tell two builds
+  apart (both report a version), so a stale venv fails with
+  `TypeError: create_quick_widget() got an unexpected keyword argument 'background'` deep inside a
+  widget constructor. Reinstall with
+  `pip install --upgrade --force-reinstall git+https://github.com/anhembedded/Sagittarius_Engine.git`.
+
+### Known issues
+
+- **`tools/state_console` (PR #221, EPIC-007 D/E/F) is not described in this file.** It landed on
+  `main` after the `2.3.0` entry was written and before this one, and `2.3.0` was never tagged, so
+  the 433-file state-console change currently sits in the changelog gap between them. This entry
+  deliberately does not summarise work it did not review — per `rules/release.md` §4 a changelog is
+  built from the diff, not from memory. Whoever cuts the next tag should write that entry from
+  `git diff v2.2.0..HEAD` first.
+- `tests/test_agents_docs_resolve.py::test_staleness_check_actually_catches_the_original_bug` fails
+  in this checkout and fails identically with `TASK-042` stashed — pre-existing, not introduced
+  here.
 
 ---
 
