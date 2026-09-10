@@ -69,10 +69,23 @@ token on its side (`BUG-115` §4.3). The engine stays ignorant of roles, as `ui-
   literal, so they hold in any collection order.
 - Existing consumers re-run: `test_widget_kit_gallery.py`, `test_overlay_host.py`,
   `tools/state_console/test_overview_screen.py`.
-- `tests/extensions/pyside_mvc/` re-run on its own after the rename: 165 passed, 1 failed —
-  `test_thread_bridge.py::test_logs_the_error_with_a_traceback_via_the_owners_logger`, which
-  fails identically with this change stashed (and passes in the full-suite gate run above, so it
-  is collection-order dependent). Not this task's; not touched.
+- **Correction (2026-09-10), and the method that produced it.** This file first recorded
+  `test_thread_bridge.py::test_logs_the_error_with_a_traceback_via_the_owners_logger` as a
+  pre-existing failure, on the strength of a `git stash` A/B that showed it red both with and
+  without this change. That conclusion was **wrong**, and the A/B was the reason: stashing swaps
+  the working tree but leaves the *environment* identical, so it cannot see an environment cause.
+  Re-checked against untouched `origin/main` in a separate `git worktree` — it passed there and
+  failed here, which looked like a regression this task had introduced. It was neither.
+
+  Real cause: this checkout was moved on disk mid-session, leaving 113 `__pycache__` directories
+  whose compiled code still recorded the old path. The test asserts that a formatted traceback
+  contains the line `raise TypeError`, and CPython cannot include a source line for a file whose
+  recorded path no longer exists. Clearing the caches makes it pass; nothing in the engine was
+  involved. Gate re-run on clean caches — see below.
+
+  Kept in the record rather than quietly deleted, because the failure mode is instructive: a
+  stash A/B *agreed* with the wrong answer, and only a checkout of the untouched base in a
+  separate directory settled it.
 - Gate: `pwsh ./scripts/ci-local.ps1` (2026-09-10, Linux, Python 3.12, PySide6 6.11.1): Ruff Lint ✅,
   Ruff Format ✅, Mypy ✅, Bandit ✅, Pip-Audit ✅, Architecture ✅, log scan ✅; Tests **1416 passed,
   11 skipped, 1 failed** — the one failure is

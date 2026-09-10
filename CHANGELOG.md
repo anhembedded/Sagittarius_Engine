@@ -56,9 +56,18 @@ only.
   deliberately does not summarise work it did not review — per `rules/release.md` §4 a changelog is
   built from the diff, not from memory. Whoever cuts the next tag should write that entry from
   `git diff v2.2.0..HEAD` first.
-- `tests/test_agents_docs_resolve.py::test_staleness_check_actually_catches_the_original_bug` fails
-  in this checkout and fails identically with `TASK-042` stashed — pre-existing, not introduced
-  here.
+- **The suite segfaults at teardown in the Linux sandbox this version was prepared in** (PySide6
+  6.11.1, Python 3.12, `QT_QPA_PLATFORM=offscreen`): every test passes, then the process dies with
+  `Fatal Python error: Segmentation fault` at ~95-100%, in a scheduler thread at interpreter
+  shutdown. Verified **not** to come from this release: an untouched `origin/main` checkout, in a
+  separate `git worktree` with the same interpreter and the same venv, segfaults identically.
+  Named here per `rules/release.md` §7 rather than described as green.
+- Two earlier apparent failures in the same environment were neither this release's nor real:
+  `test_agents_docs_resolve.py` is environment-sensitive (it shells out to `grep`), and a
+  `test_thread_bridge.py` failure turned out to be stale `__pycache__` entries recording a path
+  this checkout had been moved away from. See `TASK-042`'s correction note for why the `git stash`
+  A/B that first classified the latter agreed with the wrong answer, and why a worktree checkout of
+  the untouched base is the method that settled all three.
 
 ---
 
