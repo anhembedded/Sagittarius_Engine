@@ -16,6 +16,7 @@ from sagittarius_engine.extensions.pyside_mvc.tokens.vocabulary import (
 
 from .icon_image_provider import ICON_PROVIDER_ID, IconImageProvider, IIconLoader
 from .qml_style import ensure_qml_style
+from .quick_background import DEFAULT_BACKGROUND, resolve_opaque_background
 
 #: The widget kit's QML lives at `pyside_mvc/Sagittarius/UI/` (the
 #: `Sagittarius.UI` module — see EPIC-001C's directory-per-component
@@ -98,11 +99,13 @@ def configure_app_qml(
     )
 
 
-def create_quick_widget() -> QQuickWidget:
+def create_quick_widget(
+    background: str = DEFAULT_BACKGROUND,
+) -> QQuickWidget:
     """
     @brief Builds a QQuickWidget wired with this framework's shared QML
-    plumbing — the "Basic" style, the `Theme` singleton, and the icon
-    provider.
+    plumbing — the "Basic" style, the `Theme` singleton, the icon
+    provider, and an opaque token-driven background.
 
     @details
     Every QML-hosting widget needs this setup, whether it's the sole widget
@@ -110,7 +113,17 @@ def create_quick_widget() -> QQuickWidget:
     sharing a single View. Factored out so every path configures
     identically instead of hand-rolling a partial copy.
 
+    @param background The colour token the widget clears to where its
+        QML paints nothing — the token of the surface it is embedded in
+        (`"bg"` for a whole route on the app background, `"bgCard"` for a
+        widget inside a card, ...). Always opaque: see `quick_background`
+        for why a transparent clear colour is refused rather than offered.
+        Qt's own default (opaque white) is never what a themed app wants,
+        which is why this is resolved here instead of left to each caller.
+
     @raise RuntimeError If called before @ref configure_app_qml.
+    @raise KeyError / ValueError From `resolve_opaque_background()` — an
+        unknown token, or one that is not an opaque colour.
     """
     if _app_qml_config is None:
         raise RuntimeError(
@@ -123,6 +136,7 @@ def create_quick_widget() -> QQuickWidget:
     quick_widget.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
     quick_widget.engine().addImportPath(_QML_IMPORT_PATH)
     register_theme(quick_widget, _app_qml_config.ui_palette)
+    quick_widget.setClearColor(resolve_opaque_background(background))
     # Engine takes ownership of the provider, so each QQuickWidget gets its
     # own instance; the underlying icon_loader it delegates to is whatever
     # the app registered — typically its own shared app-wide singleton, so

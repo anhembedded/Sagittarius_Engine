@@ -211,6 +211,16 @@ host, and named regions that consumer screens contribute into.
 - **The runtime must not know the consuming application.** A registered contribution is fed
   by the consumer's own presenter/view-model layer; the runtime never reaches toward
   application domain state to decide what to render.
+- **An embedded QML scene is opaque, and its background is a token.** `create_quick_widget()`
+  clears every `QQuickWidget` to an opaque colour resolved from a theme token
+  (`runtime/quick_background.py`, default `"bg"`; a widget embedded in a card passes that
+  surface's own token). `setClearColor(Qt::transparent)` is never the way to "let the parent
+  show through": on the texture rendering path of every real desktop session Qt punches a hole
+  in the widget backing store under the scene and composites the texture over a black (or, on
+  Wayland, see-through) clear — the parent's background is not there to show. Only the
+  software path (`offscreen`, `widget.grab()`, i.e. every headless test) behaves the way that
+  comment assumes, which is how the reference consumer shipped ten black/see-through QML
+  bodies behind a green suite (`Sagittarius_Elite_Warrior` `BUG-102`/`BUG-115`, `TASK-042`).
 
 ---
 

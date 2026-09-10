@@ -7,6 +7,70 @@ their history is in `git log`.
 
 ---
 
+## [2.4.0] — 2026-09-10
+
+Version component `b`, per `rules/release.md` §2: the published API changed (`create_quick_widget`
+is in `sagittarius_engine.__all__` and gained a parameter). Not a feature change, not a bug fix
+only.
+
+### Added
+
+- **`runtime/quick_background.py`** (`TASK-042`) — `DEFAULT_BACKGROUND` and
+  `resolve_opaque_background(token)`, which resolve a colour token through the shared theme bridge
+  and refuse anything that is not an opaque colour. An unknown token raises `KeyError`; a
+  translucent or non-colour one raises `ValueError`, at construction rather than on a user's
+  screen.
+
+### Changed — behaviour
+
+- **`create_quick_widget(background="bg")` now clears every `QQuickWidget` to an opaque,
+  token-driven colour** instead of leaving Qt's default (opaque white). Consumers that relied on
+  the white default will see the app's `bg` token instead; consumers embedding a scene inside a
+  card pass that surface's own token.
+
+  Why this is a behaviour change worth reading: `QQuickWidget` has two rendering paths that
+  disagree about a transparent clear colour. On the software path (`offscreen`,
+  `QT_QUICK_BACKEND=software`, every `QWidget.grab()`) an unpainted region shows the parent
+  widget's background. On the texture path — every real desktop session — `QWidgetPrivate::drawWidget`
+  punches a hole in the backing store under the widget and the compositor draws the scene
+  unblended over a clear of `Qt::black`, so that region renders **black on X11 and see-through on
+  Wayland**. The reference consumer had worked around the white default with
+  `setClearColor(Qt::transparent)` in ten hosts and shipped ten broken screens behind a fully
+  green headless suite (`Sagittarius_Elite_Warrior` `BUG-102`, `BUG-115`). Making the opaque
+  token background a property of the factory removes the reason to reach for that workaround.
+
+### Upgrade checklist
+
+- Nothing to change in consumer code: the parameter has a default. But a consumer whose **source**
+  already passes `background=` needs this build installed — `pip show` cannot tell two builds
+  apart (both report a version), so a stale venv fails with
+  `TypeError: create_quick_widget() got an unexpected keyword argument 'background'` deep inside a
+  widget constructor. Reinstall with
+  `pip install --upgrade --force-reinstall git+https://github.com/anhembedded/Sagittarius_Engine.git`.
+
+### Known issues
+
+- **`tools/state_console` (PR #221, EPIC-007 D/E/F) is not described in this file.** It landed on
+  `main` after the `2.3.0` entry was written and before this one, and `2.3.0` was never tagged, so
+  the 433-file state-console change currently sits in the changelog gap between them. This entry
+  deliberately does not summarise work it did not review — per `rules/release.md` §4 a changelog is
+  built from the diff, not from memory. Whoever cuts the next tag should write that entry from
+  `git diff v2.2.0..HEAD` first.
+- **The suite segfaults at teardown in the Linux sandbox this version was prepared in** (PySide6
+  6.11.1, Python 3.12, `QT_QPA_PLATFORM=offscreen`): every test passes, then the process dies with
+  `Fatal Python error: Segmentation fault` at ~95-100%, in a scheduler thread at interpreter
+  shutdown. Verified **not** to come from this release: an untouched `origin/main` checkout, in a
+  separate `git worktree` with the same interpreter and the same venv, segfaults identically.
+  Named here per `rules/release.md` §7 rather than described as green.
+- Two earlier apparent failures in the same environment were neither this release's nor real:
+  `test_agents_docs_resolve.py` is environment-sensitive (it shells out to `grep`), and a
+  `test_thread_bridge.py` failure turned out to be stale `__pycache__` entries recording a path
+  this checkout had been moved away from. See `TASK-042`'s correction note for why the `git stash`
+  A/B that first classified the latter agreed with the wrong answer, and why a worktree checkout of
+  the untouched base is the method that settled all three.
+
+---
+
 ## [2.3.0] — 2026-08-23
 
 Makes `DatabaseExtension` able to own more than one database (`EPIC-003`), then absorbs a
