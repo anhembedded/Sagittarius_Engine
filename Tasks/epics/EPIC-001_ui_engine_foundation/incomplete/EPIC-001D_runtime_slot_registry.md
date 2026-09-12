@@ -5,6 +5,7 @@
 **Category:** UI Engine / Composition Runtime
 **Priority:** P2 — highest value ceiling, highest design risk; deliberately sequenced last
 **Depends on:** EPIC-001B, EPIC-001C
+**First real consumer (2026-09-11):** [`TASK-043`](../../../backlog/TASK-043_navigation_service_and_contribution_runtime_for_modular_apps.md) — the consumer app `Sagittarius_Elite_Warrior` (`PRO-004`/`EPIC-025`) is splitting into bounded-context modules on `IExtension` and needs exactly objectives 1, 2 and 4 of this epic in its Phase 5; that task is the concrete, consumer-driven slice — start there, not from a fresh design.
 
 ---
 

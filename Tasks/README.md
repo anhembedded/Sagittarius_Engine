@@ -55,6 +55,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 | **TASK-035** | `AppDataTable`'s columns render with no horizontal gap — a right-aligned column touches the next one | UI / Widget Kit (`pyside_mvc`) | P3 | [TASK-035_appdatatable_columns_have_no_horizontal_gap.md](backlog/TASK-035_appdatatable_columns_have_no_horizontal_gap.md) |
 | **TASK-036** | Audit every widget-kit card for missing Windows-Explorer-style utility actions (survey done, decisions/implementation pending) | UI / Widget Kit (`pyside_mvc`) | P2 | [TASK-036_audit_widget_kit_for_missing_windows_style_actions.md](backlog/TASK-036_audit_widget_kit_for_missing_windows_style_actions.md) |
 | **TASK-041** | Re-probe `REF-001`'s 11 cycle-claimed local imports under real import orders, retire what survives | Core Architecture / Tech Debt | P3 | [TASK-041_reprobe_cycle_claimed_local_imports.md](backlog/TASK-041_reprobe_cycle_claimed_local_imports.md) |
+| **TASK-043** | Navigation service (`USER_INTENT` vs `RESTORE`, `can_leave`), slot/contribution registry as mechanism, `create_quick_widget(import_paths=)`, generalised `import_boundary` with ratchet allowlist — the consumer-driven slice of `EPIC-001D` (consumer: Elite `PRO-004`/`EPIC-025`) | UI Engine / Composition Runtime (`pyside_mvc`) | P2 | [TASK-043_navigation_service_and_contribution_runtime_for_modular_apps.md](backlog/TASK-043_navigation_service_and_contribution_runtime_for_modular_apps.md) |
 
 ---
 
