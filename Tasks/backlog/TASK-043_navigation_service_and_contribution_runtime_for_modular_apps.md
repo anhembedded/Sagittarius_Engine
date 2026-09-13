@@ -35,7 +35,13 @@ Objectives, in priority order — each is independently shippable:
    "registry state is exposed as models, not dynamically-named context properties"). The engine
    does **not** know which kinds exist — `kind` is an opaque string the app registers. Ordering,
    add/remove/reorder survive; a contribution whose factory raises fails the surface loudly.
-3. **`create_quick_widget(..., import_paths: Sequence[str] = ())`**: today `_QML_IMPORT_PATH` is the
+3. ~~**`create_quick_widget(..., import_paths: Sequence[str] = ())`**~~ — **dropped 2026-09-13.** The
+   consumer decided (its ADR D20–D22) to build every module's UI in QtWidgets with the OS theme: no
+   QML, no tokens. It keeps using `BaseView`, `BasePresenter`, `PresenterManager`, `QtEventBridge` and
+   the thread-affinity helpers; it no longer calls `create_quick_widget`, `configure_app_qml` or
+   the token layer. Whether this engine grows a QtWidgets kit is a separate decision the user has
+   deferred; E2's region host below is a `QMainWindow`-based surface host. Original item, for the
+   record: `create_quick_widget(..., import_paths: Sequence[str] = ())`: today `_QML_IMPORT_PATH` is the
    single hard-coded path for `Sagittarius/UI`. Per-widget extra import paths let a consumer module
    ship its own QML next to its Python without a `QQmlApplicationEngine` (none exists repo-wide,
    deliberately). Consumer's ADR D6 is deferred on exactly this.
