@@ -49,6 +49,24 @@ Objectives, in priority order — each is independently shippable:
    ordering question is answered by `examples/student_management/docs/ui_extension_lifecycle.md`:
    construct `QApplication` before `App.boot()`, no engine change needed).
 
+## 🔁 How the consumer feeds this task — a harvest, not a design-first build (added 2026-09-13)
+
+The consumer builds each mechanism inside its own tree first (`core/contracts/`,
+`shell/workbench/`), with no application import and this engine's package layout, and **lifts**
+it here once a written criterion holds: zero app imports, used by at least two surfaces or two
+modules, API unchanged for one whole phase (consumer HLD §8). So this task is delivered in steps
+that the consumer's phases trigger, not as one design:
+
+| Step | Trigger (consumer) | Lands here |
+| :-: | :--- | :--- |
+| E0 | now | `ScheduledJob.cancel()` — small, no dependency |
+| E1 | after its Phase 1 | `WorkbenchModule` (`IExtension` + `contribute` / `subscribe`), `ContributionRegistry`, `ContributionDescriptor`, `Place`, `SizeHint` → objectives 2 and 5 |
+| E2 | after its Phase 2 | the surface runtime: a region host with the place slots, per-place models (EPIC-001D objective 2) |
+| E3 | with its Phase 5 | `NavigationService`, screen lifecycle + conformance suite, `create_quick_widget(import_paths=)` → objectives 1, 3, 5 |
+
+The consumer's SDD (`Docs/SDD/README.md`) already fixes the descriptor shape and the registry
+validation rules that E1 will receive; read it before designing E1 independently.
+
 ## 📐 Design Constraints
 
 - Honour every EPIC-001D constraint verbatim: Python describes, QML renders; registry is for
