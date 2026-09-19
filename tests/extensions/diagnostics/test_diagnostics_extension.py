@@ -65,15 +65,23 @@ def test_the_extension_runs_the_inspection_at_readiness():
 
 
 def test_fail_fast_aborts_the_boot_on_a_wiring_error():
+    """`BUG-014`: the readiness inspection this raises from runs after
+    `Bootstrap.boot()`'s own try/except (which only wraps extension/hosted-
+    service/scheduler startup, not `set_ready()`), so `scheduler.start()`
+    already succeeded and nothing catches this to clean it up -- a real
+    leaked thread, not just a missing test-side `.stop()`."""
     app = _app()
     app.event_bus.on("app.bootd", _noop)  # typo of app.booted — check A2
     app.use(DiagnosticsExtension(fail_fast=True))
 
-    with pytest.raises(DiagnosticsError) as excinfo:
-        app.boot()
+    try:
+        with pytest.raises(DiagnosticsError) as excinfo:
+            app.boot()
 
-    assert "app.bootd" in str(excinfo.value)
-    assert 'did you mean "app.booted"?' in str(excinfo.value)
+        assert "app.bootd" in str(excinfo.value)
+        assert 'did you mean "app.booted"?' in str(excinfo.value)
+    finally:
+        app.stop()
 
 
 def test_fail_fast_is_off_by_default():

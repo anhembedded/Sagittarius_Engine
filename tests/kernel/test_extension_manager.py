@@ -7,7 +7,6 @@ from sagittarius_engine.exceptions import (
 from sagittarius_engine.infrastructure.container.std_container import StdLibContainer
 from sagittarius_engine.infrastructure.event_bus.memory_event_bus import MemoryEventBus
 from sagittarius_engine.interfaces.i_extension import ExtensionDescriptor, IExtension
-from sagittarius_engine.kernel.app import App
 from sagittarius_engine.kernel.events import (
     ExtensionInitializing,
     ExtensionStarted,
@@ -58,10 +57,10 @@ class MockExtension(IExtension):
         self.history.append(f"{self.descriptor.name}_disposed")
 
 
-def test_extension_manager_dependency_sorting():
+def test_extension_manager_dependency_sorting(app_factory):
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     history = []
     ext_a = MockExtension("ExtA", dependencies=["ExtB"], history=history)
@@ -78,11 +77,11 @@ def test_extension_manager_dependency_sorting():
     assert history.index("ExtB_started") < history.index("ExtA_started")
 
 
-def test_extension_manager_optional_dependency():
+def test_extension_manager_optional_dependency(app_factory):
     # 1. Optional dependency is present
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     history = []
     ext_a = MockExtension("ExtA", optional_dependencies=["ExtB"], history=history)
@@ -97,7 +96,7 @@ def test_extension_manager_optional_dependency():
     # 2. Optional dependency is missing (should boot normally)
     container2 = StdLibContainer()
     event_bus2 = MemoryEventBus()
-    app2 = App(container2, event_bus2)
+    app2 = app_factory(container2, event_bus2)
 
     ext_c = MockExtension("ExtC", optional_dependencies=["ExtD"])
     app2.use(ext_c)
@@ -106,10 +105,10 @@ def test_extension_manager_optional_dependency():
     assert ext_c.initialized is True
 
 
-def test_extension_manager_missing_dependency():
+def test_extension_manager_missing_dependency(app_factory):
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     ext_a = MockExtension("ExtA", dependencies=["ExtB"])
     app.use(ext_a)
@@ -120,10 +119,10 @@ def test_extension_manager_missing_dependency():
     assert "requires missing dependency 'ExtB'" in str(excinfo.value)
 
 
-def test_extension_manager_circular_dependency():
+def test_extension_manager_circular_dependency(app_factory):
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     ext_a = MockExtension("ExtA", dependencies=["ExtB"])
     ext_b = MockExtension("ExtB", dependencies=["ExtA"])
@@ -137,10 +136,10 @@ def test_extension_manager_circular_dependency():
     assert "Circular dependency detected" in str(excinfo.value)
 
 
-def test_extension_manager_startup_rollback():
+def test_extension_manager_startup_rollback(app_factory):
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     history = []
     ext_a = MockExtension("ExtA", history=history)
@@ -166,10 +165,10 @@ def test_extension_manager_startup_rollback():
     assert ext_b.started is False
 
 
-def test_extension_manager_shutdown_ordering():
+def test_extension_manager_shutdown_ordering(app_factory):
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     history = []
     ext_a = MockExtension("ExtA", dependencies=["ExtB"], history=history)
@@ -187,10 +186,10 @@ def test_extension_manager_shutdown_ordering():
     assert history.index("ExtA_disposed") < history.index("ExtB_disposed")
 
 
-def test_extension_manager_lifecycle_events():
+def test_extension_manager_lifecycle_events(app_factory):
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     emitted_events = []
 
@@ -214,7 +213,7 @@ def test_extension_manager_lifecycle_events():
     assert emitted_events[1][1].extension_name == "ExtA"
 
 
-def test_extension_attribute_dependencies_topological_sort():
+def test_extension_attribute_dependencies_topological_sort(app_factory):
 
     history = []
 
@@ -242,7 +241,7 @@ def test_extension_attribute_dependencies_topological_sort():
 
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     # Register DatabaseExt BEFORE ConfigExt (out-of-order)
     app.use(DatabaseExt())
@@ -257,7 +256,7 @@ def test_extension_attribute_dependencies_topological_sort():
     assert history.index("ConfigExt_booted") < history.index("DatabaseExt_booted")
 
 
-def test_base_module_dependencies_topological_sort():
+def test_base_module_dependencies_topological_sort(app_factory):
     from sagittarius_engine.base import BaseModule
 
     history = []
@@ -280,7 +279,7 @@ def test_base_module_dependencies_topological_sort():
 
     container = StdLibContainer()
     event_bus = MemoryEventBus()
-    app = App(container, event_bus)
+    app = app_factory(container, event_bus)
 
     # Register DatabaseModule BEFORE ConfigModule (out-of-order)
     app.use(DatabaseModule())

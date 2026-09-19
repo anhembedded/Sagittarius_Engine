@@ -50,7 +50,8 @@ wrong abstraction with live consumers is far more expensive to correct than dupl
 
 ## 📐 Design Constraints
 
-Carried forward from the architecture review, to be honoured rather than rediscovered:
+Carried forward from the architecture review, to be honoured rather than rediscovered — **except
+where `TASK-043`'s own first real consumer has since overridden them; see the note below.**
 
 - **Python describes, QML renders.** A registered contribution is a *specification* —
   identity, kind, state, layout hint, action — not a visual object. Visual authority stays
@@ -60,6 +61,22 @@ Carried forward from the architecture review, to be honoured rather than redisco
   per-slot model gives ordering, multiple contributions per slot, and real reactivity;
   string-concatenated context properties give one item per slot, no tooling visibility, and
   silent nulls on typos.
+
+**Superseded for objective 2's region host, 2026-09-19 — found while starting `TASK-043` E2, not
+rediscovered speculatively.** Both constraints above assume QML rendering, written before this
+epic had a real consumer. Its first real consumer (`TASK-043`, `Sagittarius_Elite_Warrior`)
+decided the opposite for its own UI (ADR D20–D22, 2026-09-13): QtWidgets only, no QML, ever — a
+user decision, not this task's. `TASK-043` item 3 already records the consequence ("Whether this
+engine grows a QtWidgets kit is a separate decision the user has deferred; E2's region host below
+is a `QMainWindow`-based surface host"), so E2 is landing as **imperative Python construction
+against real `QMainWindow` parts** (toolbars, dock areas, a central widget, a status bar, modal
+`QDialog`s) — the literal shape "Python describes, QML renders" warns against — because it is
+harvested from the one real consumer's own working mechanism
+(`support/ui_kit/workbench_surface.py`), not designed fresh here. The "models, not context
+properties" constraint is moot for the same reason: there is no QML layer in this consumer's UI to
+expose a model to. Both constraints stay written above, unmodified, because a second consumer that
+*does* render through QML would need exactly what they describe — this note marks them
+**inapplicable to `TASK-043`'s own harvested slice**, not deleted or wrong in general.
 - **Registry is for genuinely dynamic surfaces.** Where composition is static, direct
   declaration is shorter and clearer than registration. Forcing every surface through the
   registry trades layout code for registration code without reducing either.

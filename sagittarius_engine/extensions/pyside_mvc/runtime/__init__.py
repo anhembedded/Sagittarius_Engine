@@ -14,6 +14,11 @@ recorded in `EPIC-001A`.
 """
 
 from .base_view_model import BaseQmlViewModel
+from .contribution_descriptor import ContributionDescriptor
+from .contribution_error import ContributionError
+from .contribution_registry import ContributionRegistry
+from .i_contribution_registry import IContributionRegistry
+from .i_region_host import IRegionHost
 from .icon_image_provider import ICON_PROVIDER_ID, IconImageProvider, IIconLoader
 from .log_list_model import LogListModel
 from .overlay_host import OverlayHost
@@ -26,17 +31,30 @@ from .qml_host_view import (
 from .qml_style import ensure_qml_style
 from .qml_value_normalizer import from_qml
 from .quick_background import DEFAULT_BACKGROUND, resolve_opaque_background
+from .region_host import RegionHost
+from .region_kind import RegionKind
+from .size_hint import SizeHint
+from .surface_declaration import SurfaceDeclaration
 
 __all__ = [
     "DEFAULT_BACKGROUND",
     "ICON_PROVIDER_ID",
     "AppQmlConfig",
     "BaseQmlViewModel",
+    "ContributionDescriptor",
+    "ContributionError",
+    "ContributionRegistry",
+    "IContributionRegistry",
     "IIconLoader",
+    "IRegionHost",
     "IconImageProvider",
     "LogListModel",
     "OverlayHost",
     "QmlHostView",
+    "RegionHost",
+    "RegionKind",
+    "SizeHint",
+    "SurfaceDeclaration",
     "configure_app_qml",
     "create_quick_widget",
     "ensure_qml_style",

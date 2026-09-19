@@ -111,6 +111,8 @@ def test_integration_cli_flow():
                 output = mock_stdout.getvalue()
                 assert "Executed command with id: 123" in output
 
+    app.stop()
+
 
 def test_integration_batch_flow():
     # Setup App
@@ -151,3 +153,4 @@ def test_integration_batch_flow():
     finally:
         os.remove(in_tmp_path)
         os.remove(out_tmp_path)
+        app.stop()

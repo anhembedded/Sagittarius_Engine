@@ -29,6 +29,27 @@ class ScheduledJob:
         self.max_runs = max_runs
         self.runs = 0
         self.next_run = trigger.get_next_run(datetime.now())
+        self._cancelled = threading.Event()
+
+    def cancel(self) -> None:
+        """
+        @brief Cancels this job: it will not be spawned or rescheduled again.
+
+        Thread-safe (`threading.Event`) — callable from any thread, including
+        from inside the job's own callback. `Scheduler._run()` drops a
+        cancelled job the next time it evaluates `self.jobs`, at most one
+        polling tick away (`TASK-043` E0 — the consumer measured this as a
+        real gap: no per-job cancel existed at all).
+
+        Does not interrupt a run already handed to `ITaskManager.spawn()` for
+        the tick in progress when `cancel()` is called — only a run that has
+        not yet been dispatched.
+        """
+        self._cancelled.set()
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self._cancelled.is_set()
 
 
 class JobBuilder:
@@ -78,9 +99,25 @@ class Scheduler:
     def start(self) -> None:
         """
         @brief Starts the background scheduler thread.
+
+        @details `BUG-014` follow-up: guarding only on `self._running` let a
+        `start()` after a `stop()` that timed out (which leaves `self._running`
+        `False` but `self._thread` alive and intentionally tracked, so the failed
+        stop can be retried) sail straight through and overwrite `self._thread`
+        with a fresh `Thread` -- silently orphaning the still-running old one, the
+        same "leaked, untracked thread" shape `stop()` was fixed to stop producing,
+        just moved into `start()`. Also guarding on the previous thread still being
+        alive closes that gap; `AsyncRuntime.start()` already had this guard.
         """
         with self._lock:
             if self._running:
+                return
+            if self._thread is not None and self._thread.is_alive():
+                self._logger.error(
+                    "Scheduler.start() called while a previous background thread "
+                    "is still alive after a stop() that did not complete -- "
+                    "refusing to start a second thread; call stop() again first."
+                )
                 return
             self._running = True
 
@@ -91,18 +128,39 @@ class Scheduler:
         self._logger.info("Scheduler started.")
         self._emit(SchedulerStarted.event_name, SchedulerStarted())
 
-    def stop(self) -> None:
+    def stop(self, timeout: float = 5.0) -> None:
         """
         @brief Stops the scheduler thread gracefully.
+
+        @details `BUG-014`: `self._thread = None` used to run unconditionally after
+        `join(timeout=...)`, whether or not the join actually succeeded — a thread
+        still alive past the deadline was silently forgotten rather than reported,
+        which is what let it keep running as an untracked, unjoinable leak (`TASK-043`
+        E1/E2's own gate runs hit exactly this signature under CI load: dozens of
+        `SagittariusScheduler`/`AsyncRuntimeLoop` threads still alive at a later
+        segfault). A thread that is still alive after `timeout` now stays tracked —
+        `self._thread` is left set rather than cleared — so a caller inspecting it
+        sees the true state, and a second `stop()` call (unlike before, no longer
+        blocked by `self._running` already being `False`) can retry the join.
         """
         with self._lock:
-            if not self._running:
-                return
+            was_running = self._running
             self._running = False
             self._cond.notify_all()
 
+        if not was_running and (self._thread is None or not self._thread.is_alive()):
+            return
+
         if self._thread is not None:
-            self._thread.join(timeout=5.0)
+            self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                self._logger.error(
+                    "Scheduler thread did not stop within %ss — leaving it tracked "
+                    "rather than discarding the reference; call stop() again to "
+                    "retry the join.",
+                    timeout,
+                )
+                return
             self._thread = None
         self._logger.info("Scheduler stopped.")
         self._emit(SchedulerStopped.event_name, SchedulerStopped())
@@ -151,6 +209,10 @@ class Scheduler:
                 next_wakeup = now + timedelta(seconds=1.0)
 
                 for job in self.jobs:
+                    if job.is_cancelled:
+                        # Dropped the same way a dead (`next_run is None`) job
+                        # is: neither spawned nor kept for the next tick.
+                        continue
                     if job.next_run is None:
                         # A job with no next run is dead — dropped here rather
                         # than compared against `now`, which crashed this

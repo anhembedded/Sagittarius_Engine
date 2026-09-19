@@ -46,7 +46,7 @@ from sagittarius_engine.interfaces import (
     IMiddleware,
     IModule,
 )
-from sagittarius_engine.kernel import App, MiddlewarePipeline
+from sagittarius_engine.kernel import MiddlewarePipeline
 from tests.helpers import assert_event_emitted
 
 try:
@@ -586,14 +586,16 @@ class InvalidModule:
     pass
 
 
-def test_app__boot_without_module__emits_booted(event_bus):
-    app = App(container=StdLibContainer(), event_bus=event_bus)
+def test_app__boot_without_module__emits_booted(app_factory, event_bus):
+    app = app_factory(container=StdLibContainer(), event_bus=event_bus)
     app.boot()
 
     assert_event_emitted(event_bus, "app.booted", times=1)
 
 
-def test_app__boot_with_auto_discover__discovers_module(tmp_path, event_bus):
+def test_app__boot_with_auto_discover__discovers_module(
+    app_factory, tmp_path, event_bus
+):
     # Setup mock module structure
     mod_dir = tmp_path / "my_module"
     mod_dir.mkdir()
@@ -606,7 +608,7 @@ class MyAutoModule(IModule):
         pass
 """)
 
-    app = App(container=StdLibContainer(), event_bus=event_bus)
+    app = app_factory(container=StdLibContainer(), event_bus=event_bus)
 
     # Temporarily add tmp_path to sys.path
     sys.path.insert(0, str(tmp_path))
@@ -620,17 +622,17 @@ class MyAutoModule(IModule):
     assert_event_emitted(event_bus, "app.booted", times=1)
 
 
-def test_app__execute_command__resolves_and_executes():
+def test_app__execute_command__resolves_and_executes(app_factory):
     container = StdLibContainer()
-    app = App(container=container, event_bus=MemoryEventBus())
+    app = app_factory(container=container, event_bus=MemoryEventBus())
 
     result = app.dispatch(DummyCommand, "data")
     assert result == "Executed cmd with data"
 
 
-def test_app__execute_command_with_middleware():
+def test_app__execute_command_with_middleware(app_factory):
     container = StdLibContainer()
-    app = App(container=container, event_bus=MemoryEventBus())
+    app = app_factory(container=container, event_bus=MemoryEventBus())
 
     middleware = DummyMiddleware("app_mw")
     app.use_middleware(middleware)
@@ -640,16 +642,16 @@ def test_app__execute_command_with_middleware():
     assert middleware.calls == ["app_mw_before", "app_mw_after"]
 
 
-def test_app__execute_query__resolves_and_executes():
+def test_app__execute_query__resolves_and_executes(app_factory):
     container = StdLibContainer()
-    app = App(container=container, event_bus=MemoryEventBus())
+    app = app_factory(container=container, event_bus=MemoryEventBus())
 
     result = app.dispatch(DummyQuery, "query_data")
     assert result == "Executed query with query_data"
 
 
-def test_app__use_module__registers_and_boots():
-    app = App(container=StdLibContainer(), event_bus=MemoryEventBus())
+def test_app__use_module__registers_and_boots(app_factory):
+    app = app_factory(container=StdLibContainer(), event_bus=MemoryEventBus())
     mod = DummyModule()
 
     # Spy on register and boot
@@ -663,15 +665,15 @@ def test_app__use_module__registers_and_boots():
     mod.boot.assert_called_once_with(app)
 
 
-def test_app__use_invalid_module__raises_error():
-    app = App(container=StdLibContainer(), event_bus=MemoryEventBus())
+def test_app__use_invalid_module__raises_error(app_factory):
+    app = app_factory(container=StdLibContainer(), event_bus=MemoryEventBus())
     with pytest.raises(ModuleRegistrationError):
         app.use(InvalidModule())
 
 
-def test_app__logger_behavior_on_boot():
+def test_app__logger_behavior_on_boot(app_factory):
     # Without logger, doesn't crash during boot
-    app = App(container=StdLibContainer(), event_bus=MemoryEventBus())
+    app = app_factory(container=StdLibContainer(), event_bus=MemoryEventBus())
     app.boot()
 
     # With logger bound, check that it writes to the logger during execute
@@ -680,7 +682,7 @@ def test_app__logger_behavior_on_boot():
     # We must wrap it in a lambda or provide an instance that isn't callable.
     mock_logger = MagicMock(spec=ILogger)
     container.singleton(ILogger, lambda c: mock_logger)
-    app = App(container=container, event_bus=MemoryEventBus())
+    app = app_factory(container=container, event_bus=MemoryEventBus())
 
     # Execute something to trigger logging
     app.dispatch(DummyCommand, "data")
@@ -838,7 +840,7 @@ def test_base_event__to_dict__returns_expected_keys():
 # ==========================================
 
 
-def test_module_auto_discovery__loads_correct_modules(tmp_path, event_bus):
+def test_module_auto_discovery__loads_correct_modules(app_factory, tmp_path, event_bus):
     root = tmp_path / "modules_test"
     root.mkdir()
     (root / "__init__.py").write_text("")
@@ -879,7 +881,7 @@ class JustAClass:
     sys.path.insert(0, str(tmp_path))
 
     try:
-        app = App(container=StdLibContainer(), event_bus=event_bus)
+        app = app_factory(container=StdLibContainer(), event_bus=event_bus)
         app.boot(auto_discover="modules_test")
 
         assert_event_emitted(event_bus, "pkg_mod.registered", times=1)
@@ -894,11 +896,11 @@ class JustAClass:
 # ==========================================
 
 
-def test_health_module__without_database(event_bus):
+def test_health_module__without_database(app_factory, event_bus):
     container = StdLibContainer()
     container.singleton(IContainer, container)
     container.singleton(IEventBus, event_bus)
-    app = App(container=container, event_bus=event_bus)
+    app = app_factory(container=container, event_bus=event_bus)
     app.use(HealthExtension())
     app.boot()
 
@@ -912,11 +914,11 @@ def test_health_module__without_database(event_bus):
     assert result["components"]["database"] == "not configured"
 
 
-def test_health_module__with_database(event_bus):
+def test_health_module__with_database(app_factory, event_bus):
     container = StdLibContainer()
     container.singleton(IContainer, container)
     container.singleton(IEventBus, event_bus)
-    app = App(container=container, event_bus=event_bus)
+    app = app_factory(container=container, event_bus=event_bus)
 
     # Mock database session
     mock_session = MagicMock(spec=ISession)
@@ -1002,7 +1004,7 @@ def test_pydantic_validation_middleware__validate_failure_blocks_execution():
 # ==========================================
 
 
-def test_integration__end_to_end_flow():
+def test_integration__end_to_end_flow(app_factory):
     # Setup Container and EventBus
     container = StdLibContainer()
     event_bus = MemoryEventBus()
@@ -1011,7 +1013,7 @@ def test_integration__end_to_end_flow():
     container.singleton(IContainer, container)
     container.singleton(IEventBus, event_bus)
 
-    app = App(container=container, event_bus=event_bus)
+    app = app_factory(container=container, event_bus=event_bus)
 
     # Create Logger Mock
     # MagicMock is callable, so StdLibContainer treats it as a factory.

@@ -1,3 +1,4 @@
+import threading
 import unittest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
@@ -162,6 +163,125 @@ class TestScheduler(unittest.TestCase):
 
         mock_context.tasks.spawn.assert_not_called()
         self.assertNotIn(dead_job, scheduler.jobs)
+
+    def test_cancel_prevents_a_pending_job_from_ever_running(self):
+        """`TASK-043` E0 — the consumer measured this exact gap: no per-job
+        cancel existed at all. A job cancelled before the scheduler's next
+        tick must neither spawn nor survive into `scheduler.jobs`."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.tasks = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        fn = MagicMock(__name__="cancelled_fn")
+        job = ScheduledJob(fn, IntervalTrigger(timedelta(hours=1)))
+        job.next_run = datetime.now() - timedelta(seconds=1)  # ready immediately
+        scheduler.add_job(job)
+
+        job.cancel()
+        self.assertTrue(job.is_cancelled)
+
+        scheduler.start()
+        import time
+
+        time.sleep(0.05)
+        scheduler.stop()
+
+        mock_context.tasks.spawn.assert_not_called()
+        self.assertNotIn(job, scheduler.jobs)
+
+    def test_cancel_on_a_recurring_job_stops_it_from_running_again(self):
+        """A job cancelled after it has already run once must not be
+        rescheduled for a second run."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.tasks = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        fn = MagicMock(__name__="recurring_fn")
+        job = ScheduledJob(fn, IntervalTrigger(timedelta(milliseconds=10)))
+        job.next_run = datetime.now() - timedelta(seconds=1)
+        scheduler.add_job(job)
+
+        scheduler.start()
+        import time
+
+        time.sleep(0.05)
+        self.assertGreaterEqual(mock_context.tasks.spawn.call_count, 1)
+
+        job.cancel()
+        runs_at_cancel = mock_context.tasks.spawn.call_count
+        time.sleep(0.05)
+        scheduler.stop()
+
+        self.assertEqual(mock_context.tasks.spawn.call_count, runs_at_cancel)
+        self.assertNotIn(job, scheduler.jobs)
+
+    def test_stop_leaves_a_still_running_thread_tracked_instead_of_discarding_it(self):
+        """`BUG-014`: `stop()` used to run `self._thread = None` unconditionally
+        after `join(timeout=...)`, whether or not the join actually succeeded --
+        a thread still alive past the deadline was silently forgotten rather than
+        reported, which is what let it keep running as an untracked, unjoinable
+        leak. Drives the real thread-lifecycle mechanism directly (not `_run()`'s
+        own scheduling logic, which the other tests already cover): a thread
+        that blocks on a controllable `threading.Event` stands in for a
+        `_run()` tick that is slow to notice `_running is False`."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.event_bus = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        release = threading.Event()
+        scheduler._thread = threading.Thread(target=release.wait, daemon=True)
+        scheduler._running = True
+        scheduler._thread.start()
+
+        with self.assertLogs("App", level="ERROR") as logs:
+            scheduler.stop(timeout=0.05)
+
+        self.assertIsNotNone(scheduler._thread)
+        self.assertTrue(scheduler._thread.is_alive())
+        self.assertTrue(any("did not stop" in message for message in logs.output))
+        # A failed stop() must not claim success -- no SchedulerStopped event.
+        mock_context.event_bus.emit.assert_not_called()
+
+        # Letting the real thread finish and retrying now succeeds and clears it.
+        release.set()
+        scheduler.stop(timeout=1.0)
+        self.assertIsNone(scheduler._thread)
+        mock_context.event_bus.emit.assert_called_once()
+
+    def test_start_refuses_to_orphan_a_thread_left_alive_by_a_failed_stop(self):
+        """`BUG-014` follow-up, found by independent PR review: `start()` used
+        to guard only on `self._running`, which a `stop()` that timed out
+        already flips to `False` (by design, so a retry can happen) while
+        leaving the old thread alive and tracked. A `start()` call straight
+        after such a failed `stop()` sailed through that guard and overwrote
+        `self._thread` with a fresh `Thread`, orphaning the still-running old
+        one -- the exact leaked-thread shape `stop()` was fixed to stop
+        producing, reintroduced via `start()` instead."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.event_bus = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        release = threading.Event()
+        scheduler._thread = threading.Thread(target=release.wait, daemon=True)
+        scheduler._running = True
+        scheduler._thread.start()
+
+        scheduler.stop(timeout=0.05)
+        orphan_candidate = scheduler._thread
+        self.assertIsNotNone(orphan_candidate)
+        self.assertTrue(orphan_candidate.is_alive())
+
+        with self.assertLogs("App", level="ERROR") as logs:
+            scheduler.start()
+
+        # start() must refuse rather than replace the still-alive thread.
+        self.assertIs(scheduler._thread, orphan_candidate)
+        self.assertFalse(scheduler._running)
+        self.assertTrue(any("still alive" in message for message in logs.output))
+        mock_context.event_bus.emit.assert_not_called()
+
+        release.set()
+        orphan_candidate.join(timeout=1.0)
 
     def test_start_stop_idempotent(self):
         # Arrange

@@ -124,6 +124,8 @@ def test_app_boot():
     boot_mock.assert_called_once()
     handler.assert_called_once_with(app)
 
+    app.stop()
+
 
 def test_app_execute_command():
     container = StdLibContainer()
@@ -228,3 +230,5 @@ def test_kernel_facade_and_components():
         and "Responsible for discovering and loading engine extensions."
         in ModuleLoader.__doc__
     )
+
+    app.stop()

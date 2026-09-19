@@ -39,7 +39,7 @@ def _boot(tmp_path):
 
 
 def test_qml_and_widget_views_both_satisfy_iview(qtbot, tmp_path):
-    _boot(tmp_path)  # configure_app_qml() must run before QmlEnrollFormView loads
+    app = _boot(tmp_path)  # configure_app_qml() must run before QmlEnrollFormView loads
     qml_view = QmlEnrollFormView()
     widget_view = WidgetEnrollFormView()
     qtbot.addWidget(qml_view)
@@ -48,13 +48,15 @@ def test_qml_and_widget_views_both_satisfy_iview(qtbot, tmp_path):
     assert isinstance(qml_view, IView)
     assert isinstance(widget_view, IView)
 
+    app.stop()
+
 
 def test_presenter_drives_qml_view_identically_to_widget_view(qtbot, tmp_path):
     """The actual point of the prototype: EnrollFormPresenter is written
     once, against IView, with no knowledge of which concrete View it
     gets -- both must produce the same submitted data through the exact
     same presenter code path."""
-    _boot(tmp_path)
+    app = _boot(tmp_path)
 
     for view in (QmlEnrollFormView(), WidgetEnrollFormView()):
         qtbot.addWidget(view)
@@ -71,15 +73,19 @@ def test_presenter_drives_qml_view_identically_to_widget_view(qtbot, tmp_path):
             f"failed for {type(view).__name__}"
         )
 
+    app.stop()
+
 
 def test_qml_enroll_form_view_loads_with_no_errors(qtbot, tmp_path):
-    _boot(tmp_path)
+    app = _boot(tmp_path)
     view = QmlEnrollFormView()
     qtbot.addWidget(view)
     EnrollFormPresenter(view, lambda *args: None)
 
     assert view.quick_widget.errors() == []
     assert view.quick_widget.rootObject() is not None
+
+    app.stop()
 
 
 def test_widget_enroll_form_view_reflects_view_model_changes(qtbot, tmp_path):
@@ -88,7 +94,7 @@ def test_widget_enroll_form_view_reflects_view_model_changes(qtbot, tmp_path):
     field automatically; a QWidget View has to wire that direction back
     explicitly (fullNameChanged -> setText) or it silently only works
     forward (typing), not for a programmatic ViewModel change."""
-    _boot(tmp_path)
+    app = _boot(tmp_path)
     view = WidgetEnrollFormView()
     qtbot.addWidget(view)
     presenter = EnrollFormPresenter(view, lambda *args: None)
@@ -98,6 +104,8 @@ def test_widget_enroll_form_view_reflects_view_model_changes(qtbot, tmp_path):
 
     presenter.view_model.gpa = 3.4
     assert view._gpa_field.value() == 3.4
+
+    app.stop()
 
 
 def test_register_enroll_form_view_picks_backend_from_config(tmp_path):

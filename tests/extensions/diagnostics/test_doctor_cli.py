@@ -7,6 +7,7 @@ test is behaviour, and a subprocess would only make that slower and flakier.
 """
 
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -25,7 +26,6 @@ def _noop(data=None):
 def clean_app():
     app = App(StdLibContainer(), MemoryEventBus())
     app.boot()
-    _apps.append(app)
     return app
 
 
@@ -33,7 +33,6 @@ def app_with_a_typo():
     app = App(StdLibContainer(), MemoryEventBus())
     app.event_bus.on("app.bootd", _noop)  # A2 — an error
     app.boot()
-    _apps.append(app)
     return app
 
 
@@ -41,7 +40,6 @@ def app_with_only_a_warning():
     app = App(StdLibContainer(), MemoryEventBus())
     app.event_bus.on("nothing.resembling.a.declared.name", _noop)
     app.boot()
-    _apps.append(app)
     return app
 
 
@@ -66,7 +64,23 @@ class _HandlerWithADependency:
 
 @pytest.fixture(autouse=True)
 def _stop_apps():
-    yield
+    """`BUG-014`: several tests here exercise `cli.main()` end-to-end against
+    `examples.student_management.doctor_target:build`, which boots a real
+    `App` entirely inside `cli.main()` -- the test never gets a reference to
+    stop it, and a real CLI invocation legitimately never needs to (the
+    process exits). Patching `App.boot` to self-register every booted
+    instance, regardless of who constructed it, is the one place that can
+    catch that path without cli.py or doctor_target.py needing to grow a
+    test-only escape hatch."""
+    original_boot = App.boot
+
+    def _tracking_boot(self, *args, **kwargs):
+        _apps.append(self)
+        return original_boot(self, *args, **kwargs)
+
+    with patch.object(App, "boot", _tracking_boot):
+        yield
+
     while _apps:
         _apps.pop().stop()
 

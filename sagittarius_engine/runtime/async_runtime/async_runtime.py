@@ -44,9 +44,19 @@ class AsyncRuntime:
             raise RuntimeError("AsyncRuntime loop is not running")
         return asyncio.run_coroutine_threadsafe(coro, self.loop)
 
-    def stop(self) -> None:
+    def stop(self, timeout: float = 5.0) -> None:
         """
         @brief Stops and closes the background event loop gracefully.
+
+        @details `BUG-014`: this used to join with a fixed timeout and then
+        unconditionally clear `self._thread` and `close()` the loop, whether or not
+        the background thread's own `run_forever()` had actually returned. Closing a
+        loop while another thread is still iterating it is unsafe in asyncio (at best
+        a `RuntimeError`, at worst native-level corruption — a live suspect for this
+        bug's segfaults, not just its leaked threads). A thread still alive after
+        `timeout` now stops this method before `close()` ever runs, and leaves
+        `self._thread`/`self.loop` set rather than discarding them, so the state
+        stays honest and a second `stop()` call can retry.
         """
         if self.loop is None:
             return
@@ -55,7 +65,15 @@ class AsyncRuntime:
         self.loop.call_soon_threadsafe(self.loop.stop)
 
         if self._thread is not None:
-            self._thread.join(timeout=5.0)
+            self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                self._logger.error(
+                    "AsyncRuntime event loop thread did not stop within %ss — "
+                    "leaving it and the loop tracked rather than closing a loop "
+                    "still running on another thread; call stop() again to retry.",
+                    timeout,
+                )
+                return
             self._thread = None
 
         try:

@@ -48,6 +48,8 @@ def test_runtime_add_database_after_boot_is_immediately_usable():
     assert session is not None
     assert set(manager.names()) == {"default", "BTCUSDT"}
 
+    app.stop()
+
 
 def test_shutdown_disposes_the_engine_so_a_backing_sqlite_file_can_be_deleted():
     """@brief Regression test, two bugs deep. DatabaseExtension.shutdown()
@@ -129,6 +131,8 @@ def test_runtime_remove_database_after_boot_disposes_and_forgets():
     with pytest.raises(DatabaseNotFoundError):
         manager.get_session("ETHUSDT")
 
+    app.stop()
+
 
 def test_runtime_add_then_remove_cycle_matches_per_symbol_shard_lifecycle():
     app = _boot_app_with_database_extension(
@@ -148,3 +152,5 @@ def test_runtime_add_then_remove_cycle_matches_per_symbol_shard_lifecycle():
         manager.get_session("SOLUSDT")
     assert manager.get_session("BTCUSDT") is not None
     assert manager.get_session("ETHUSDT") is not None
+
+    app.stop()

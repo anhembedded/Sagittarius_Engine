@@ -265,3 +265,22 @@ def test_app_stop_completes_despite_a_rogue_hanging_extension():
     finally:
         release_rogue.set()  # let the rogue thread exit instead of leaking it
     app.context.lifecycle.set_stopped.assert_called_once()
+
+
+def test_app_stop_gives_the_scheduler_and_async_runtime_the_full_step_timeout():
+    """`BUG-014` follow-up: `scheduler.stop`/`async_runtime.stop` used to be
+    called with no arguments, so they silently fell back to their own
+    hard-coded 5.0s default no matter what `step_timeout` the caller passed
+    to `App.stop()` -- a background thread genuinely about to exit, just
+    slower than 5.0s under load, was abandoned with half the budget every
+    other step gets. `App.stop(step_timeout=...)` must reach both calls."""
+    app = App.__new__(App)
+    app.context = MagicMock()
+    app.context.lifecycle.is_stopping = False
+    app.context.lifecycle.is_stopped = False
+    app.context.logger = MagicMock(spec=ILogger)
+
+    app.stop(step_timeout=17.5)
+
+    app.context.scheduler.stop.assert_called_once_with(timeout=17.5)
+    app.context.async_runtime.stop.assert_called_once_with(timeout=17.5)

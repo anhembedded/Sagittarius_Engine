@@ -16,8 +16,6 @@ import timeit
 import pytest
 
 from sagittarius_engine.extensions.audit.recorder import TraceRecorder
-from sagittarius_engine.infrastructure.container.std_container import StdLibContainer
-from sagittarius_engine.infrastructure.event_bus.memory_event_bus import MemoryEventBus
 from sagittarius_engine.interfaces import IExtension, IMiddleware
 from sagittarius_engine.interfaces.i_dispatchable import IDispatchable
 from sagittarius_engine.interfaces.i_trace_recorder import Lane
@@ -78,15 +76,19 @@ class FailingCommand(IDispatchable):
         raise ValueError("handler exploded")
 
 
-def _app(*, tracing: bool = True):
+def _app(app_factory, *, tracing: bool = True):
     """Returns `(app, recorder)`; `recorder` is `None` when tracing is off.
 
     Deliberately unannotated: `enable_tracing()` returns the *interface*, so a
     `TraceRecorder | None` annotation would be a lie mypy correctly rejects,
     and widening it to `ITraceRecorder | None` would lose the concrete methods
     (`snapshot()`) every test here calls.
+
+    `app_factory` (`tests/conftest.py`, `BUG-014`) rather than a bare `App(...)`
+    so every app this helper builds is stopped in teardown, whether or not the
+    calling test ever reaches its own `.stop()`.
     """
-    app = App(StdLibContainer(), MemoryEventBus())
+    app = app_factory()
     recorder = TraceRecorder() if tracing else None
     if recorder is not None:
         app.context.enable_tracing(recorder)
@@ -105,26 +107,26 @@ def _spans(recorder, lane=None, cat=None):
 # ------------------------------------------------------------------- off state
 
 
-def test_tracing_is_off_unless_asked_for():
-    app, _ = _app(tracing=False)
+def test_tracing_is_off_unless_asked_for(app_factory):
+    app, _ = _app(app_factory, tracing=False)
     assert app.context.recorder is None
     assert app.context.trace.enabled is False
 
 
-def test_the_application_api_is_safe_when_tracing_is_off():
+def test_the_application_api_is_safe_when_tracing_is_off(app_factory):
     """An API that made every application write `if ctx.trace is not None:`
     around its own markers would push the engine's constraint onto the place
     where it does not apply."""
-    app, _ = _app(tracing=False)
+    app, _ = _app(app_factory, tracing=False)
 
     app.context.trace.mark("nothing-is-recorded", price=1)
     with app.context.trace.span("also-nothing"):
         pass  # must not raise
 
 
-def test_disabling_keeps_what_was_already_recorded():
+def test_disabling_keeps_what_was_already_recorded(app_factory):
     """The report is usually read after the fact."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.context.trace.mark("before")
     app.context.disable_tracing()
 
@@ -132,11 +134,11 @@ def test_disabling_keeps_what_was_already_recorded():
     assert len(recorder.snapshot()) == 1
 
 
-def test_enabling_after_the_api_object_exists_still_takes_effect():
+def test_enabling_after_the_api_object_exists_still_takes_effect(app_factory):
     """`TraceApi` reads the recorder off the context per call rather than
     caching it — a handle that silently recorded nothing would be the exact
     class of bug this epic is about."""
-    app, _ = _app(tracing=False)
+    app, _ = _app(app_factory, tracing=False)
     trace = app.context.trace
 
     recorder = app.context.enable_tracing(TraceRecorder())
@@ -148,10 +150,10 @@ def test_enabling_after_the_api_object_exists_still_takes_effect():
 # --------------------------------------------------------------- boot profiling
 
 
-def test_boot_profiling_separates_a_slow_extension_from_a_fast_one():
+def test_boot_profiling_separates_a_slow_extension_from_a_fast_one(app_factory):
     """ "Why does startup take four seconds?" as a bar chart — `EPIC-005B` names
     this as one of two things that fall out for free."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.use(SlowExtension())
     app.use(FastExtension())
     app.boot()
@@ -162,10 +164,10 @@ def test_boot_profiling_separates_a_slow_extension_from_a_fast_one():
     assert by_name["SlowExtension"] >= SLOW * 1e9 * 0.5
 
 
-def test_the_recorder_must_exist_before_boot_to_profile_it():
+def test_the_recorder_must_exist_before_boot_to_profile_it(app_factory):
     """Stated in `enable_tracing()`'s docstring, and true: extensions start
     during `boot()`, so a recorder installed afterwards has nothing to record."""
-    app, _ = _app(tracing=False)
+    app, _ = _app(app_factory, tracing=False)
     app.use(SlowExtension())
     app.boot()
 
@@ -176,12 +178,12 @@ def test_the_recorder_must_exist_before_boot_to_profile_it():
 # -------------------------------------------------------------- middleware cost
 
 
-def test_a_span_per_middleware_frame_names_the_right_middleware():
+def test_a_span_per_middleware_frame_names_the_right_middleware(app_factory):
     """The regression this guards: wrapping the frames in a closure built
     inside the loop makes Python's late binding report the *last* middleware's
     name for every frame — a trace that is confidently wrong rather than merely
     absent. `_traced_frame()` is a module-level function for this reason."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.boot()
     app.context.middleware_pipeline.add(CheapMiddleware())
     app.context.middleware_pipeline.add(ExpensiveMiddleware())
@@ -193,12 +195,12 @@ def test_a_span_per_middleware_frame_names_the_right_middleware():
     assert names == {"CheapMiddleware", "ExpensiveMiddleware"}
 
 
-def test_middleware_spans_are_inclusive_so_self_time_is_parent_minus_child():
+def test_middleware_spans_are_inclusive_so_self_time_is_parent_minus_child(app_factory):
     """Frames nest, so an outer frame's duration contains the inner ones. That
     is what a flame graph needs, and it is why the expensive frame is found by
     subtraction rather than by reading one number — `EPIC-005` §5's argument for
     borrowing Perfetto rather than building a viewer."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.boot()
     app.context.middleware_pipeline.add(CheapMiddleware())  # outermost
     app.context.middleware_pipeline.add(ExpensiveMiddleware())
@@ -213,8 +215,8 @@ def test_middleware_spans_are_inclusive_so_self_time_is_parent_minus_child():
     assert self_time < by_name["ExpensiveMiddleware"] / 2
 
 
-def test_no_middleware_means_no_middleware_spans():
-    app, recorder = _app()
+def test_no_middleware_means_no_middleware_spans(app_factory):
+    app, recorder = _app(app_factory)
     app.boot()
     app.context.container.bind(GreetCommand, GreetCommand)
 
@@ -226,10 +228,10 @@ def test_no_middleware_means_no_middleware_spans():
 # -------------------------------------------------------------------- dispatch
 
 
-def test_dispatch_records_a_total_and_a_handler_span_sharing_one_id():
+def test_dispatch_records_a_total_and_a_handler_span_sharing_one_id(app_factory):
     """Without the correlation id, a concurrent dispatch on another thread
     interleaves into the same lane and the trace reads as one impossible call."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.boot()
     app.context.container.bind(GreetCommand, GreetCommand)
 
@@ -242,12 +244,12 @@ def test_dispatch_records_a_total_and_a_handler_span_sharing_one_id():
     assert all(r.cid != 0 for r in spans)
 
 
-def test_a_query_is_labelled_as_one():
+def test_a_query_is_labelled_as_one(app_factory):
     class RosterQuery(IDispatchable):
         def execute(self, dto=None):
             return []
 
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.boot()
     app.context.container.bind(RosterQuery, RosterQuery)
 
@@ -256,10 +258,10 @@ def test_a_query_is_labelled_as_one():
     assert {r.cat for r in _spans(recorder, Lane.DISPATCH)} == {"query", "handler"}
 
 
-def test_a_dispatch_that_raises_is_still_measured():
+def test_a_dispatch_that_raises_is_still_measured(app_factory):
     """The slow-then-failing operation is exactly what someone opens a tracer to
     find; a span that vanished when its body raised would hide it."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.boot()
     app.context.container.bind(FailingCommand, FailingCommand)
 
@@ -272,7 +274,7 @@ def test_a_dispatch_that_raises_is_still_measured():
 # ------------------------------------------------------- tasks (requirement 2)
 
 
-def test_a_task_run_span_measures_the_work_and_not_the_bookkeeping():
+def test_a_task_run_span_measures_the_work_and_not_the_bookkeeping(app_factory):
     """`EPIC-005B` requirement 2 says a task-run span must reconstruct to "the
     same duration the task manager itself reports".
 
@@ -286,7 +288,7 @@ def test_a_task_run_span_measures_the_work_and_not_the_bookkeeping():
     call. A trace that disagreed with a real clock is wrong, and nothing built
     on it could be trusted.
     """
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.boot()
 
     def work():
@@ -310,11 +312,11 @@ def test_a_task_run_span_measures_the_work_and_not_the_bookkeeping():
 # --------------------------------------------------- the application's own API
 
 
-def test_an_application_span_lands_in_the_user_lane():
+def test_an_application_span_lands_in_the_user_lane(app_factory):
     """`D8` was the framework hard-coding `student.added` and three other
     demo-app event names. The replacement: the app marks what matters to it, and
     the framework knows about zero application events."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.boot()
 
     with app.context.trace.span("strategy-eval", symbol="BTC"):
@@ -331,8 +333,8 @@ def test_an_application_span_lands_in_the_user_lane():
     assert instant.args == {"price": 101.5}
 
 
-def test_an_application_span_survives_an_exception_in_its_body():
-    app, recorder = _app()
+def test_an_application_span_survives_an_exception_in_its_body(app_factory):
+    app, recorder = _app(app_factory)
     app.boot()
 
     with pytest.raises(RuntimeError), app.context.trace.span("doomed"):
@@ -341,10 +343,10 @@ def test_an_application_span_survives_an_exception_in_its_body():
     assert [r.name for r in _spans(recorder, Lane.USER)] == ["doomed"]
 
 
-def test_no_framework_module_names_an_application_event():
+def test_no_framework_module_names_an_application_event(app_factory):
     """`EPIC-005B` requirement 4, as a check rather than a promise: every record
     the engine produces without the application asking is in an engine lane."""
-    app, recorder = _app()
+    app, recorder = _app(app_factory)
     app.use(FastExtension())
     app.boot()
     app.context.container.bind(GreetCommand, GreetCommand)
@@ -381,7 +383,7 @@ _INSTRUMENTED = _instrumentation()
         "run via the benchmark job, which does not use --cov"
     ),
 )
-def test_the_disabled_path_short_circuits_before_anything_tracing_costs():
+def test_the_disabled_path_short_circuits_before_anything_tracing_costs(app_factory):
     """`EPIC-005B` requirement 3.
 
     The regression this exists for was real and was mine: the first version
@@ -402,7 +404,7 @@ def test_the_disabled_path_short_circuits_before_anything_tracing_costs():
             return next_handler()
 
     def build(tracing: bool) -> App:
-        app = App(StdLibContainer(), MemoryEventBus())
+        app = app_factory()
         if tracing:
             app.context.enable_tracing(TraceRecorder())
         app.boot()
