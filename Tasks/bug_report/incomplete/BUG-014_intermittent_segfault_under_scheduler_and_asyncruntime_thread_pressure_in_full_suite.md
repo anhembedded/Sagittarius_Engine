@@ -2,7 +2,7 @@
 
 **Reported date:** 2026-09-19
 **Severity:** Medium (intermittent — roughly 1 in 3 full-suite runs this session — but a hard crash, not a test failure, so it can silently read as "gate never finished" rather than "gate is red")
-**Status:** ✅ Fixed (2026-09-19)
+**Status:** 🔴 Reopened (2026-09-19) — see "Reopened" section; the 2026-09-19 "Fixed" closure below was premature
 **Found by:** `TASK-043` E1, while verifying the contribution-mechanism harvest's full local gate
 
 ---
@@ -160,6 +160,68 @@ this report.
 in here: `BUG-015` (`tests/extensions/ui_state/test_ui_state_coordinator.py`'s `QTimer` debounce
 test, load-sensitive, unrelated to `Scheduler`/`AsyncRuntime`).
 
+## Reopened, 2026-09-19 — the fix above was necessary but not sufficient
+
+GitHub Actions' `Test (Python 3.12 on ubuntu-latest)` job (run `35438668390`, commit `3acbea4` —
+**the commit that introduced the fix above**) crashed with the identical signature: `Segmentation
+fault (core dumped)` during `pytest tests/ examples/student_management/tests/ --cov=... -q`, with
+**59 live threads** in the crash dump — 28 in `scheduler.py`'s `_run()` (blocked on
+`self._cond.wait()`, now at line 241) and 30 in `async_runtime.py`'s `_run_loop()` (blocked on
+`run_forever()`'s `select()`), plus 1 thread-pool worker. This is the same leaked-thread family the
+original report described, reproducing on GitHub's own runner right after the fix meant to close it
+— proof the closure above was premature. The 3 clean local runs cited as evidence were real, but
+insufficient: GitHub's runner shares a weaker, more contended CPU than the local dev container, and
+this session's local reproduction never actually matched that load profile.
+
+**Why the original fix didn't stop the leak.** The original fix made `Scheduler.stop()` /
+`AsyncRuntime.stop()` *honest* about a join that times out — it logs an `ERROR` and leaves the
+thread tracked instead of silently discarding the reference — and *retry-safe*, so a second
+`stop()` call can pick up where the first left off. But nothing in the codebase ever makes that
+second call. `App.stop()` — the only caller that matters in a real shutdown — runs each step
+exactly once, on a dedicated daemon thread bounded by `step_timeout`
+(`sagittarius_engine/kernel/app.py::App._run_stop_step`, by design: a hung extension must never
+block the rest of shutdown). A step that times out is logged and abandoned, never retried. So the
+underlying OS thread was exactly as leaked after the original fix as before it — the only change
+was that the leak became a logged `ERROR` instead of a silent one. The fix improved diagnosability,
+not the actual thread lifecycle, which is why the segfault signature reproduced unchanged.
+
+**A second, real defect found while re-investigating (`sagittarius_engine/kernel/app.py`
+`App.stop()`):** the scheduler/async-runtime shutdown steps were wired as
+`("scheduler", self.context.scheduler.stop)` / `("async runtime", self.context.async_runtime.stop)`
+— bound methods called with **no arguments** inside `_run_stop_step`'s own `_runner()`. Both
+methods now take a `timeout` parameter (added by the original fix), but nothing passed one through,
+so they silently fell back to their own hard-coded `timeout=5.0` default regardless of the
+`step_timeout` (10.0s default, and the actual budget `App.stop()`'s own docstring promises "each
+individual step") the caller configured. A background thread that is genuinely about to exit, just
+slower than 5.0s to be scheduled under a heavily loaded, coverage-instrumented, ~1400-test shared
+process, was abandoned with **half** the budget every other step gets. This is now fixed:
+`App.stop()`'s step list passes `timeout=step_timeout` through to both calls, and a regression test
+(`tests/kernel/test_app.py::test_app_stop_gives_the_scheduler_and_async_runtime_the_full_step_timeout`)
+locks the wiring, mutation-verified against the exact pre-fix no-argument call.
+
+**What this does and does not claim.** Doubling the join budget for these two steps is a genuine,
+narrowly-scoped correction of a real plumbing bug (a documented parameter silently not reaching its
+callee) — not a guess. It should reduce, not necessarily eliminate, the rate at which a slow-to-exit
+thread gets abandoned under load. It does **not** by itself explain why dozens of *separate*
+`Scheduler`/`AsyncRuntime` instances (one pair per `App()` under test) end up leaked simultaneously
+across a single ~1400-test session, nor has the exact native mechanism that turns "many leaked
+Python threads alive" into `Segmentation fault` been identified — only the accumulation path (one
+failed join is never retried, so it is permanent for the rest of the process) is understood. Both
+remain open questions; see Requirements below.
+
+## Requirements (reopened)
+
+5. Run the full gate several more times, both locally and by watching GitHub Actions on this PR,
+   after the `step_timeout` propagation fix — do not close on local runs alone again, given this is
+   exactly the mistake that reopened this report.
+6. Investigate whether something beyond a single slow join is leaking whole `Scheduler`/
+   `AsyncRuntime` *instances* — e.g. a fixture or composition-root path that constructs and
+   `.start()`s one without a guaranteed `.stop()` on every exit path (including test failure) — since
+   28+30 simultaneously alive instances is a lot to attribute to occasional slow joins alone.
+7. If the segfault recurs even with the `step_timeout` fix, treat "GitHub Actions' runner reliably
+   reproduces this; the local dev container does not" as a fact to design verification around, not
+   a fact to work around by re-running until green.
+
 ## Related
 
 - `TASK-043` E1/E2 — where this was found; not blocking, not caused by that change (evidence above)
@@ -167,3 +229,5 @@ test, load-sensitive, unrelated to `Scheduler`/`AsyncRuntime`).
   `ResourceWarning`" as part of its own green-gate bar; the `ResourceWarning` half of that bar is
   still not met (see "Not fixed" above)
 - `BUG-015` — the unrelated flake this fix's own verification runs surfaced
+- PR #222, GitHub Actions run `35438668390`, job `105885679152`, commit `3acbea4` — the recurrence
+  that reopened this report

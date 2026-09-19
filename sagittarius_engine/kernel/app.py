@@ -161,6 +161,16 @@ class App:
         @details Stops the scheduler, hosted services, extensions, task manager, and
         async runtime in reverse order. Each step is bounded by `step_timeout` seconds
         so a single hanging step cannot block the rest of shutdown indefinitely.
+
+        `BUG-014` follow-up: the scheduler/async-runtime steps used to ignore
+        `step_timeout` entirely and join with their own hard-coded 5.0s default,
+        silently giving those two steps half the budget every other step gets. A
+        caller passing a larger `step_timeout` to buy a background thread more time
+        to notice shutdown got no benefit for exactly the two steps most exposed to
+        GIL contention under a large, coverage-instrumented test session — where a
+        thread that is genuinely about to exit, just slower than 5.0s to be
+        scheduled, was abandoned rather than actually waited for.
+
         @param step_timeout Maximum seconds to wait for each individual step.
         """
         if self.context.lifecycle.is_stopping or self.context.lifecycle.is_stopped:
@@ -179,11 +189,17 @@ class App:
                 bus.dispose()
 
         steps: list[tuple[str, Callable[[], None]]] = [
-            ("scheduler", self.context.scheduler.stop),
+            (
+                "scheduler",
+                lambda: self.context.scheduler.stop(timeout=step_timeout),
+            ),
             ("hosted services", self.context.hosted_services.stop),
             ("extensions", self.context.extension_manager.stop_and_dispose),
             ("task manager", self.context.tasks.shutdown),
-            ("async runtime", self.context.async_runtime.stop),
+            (
+                "async runtime",
+                lambda: self.context.async_runtime.stop(timeout=step_timeout),
+            ),
             ("event bus", _shutdown_event_bus),
         ]
         for step_name, fn in steps:
