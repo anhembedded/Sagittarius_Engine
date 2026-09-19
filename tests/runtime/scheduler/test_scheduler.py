@@ -163,6 +163,57 @@ class TestScheduler(unittest.TestCase):
         mock_context.tasks.spawn.assert_not_called()
         self.assertNotIn(dead_job, scheduler.jobs)
 
+    def test_cancel_prevents_a_pending_job_from_ever_running(self):
+        """`TASK-043` E0 — the consumer measured this exact gap: no per-job
+        cancel existed at all. A job cancelled before the scheduler's next
+        tick must neither spawn nor survive into `scheduler.jobs`."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.tasks = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        fn = MagicMock(__name__="cancelled_fn")
+        job = ScheduledJob(fn, IntervalTrigger(timedelta(hours=1)))
+        job.next_run = datetime.now() - timedelta(seconds=1)  # ready immediately
+        scheduler.add_job(job)
+
+        job.cancel()
+        self.assertTrue(job.is_cancelled)
+
+        scheduler.start()
+        import time
+
+        time.sleep(0.05)
+        scheduler.stop()
+
+        mock_context.tasks.spawn.assert_not_called()
+        self.assertNotIn(job, scheduler.jobs)
+
+    def test_cancel_on_a_recurring_job_stops_it_from_running_again(self):
+        """A job cancelled after it has already run once must not be
+        rescheduled for a second run."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.tasks = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        fn = MagicMock(__name__="recurring_fn")
+        job = ScheduledJob(fn, IntervalTrigger(timedelta(milliseconds=10)))
+        job.next_run = datetime.now() - timedelta(seconds=1)
+        scheduler.add_job(job)
+
+        scheduler.start()
+        import time
+
+        time.sleep(0.05)
+        self.assertGreaterEqual(mock_context.tasks.spawn.call_count, 1)
+
+        job.cancel()
+        runs_at_cancel = mock_context.tasks.spawn.call_count
+        time.sleep(0.05)
+        scheduler.stop()
+
+        self.assertEqual(mock_context.tasks.spawn.call_count, runs_at_cancel)
+        self.assertNotIn(job, scheduler.jobs)
+
     def test_start_stop_idempotent(self):
         # Arrange
         mock_context = MagicMock(spec=IEngineContext)

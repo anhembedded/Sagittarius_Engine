@@ -29,6 +29,27 @@ class ScheduledJob:
         self.max_runs = max_runs
         self.runs = 0
         self.next_run = trigger.get_next_run(datetime.now())
+        self._cancelled = threading.Event()
+
+    def cancel(self) -> None:
+        """
+        @brief Cancels this job: it will not be spawned or rescheduled again.
+
+        Thread-safe (`threading.Event`) — callable from any thread, including
+        from inside the job's own callback. `Scheduler._run()` drops a
+        cancelled job the next time it evaluates `self.jobs`, at most one
+        polling tick away (`TASK-043` E0 — the consumer measured this as a
+        real gap: no per-job cancel existed at all).
+
+        Does not interrupt a run already handed to `ITaskManager.spawn()` for
+        the tick in progress when `cancel()` is called — only a run that has
+        not yet been dispatched.
+        """
+        self._cancelled.set()
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self._cancelled.is_set()
 
 
 class JobBuilder:
@@ -151,6 +172,10 @@ class Scheduler:
                 next_wakeup = now + timedelta(seconds=1.0)
 
                 for job in self.jobs:
+                    if job.is_cancelled:
+                        # Dropped the same way a dead (`next_run is None`) job
+                        # is: neither spawned nor kept for the next tick.
+                        continue
                     if job.next_run is None:
                         # A job with no next run is dead — dropped here rather
                         # than compared against `now`, which crashed this

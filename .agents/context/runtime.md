@@ -16,6 +16,8 @@ A thin wrapper around `asyncio` that allows synchronous engine code to fire-and-
 ### 3. Scheduler
 Handles recurring and delayed jobs.
 - **Triggers**: `IntervalTrigger`, `CronTrigger`.
+- **Cancellation**: `ScheduledJob.cancel()` (`runtime/scheduler/scheduler.py`) — thread-safe,
+  stops future runs; does not interrupt a run already dispatched for the current tick.
 - Used by health checks or periodic cleanup tasks.
 
 ### 4. Hosted Services (`IHostedService`)
