@@ -164,8 +164,19 @@ E1/E2), which Phase 5 cannot yet do because it currently has nothing but its own
 `NavigationService` app-side against `ScreenRegistry`'s current shape (mirroring what
 `examples/student_management/docs/ui_extension_lifecycle.md` already did for objective 5's
 ordering question, §"Two lifecycles" above) or a user decision to build E3 here first, ahead of a
-live consumer, as a deliberate exception to the harvest rule. Not decided in this session — surfaced
-here for the user rather than guessed.
+live consumer, as a deliberate exception to the harvest rule.
+
+**Decided 2026-09-19, by user instruction ("make the call").** Path (a): the consumer prototypes a
+`NavigationService`-shaped mechanism in its own tree first, against its current `ScreenRegistry`,
+the same harvest-first pattern every other step of this table already follows — not path (b),
+building E3 here ahead of any live consumer. Reasoning: harvest-first won every prior step (E0/E1)
+precisely because the engine did not have to guess a shape no real consumer had proven; breaking
+that rule for E3 alone, with no other justification than "it is currently blocked," would repeat
+the exact mistake this task's own header already warns against ("start there, not from a fresh
+design"). This is a decision about *sequencing*, not a design of `NavigationService` itself — that
+design still happens in the consumer's own tree, against its own `EPIC-025F`, verified there before
+anything lands here. Consumer's `EPIC-025F` is updated with the matching decision in the same
+session.
 
 The consumer's SDD (`Docs/SDD/README.md`) already fixes the descriptor shape and the registry
 validation rules that E1 will receive; read it before designing E1 independently.
