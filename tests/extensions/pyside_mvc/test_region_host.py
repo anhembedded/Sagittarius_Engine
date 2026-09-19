@@ -42,8 +42,10 @@ def _trading_surface() -> SurfaceDeclaration:
 
 
 @pytest.fixture
-def trading(qapp) -> RegionHost:
-    return RegionHost(_trading_surface(), _TRADING_PLACE_REGIONS)
+def trading(qapp, qtbot) -> RegionHost:
+    host = RegionHost(_trading_surface(), _TRADING_PLACE_REGIONS)
+    qtbot.addWidget(host)
+    return host
 
 
 class TestConstruction:
@@ -72,11 +74,14 @@ class TestIdentity:
         assert trading.surface_id == "trading"
         assert "rail" in trading.accepts()
 
-    def test_it_nests_instead_of_drawing_its_own_window_frame(self, qapp) -> None:
+    def test_it_nests_instead_of_drawing_its_own_window_frame(
+        self, qapp, qtbot
+    ) -> None:
         """A parent is not enough: `QMainWindow` sets the `Window` flag on
         itself, so nested in a page it would still draw its own title bar
         without `setWindowFlags(Qt.Widget)` clearing that flag set."""
         page = QWidget()
+        qtbot.addWidget(page)
 
         nested = RegionHost(_trading_surface(), _TRADING_PLACE_REGIONS, page)
 
