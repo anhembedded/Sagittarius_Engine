@@ -209,18 +209,74 @@ Python threads alive" into `Segmentation fault` been identified — only the acc
 failed join is never retried, so it is permanent for the rest of the process) is understood. Both
 remain open questions; see Requirements below.
 
+## Requirement 6, confirmed 2026-09-19 — the real root cause
+
+GitHub Actions crashed a **third** time, identical signature, on commit `f6ff744` (run
+`35439470637`, job `105887787307`) — the commit carrying *both* the `step_timeout` propagation fix
+**and** the `Scheduler.start()` orphan-guard fix an independent reviewer found. **60 live threads**
+in the dump this time: 29 in `scheduler.py`'s `_run()` (now at line 257), 29 in `async_runtime.py`'s
+`_run_loop()`, 1 thread-pool worker — same scale as both prior crashes. Two consecutive real GitHub
+Actions runs, two different rounds of genuine fixes in between, functionally the same crash: this is
+no longer explainable as a slow join under load. Requirement 6's suspicion was right, and this time
+it was checked rather than left open:
+
+```
+grep -rl "\.boot(" tests/ --include=*.py | wc -l   # 24 files
+# per-file .boot() vs .stop() call counts (tests/kernel/test_extension_manager.py, e.g.):
+#   boots=9  stops=0
+```
+
+**`Bootstrap.boot()` (`sagittarius_engine/kernel/bootstrap.py:40,52`) unconditionally calls
+`self.context.async_runtime.start()` and `self.context.scheduler.start()` on every successful
+boot** — so every test that constructs an `App`/`EngineContext` and calls `.boot()` starts one real
+`Scheduler` thread and one real `AsyncRuntime` thread. Across the 24 test files that call `.boot()`,
+counting `.boot(` vs `.stop(` per file finds entire files with real, non-trivial boot counts and
+**zero** stop calls of any kind — `tests/extensions/test_health_check_requested.py` (4 boots, 0
+stops), `tests/extensions/test_dependency_validator.py` (2, 0), `tests/runtime/
+test_task_progress_integration.py` (1, 0), `tests/middleware/test_middleware.py` (1, 0),
+`tests/test_full_coverage.py` (8, 0), `tests/kernel/test_extension_manager.py` (9, 0),
+`tests/kernel/test_core.py` (2, 0), `tests/test_agents_docs_resolve.py` (1, 0),
+`tests/test_edge_cases.py` (10, 0), `tests/test_integration_io.py` (2, 0) — **40 un-stopped `boot()`
+calls in these ten files alone**, each leaking a `Scheduler` + `AsyncRuntime` thread pair (checked
+for a missed teardown mechanism first: these files' own `app` fixtures use plain `return`, not
+`yield`, so there is no finalizer calling `stop()` either). Totalled across all 24 files: 103
+`.boot()` calls against 78 `.stop()` calls of any kind (a loose proxy, but consistent with the
+crash dumps' own 29-vs-29 scale). This is the accumulation mechanism Requirement 6 asked about: not
+one slow join, but dozens of test files that simply never clean up the `App` they booted.
+
+**Why the `step_timeout`/`start()` fixes didn't help:** both are real, correct fixes for what they
+address (an *attempted* `stop()` that fails to join in time), but neither one applies when `stop()`
+is never called at all. `App.stop()`'s honesty and retry-safety are moot for a caller that never
+calls it.
+
+**Scope decision needed before a fix lands.** A real fix here is either (a) hand-adding a
+guaranteed `app.stop()` teardown (a `yield` fixture, `addfinalizer`, or `try`/`finally`) to every
+one of the ~24 offending test files — direct but large and repetitive, touching files this PR never
+otherwise touches — or (b) a shared, autouse mechanism (e.g. a `conftest.py`-level fixture that
+tracks every `App` a test boots and stops it in teardown regardless of which local fixture
+constructed it) — more architecturally correct per `fix-bug-rule.md` §1 ("move shared logic up to
+the one layer that serves every consumer") but requires auditing all 24 files' actual construction
+patterns first (several define their own local `app` fixture with different dependencies, not all
+go through one shared fixture). Either way this is a repo-wide test-suite change, well outside
+`TASK-043` E0-E2's own scope (a scheduler-cancel/contribution-registry/region-host harvest) and
+outside what `PR #222`'s diff touches — consistent with the bug's own original finding that it
+reproduces with that PR's diff entirely absent. Not started; needs a scope/priority decision before
+work begins.
+
 ## Requirements (reopened)
 
 5. Run the full gate several more times, both locally and by watching GitHub Actions on this PR,
    after the `step_timeout` propagation fix — do not close on local runs alone again, given this is
    exactly the mistake that reopened this report.
-6. Investigate whether something beyond a single slow join is leaking whole `Scheduler`/
-   `AsyncRuntime` *instances* — e.g. a fixture or composition-root path that constructs and
-   `.start()`s one without a guaranteed `.stop()` on every exit path (including test failure) — since
-   28+30 simultaneously alive instances is a lot to attribute to occasional slow joins alone.
+6. ~~Investigate whether something beyond a single slow join is leaking whole `Scheduler`/
+   `AsyncRuntime` *instances*~~ — **confirmed 2026-09-19, see the section above.**
 7. If the segfault recurs even with the `step_timeout` fix, treat "GitHub Actions' runner reliably
    reproduces this; the local dev container does not" as a fact to design verification around, not
    a fact to work around by re-running until green.
+8. Fix the ~24 test files (and/or add the shared teardown mechanism) that `.boot()` an `App` without
+   ever calling `.stop()`, per the "real root cause" section above. Re-verify on GitHub Actions
+   specifically (this session's local runs never reliably reproduced the crash at all) before
+   closing this report again.
 
 ## Related
 
