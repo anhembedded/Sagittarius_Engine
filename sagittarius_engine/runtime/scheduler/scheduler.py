@@ -99,9 +99,25 @@ class Scheduler:
     def start(self) -> None:
         """
         @brief Starts the background scheduler thread.
+
+        @details `BUG-014` follow-up: guarding only on `self._running` let a
+        `start()` after a `stop()` that timed out (which leaves `self._running`
+        `False` but `self._thread` alive and intentionally tracked, so the failed
+        stop can be retried) sail straight through and overwrite `self._thread`
+        with a fresh `Thread` -- silently orphaning the still-running old one, the
+        same "leaked, untracked thread" shape `stop()` was fixed to stop producing,
+        just moved into `start()`. Also guarding on the previous thread still being
+        alive closes that gap; `AsyncRuntime.start()` already had this guard.
         """
         with self._lock:
             if self._running:
+                return
+            if self._thread is not None and self._thread.is_alive():
+                self._logger.error(
+                    "Scheduler.start() called while a previous background thread "
+                    "is still alive after a stop() that did not complete -- "
+                    "refusing to start a second thread; call stop() again first."
+                )
                 return
             self._running = True
 

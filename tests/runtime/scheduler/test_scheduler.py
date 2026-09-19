@@ -248,6 +248,41 @@ class TestScheduler(unittest.TestCase):
         self.assertIsNone(scheduler._thread)
         mock_context.event_bus.emit.assert_called_once()
 
+    def test_start_refuses_to_orphan_a_thread_left_alive_by_a_failed_stop(self):
+        """`BUG-014` follow-up, found by independent PR review: `start()` used
+        to guard only on `self._running`, which a `stop()` that timed out
+        already flips to `False` (by design, so a retry can happen) while
+        leaving the old thread alive and tracked. A `start()` call straight
+        after such a failed `stop()` sailed through that guard and overwrote
+        `self._thread` with a fresh `Thread`, orphaning the still-running old
+        one -- the exact leaked-thread shape `stop()` was fixed to stop
+        producing, reintroduced via `start()` instead."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.event_bus = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        release = threading.Event()
+        scheduler._thread = threading.Thread(target=release.wait, daemon=True)
+        scheduler._running = True
+        scheduler._thread.start()
+
+        scheduler.stop(timeout=0.05)
+        orphan_candidate = scheduler._thread
+        self.assertIsNotNone(orphan_candidate)
+        self.assertTrue(orphan_candidate.is_alive())
+
+        with self.assertLogs("App", level="ERROR") as logs:
+            scheduler.start()
+
+        # start() must refuse rather than replace the still-alive thread.
+        self.assertIs(scheduler._thread, orphan_candidate)
+        self.assertFalse(scheduler._running)
+        self.assertTrue(any("still alive" in message for message in logs.output))
+        mock_context.event_bus.emit.assert_not_called()
+
+        release.set()
+        orphan_candidate.join(timeout=1.0)
+
     def test_start_stop_idempotent(self):
         # Arrange
         mock_context = MagicMock(spec=IEngineContext)

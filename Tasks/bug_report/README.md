@@ -37,9 +37,9 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 7 |
+| 🔴 **Open** | 8 |
 | ✅ **Fixed** | 8 |
-| 📈 **Total** | **15** |
+| 📈 **Total** | **16** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -78,6 +78,7 @@ deliberately independent (see the top of this file).
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
 | **[BUG-014](incomplete/BUG-014_intermittent_segfault_under_scheduler_and_asyncruntime_thread_pressure_in_full_suite.md)** | Intermittent `Segmentation fault` in the full test suite, dozens of leaked `Scheduler`/`AsyncRuntime` threads at crash time | Medium | 2026-09-19 | **Reopened 2026-09-19**: closed once already that day, then reproduced with the identical 28+30-leaked-thread signature on GitHub Actions, on the exact commit that claimed the fix (`3acbea4`). The original fix (honest failure + retry-safety in `Scheduler.stop()`/`AsyncRuntime.stop()`) was real but insufficient — nothing ever calls the retry. A second, genuine defect found on reopening: `App.stop()` never passed its own `step_timeout` through to either call, so both silently used half the intended join budget; now fixed and regression-tested. Root cause of the multi-instance accumulation itself, and the exact native crash mechanism, remain open — see the bug file's "Reopened" section. |
+| **[BUG-016](incomplete/BUG-016_scheduler_sleep_time_fallback_test_races_a_leaked_background_thread.md)** | `test_scheduler_sleep_time_fallback` races a leaked real `Scheduler` thread through a process-global mock | Low | 2026-09-19 | Found while re-investigating `BUG-014`'s reopening. A `Scheduler`'s module-level `datetime` mock gets a `StopIteration` from a *different* test's leaked, still-running `_run()` thread calling `datetime.now()` after the mock's 2-item `side_effect` is exhausted — only visible under `-W error::pytest.PytestUnhandledThreadExceptionWarning`, does not fail the gate under normal settings. Direct evidence for `BUG-014`'s own open question: background scheduler threads do sometimes outlive their test. |
 | **[BUG-015](incomplete/BUG-015_ui_state_coordinator_debounce_test_is_load_sensitive.md)** | `UiStateCoordinator`'s `QTimer` debounce-restart test intermittently fails under full-suite load | Low | 2026-09-19 | Surfaced while verifying `BUG-014`'s fix, unrelated to that bug's own mechanism. 5/5 passed in isolation; failed once under full-suite CPU contention (`assert 1900 > 1900` on two `remainingTime()` reads). Not yet established whether this is a real timer-restart defect under load or a millisecond-rounding test artifact. |
 | **[BUG-013](incomplete/BUG-013_appdatatable_adjacent_alignment_has_no_column_gutter.md)** | `AppDataTable` renders a right-aligned column and the left-aligned column after it with zero visual gap | Low | 2026-08-27 | Two adjacent values fuse into one string (`"FailuresRegistered"`, `"0yes"`) when `align: Text.AlignRight` is immediately followed by the default left alignment — no per-cell padding anywhere in the header or data `Row`s. Reproduced against the new Events & wiring screen (`EPIC-007E`) and against the already-shipped `RosterScreen.qml` (`gpa`→`enrolledAt`), so it predates this epic. Worked around locally in both new screens; the shared kit component itself is unfixed. |
 | **[BUG-011](incomplete/BUG-011_ci_local_gate_test_crashes_on_windows_stdout_none.md)** | `test_ci_local_gate_missing_tool` crashes on Windows: `result.stdout` is `None` despite `capture_output=True` | Medium | 2026-08-25 | A `TASK-028` regression guard that cannot report on the one platform it guards. Filed by `TASK-040`, once the `test` job actually started running again. **Renumbered from `BUG-009` on 2026-08-25** — see the numbering note below. |

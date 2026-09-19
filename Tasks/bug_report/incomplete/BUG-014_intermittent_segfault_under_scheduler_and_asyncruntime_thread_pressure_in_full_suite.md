@@ -229,5 +229,8 @@ remain open questions; see Requirements below.
   `ResourceWarning`" as part of its own green-gate bar; the `ResourceWarning` half of that bar is
   still not met (see "Not fixed" above)
 - `BUG-015` — the unrelated flake this fix's own verification runs surfaced
+- `BUG-016` — a second leaked-thread instance, this time corrupting a different test's mock
+  instead of crashing, found while investigating this reopening; direct evidence for the
+  "why do dozens of instances leak simultaneously" question above
 - PR #222, GitHub Actions run `35438668390`, job `105885679152`, commit `3acbea4` — the recurrence
   that reopened this report
