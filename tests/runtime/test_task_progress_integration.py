@@ -40,3 +40,5 @@ def test_progress_set_on_a_spawned_task_is_visible_on_the_tracked_handle():
 
     assert tracked.progress == 45.5
     assert tracked.status.value in ("running", "completed")
+
+    app.stop()

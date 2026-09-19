@@ -13,11 +13,12 @@ from sagittarius_engine.infrastructure.event_bus.thread_pool_event_bus import (
 )
 from sagittarius_engine.interfaces.i_extension import ExtensionDescriptor, IExtension
 from sagittarius_engine.kernel.app import App
+from sagittarius_engine.runtime.async_runtime.async_runtime import AsyncRuntime
 from sagittarius_engine.runtime.hosted.hosted_service import IHostedService
 from sagittarius_engine.runtime.hosted.hosted_service_manager import (
     HostedServiceManager,
 )
-from sagittarius_engine.runtime.scheduler.scheduler import JobBuilder
+from sagittarius_engine.runtime.scheduler.scheduler import JobBuilder, Scheduler
 from sagittarius_engine.runtime.scheduler.triggers import IntervalTrigger
 from sagittarius_engine.runtime.tasks.background_task import TaskState
 
@@ -27,6 +28,11 @@ from sagittarius_engine.runtime.tasks.background_task import TaskState
 
 
 def test_app_stop__scheduler_raises__other_subsystems_still_stop():
+    """`BUG-014`: `scheduler.stop` mocked to raise means the real background
+    thread `boot()` started is never actually joined -- `app.stop()` catches
+    the mock's exception and moves on, same as production would, but that
+    leaves the real thread alive for the rest of the test session. Cleanup
+    bypasses the mock and calls the unmocked class method directly."""
     container = StdLibContainer()
     event_bus = MemoryEventBus()
     app = App(container, event_bus)
@@ -37,10 +43,13 @@ def test_app_stop__scheduler_raises__other_subsystems_still_stop():
     # Mock hosted_services to track stop call
     app.context.hosted_services.stop = MagicMock()
 
-    app.stop()
+    try:
+        app.stop()
 
-    assert app.context.hosted_services.stop.called is True
-    assert app.context.lifecycle.is_stopped is True
+        assert app.context.hosted_services.stop.called is True
+        assert app.context.lifecycle.is_stopped is True
+    finally:
+        Scheduler.stop(app.context.scheduler)
 
 
 def test_app_stop__extension_dispose_fails__no_resource_leak():
@@ -82,6 +91,9 @@ def test_app_stop__extension_dispose_fails__no_resource_leak():
 
 
 def test_app_stop__multiple_failures__logs_all_errors():
+    """`BUG-014`: same as `test_app_stop__scheduler_raises__other_subsystems_still_stop`
+    -- the mocked `scheduler.stop` never actually joins the real thread
+    `boot()` started."""
     container = StdLibContainer()
     event_bus = MemoryEventBus()
     app = App(container, event_bus)
@@ -91,8 +103,11 @@ def test_app_stop__multiple_failures__logs_all_errors():
     app.context.hosted_services.stop = MagicMock(side_effect=RuntimeError("Err2"))
     app.context.tasks.shutdown = MagicMock(side_effect=RuntimeError("Err3"))
 
-    app.stop()
-    assert app.context.lifecycle.is_stopped is True
+    try:
+        app.stop()
+        assert app.context.lifecycle.is_stopped is True
+    finally:
+        Scheduler.stop(app.context.scheduler)
 
 
 def test_app_stop__already_stopped__idempotent_safe():
@@ -181,6 +196,14 @@ def test_bootstrap_boot__extension_init_fails__rollback_cleans_initialized():
 
 
 def test_bootstrap_boot__rollback_cleanup_fails__logs_error_without_crash():
+    """`BUG-014`: `Bootstrap.boot()` starts the real `AsyncRuntime` thread
+    (line 40) before `hosted_services.start()` -- mocked here to fail -- is
+    even reached, so that thread is genuinely alive by the time this test's
+    own mocked `scheduler.stop()`/`async_runtime.stop()` (deliberately
+    raising, to exercise the rollback's own error handling) fail to clean it
+    up. A plain `app.stop()` afterward would hit the same mocks and raise
+    again without ever joining the real thread, so cleanup bypasses them and
+    calls the unmocked class method directly."""
     container = StdLibContainer()
     event_bus = MemoryEventBus()
     app = App(container, event_bus)
@@ -198,10 +221,13 @@ def test_bootstrap_boot__rollback_cleanup_fails__logs_error_without_crash():
         side_effect=RuntimeError("Async Cleanup Fail")
     )
 
-    with pytest.raises(RuntimeError) as exc:
-        app.boot()
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            app.boot()
 
-    assert "Boot Failure" in str(exc.value)
+        assert "Boot Failure" in str(exc.value)
+    finally:
+        AsyncRuntime.stop(app.context.async_runtime)
 
 
 # ==========================================================
@@ -313,6 +339,8 @@ def test_extension_manager__stop_raises__dispose_still_called():
 
     app.context.extension_manager.stop_and_dispose()
     assert history == ["disposed"]
+
+    app.stop()
 
 
 # ==========================================================

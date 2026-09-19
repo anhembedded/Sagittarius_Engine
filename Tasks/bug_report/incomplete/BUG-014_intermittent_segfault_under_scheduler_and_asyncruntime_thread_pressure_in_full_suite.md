@@ -2,7 +2,7 @@
 
 **Reported date:** 2026-09-19
 **Severity:** Medium (intermittent — roughly 1 in 3 full-suite runs this session — but a hard crash, not a test failure, so it can silently read as "gate never finished" rather than "gate is red")
-**Status:** 🔴 Reopened (2026-09-19) — see "Reopened" section; the 2026-09-19 "Fixed" closure below was premature
+**Status:** 🟡 Fix pushed, awaiting GitHub Actions confirmation (2026-09-19) — see "Fixed, 2026-09-19" section; the two earlier "Fixed" closures in this same report were both premature on exactly this point, so this one stays open until the `Test` job is observed green on the pushed commit, not on local evidence alone
 **Found by:** `TASK-043` E1, while verifying the contribution-mechanism harvest's full local gate
 
 ---
@@ -263,20 +263,111 @@ outside what `PR #222`'s diff touches — consistent with the bug's own original
 reproduces with that PR's diff entirely absent. Not started; needs a scope/priority decision before
 work begins.
 
+## Fixed, 2026-09-19 — the ~24-file audit, corrected and closed
+
+The aggregate `.boot(`/`.stop(` grep counts above overstated the file list: two of the ten cited as
+0-stop leaks were false positives caught only once actually read —
+`tests/extensions/test_health_check_requested.py` and `tests/extensions/test_dependency_validator.py`
+both call `extension.boot(context)`/`HealthExtension().boot(context)` — an `IExtension`'s own
+per-extension hook against a hand-rolled fake context, never a real `App`/`Bootstrap.boot()` — so
+neither leaks anything. The lesson taken from that mistake: **every remaining file was read before
+being edited**, and beyond that, correctness was checked empirically rather than by grep at all —
+a temporary `conftest.py`-level `autouse` fixture censused `threading.enumerate()` for
+`SagittariusScheduler`/`AsyncRuntimeLoop` threads before and after every test across the full suite
+(`tests/ examples/student_management/tests/`) and logged any test that left one behind. Two full
+passes with this census found the real, complete list (superseding the grep-based one above):
+
+**Straightforward missing `.stop()`** (one test each, added a trailing/`try`-`finally` call):
+`tests/kernel/test_tracing_instrumentation.py` (16 tests, converted its `_app()` helper and the
+one inline `App(...)` call to the new `app_factory` fixture below), `tests/test_edge_cases.py`
+(converted its local `app` fixture to `yield` + `stop()`), `tests/kernel/test_extension_manager.py`
+(9 tests), `tests/test_full_coverage.py` (12 call sites), `tests/runtime/
+test_task_progress_integration.py`, `tests/kernel/test_core.py` (2 tests), `tests/test_integration_io.py`
+(2 tests), `tests/extensions/persistence/test_database_extension_runtime.py` (3 of 6 tests shared a
+`_boot_app_with_database_extension()` helper but only some callers stopped the result).
+
+**A second, distinct real leak path — an exception past `Bootstrap.boot()`'s own try/except still
+leaves threads started:** `tests/extensions/diagnostics/test_diagnostics_extension.py`'s
+`test_fail_fast_aborts_the_boot_on_a_wiring_error` raises from the readiness inspection, which runs
+at `self.context.lifecycle.set_ready()` — **after** `Bootstrap.boot()`'s try/except block ends (it
+wraps only extension/hosted-service/scheduler startup, not `set_ready()`), so `scheduler.start()`
+had already succeeded and nothing in `Bootstrap.boot()` cleans it up on this path. Wrapped in
+`try`/`finally: app.stop()`.
+
+**A third, distinct real leak path — `App.stop()` catching a mocked subsystem's exception leaves
+the real thread unjoined:** `tests/runtime/test_exception_cases.py`'s
+`test_app_stop__scheduler_raises__other_subsystems_still_stop` and
+`test_app_stop__multiple_failures__logs_all_errors` (and, separately, `tests/kernel/
+test_extension_manager.py`'s predecessor-style pattern) mock `context.scheduler.stop`/
+`context.async_runtime.stop` to raise, in order to test `App.stop()`'s own per-step error handling
+(`ci-rule.md`-adjacent: a hung/failing step must not block the rest of shutdown). The mock replaces
+the method entirely, so `App.stop()`'s call to it never does the real join — the mocked
+`RuntimeError` is caught and logged exactly as production would, but the actual OS thread stays
+alive. `test_bootstrap_boot__rollback_cleanup_fails__logs_error_without_crash` has the identical
+shape (`AsyncRuntime.start()` runs for real at `bootstrap.py:40`, before the mocked
+`hosted_services.start()` fails). Fixed by bypassing the mock in a `finally` block and calling the
+real unbound class method directly on the instance (`Scheduler.stop(app.context.scheduler)` /
+`AsyncRuntime.stop(app.context.async_runtime)`), which correctly does the real join without
+touching what the test is actually asserting on.
+
+**A fourth path — the app is booted entirely inside code the test never gets a handle to:**
+`tests/extensions/diagnostics/test_doctor_cli.py` already had an `_apps` list +
+`_stop_apps` autouse-fixture pattern for its own `clean_app()`/`app_with_a_typo()`/
+`app_with_only_a_warning()` helpers, but three tests instead exercise `cli.main()` end-to-end
+against `examples.student_management.doctor_target:build` — `cli.main()` calls that factory and
+gets back an already-booted `App` with no way for the test to reach in and stop it (a real CLI
+invocation legitimately never needs to; the process exits). Fixed by patching `App.boot` itself,
+for the duration of each test in this file, to self-register whichever instance called it into the
+same `_apps` list — catching the leak regardless of which code path constructed the `App`, without
+`cli.py` or `doctor_target.py` needing a test-only escape hatch.
+
+**A fifth — most of the file's tests discarded the return value entirely:**
+`examples/student_management/tests/presentation/enroll_form/test_enroll_form_iview.py`'s `_boot()`
+helper returns the built `App`, but 4 of its 6 tests never captured it (`_boot(tmp_path)` as a bare
+statement) — only the 2 tests that did capture it also called `.stop()`. Fixed by capturing and
+stopping in all 4.
+
+**Shared mechanism added** (`tests/conftest.py`): an `app_factory` fixture, the same
+tracked-factory-with-teardown shape as the file's existing `thread_pool_bus_factory`/
+`ipc_broker_factory`, used by `test_tracing_instrumentation.py`, `test_extension_manager.py`, and
+`test_full_coverage.py` in place of bare `App(...)` construction where a shared helper made that the
+more natural fix than a one-off `try`/`finally`.
+
+**Verification.** The thread census (kept only as a diagnostic, not committed) found **zero**
+leaked `Scheduler`/`AsyncRuntime` threads across two full passes of the entire suite after these
+fixes — the first empirical (not inferential) confirmation this session has had, superseding every
+grep-based count above. `pwsh scripts/ci-local.ps1 -Full` run 3 consecutive times post-fix, all
+`RESULT: PASS`, zero `Segmentation fault`/`FAILED`/`ERROR`/`Traceback` in any of the three raw logs
+(`logs/ci-local-20260919-113602.log`, `-113655.log`, `-113745.log`) — only the pre-existing,
+separately-tracked `gc: 45 uncollectable objects` `ResourceWarning`, unchanged. Notably, one
+diagnostic run *before* these last fixes (still on top of the `step_timeout`/`start()`-guard fixes
+alone) **did** reproduce the segfault locally for the first time all session — 24 threads, 12
+Scheduler/AsyncRuntime pairs, the identical signature — direct proof this repo's local dev
+container can hit this race once the leak is large enough, and that the earlier "local never
+reproduces it" framing was really "the leak wasn't yet large enough to reproduce it locally," not a
+structural difference between environments.
+
+Given the ~1400-test full suite (~13 files, ~40 individual sites) and the demonstrated ~1-in-3ish
+historical rate on GitHub Actions specifically, this fix is reported here with real, empirical,
+census-based evidence rather than "no crash in N runs" — but GitHub Actions' own `Test` job on the
+pushed commit is still the authority this report closes against, per `ci-rule.md` §1's two-tier
+clause. Status left `🔴 Reopened` until that run is observed green.
+
 ## Requirements (reopened)
 
-5. Run the full gate several more times, both locally and by watching GitHub Actions on this PR,
-   after the `step_timeout` propagation fix — do not close on local runs alone again, given this is
-   exactly the mistake that reopened this report.
+5. ~~Run the full gate several more times, both locally and by watching GitHub Actions on this PR~~
+   — **done, see "Fixed" section above; 3/3 clean full-gate runs plus a zero-leak thread census.**
 6. ~~Investigate whether something beyond a single slow join is leaking whole `Scheduler`/
-   `AsyncRuntime` *instances*~~ — **confirmed 2026-09-19, see the section above.**
-7. If the segfault recurs even with the `step_timeout` fix, treat "GitHub Actions' runner reliably
-   reproduces this; the local dev container does not" as a fact to design verification around, not
-   a fact to work around by re-running until green.
-8. Fix the ~24 test files (and/or add the shared teardown mechanism) that `.boot()` an `App` without
-   ever calling `.stop()`, per the "real root cause" section above. Re-verify on GitHub Actions
-   specifically (this session's local runs never reliably reproduced the crash at all) before
-   closing this report again.
+   `AsyncRuntime` *instances*~~ — **confirmed 2026-09-19, see "Requirement 6, confirmed" above.**
+7. ~~If the segfault recurs even with the `step_timeout` fix, treat "GitHub Actions' runner reliably
+   reproduces this" as a fact to design verification around~~ — **superseded: the leak also
+   reproduced locally once it grew large enough (see "Fixed" section); the earlier framing that
+   local never reproduces it was itself not quite right.**
+8. ~~Fix the ~24 test files (and/or add the shared teardown mechanism) that `.boot()` an `App`
+   without ever calling `.stop()`~~ — **done, see "Fixed" section above.**
+9. Watch GitHub Actions' `Test` job on the next push and confirm green before treating this report
+   as closed for real — the two prior closures in this same report were both premature on exactly
+   this point.
 
 ## Related
 

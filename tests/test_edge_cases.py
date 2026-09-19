@@ -53,9 +53,14 @@ def logger():
 
 @pytest.fixture
 def app(container, event_bus, logger):
+    """`BUG-014`: several tests here `.boot()` this app and none of them
+    called `.stop()` -- each leaked a `Scheduler`/`AsyncRuntime` thread pair
+    for the rest of the session. `yield` + `stop()` guarantees cleanup
+    whether the test reaches its own assertions or fails first."""
     app = App(container, event_bus)
     container.singleton(ILogger, logger)
-    return app
+    yield app
+    app.stop()
 
 
 # --- 1. Container Edge Cases ---
