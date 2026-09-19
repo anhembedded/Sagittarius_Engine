@@ -80,12 +80,58 @@ from a fresh design" — read literally, that means E1/E2 are not free to design
 just because the consumer's Phase 1/2 are done. The harvest criterion is specific: the consumer's
 own tree must already hold a version of the mechanism that is (a) genuinely zero-app-import, (b)
 used by at least two surfaces or two modules, and (c) API-unchanged for one whole phase — not
-merely "the phase that would need it is finished." Whether Elite's own `IContributionRegistry`
-(mentioned in its `EPIC-025F` task file, `shell/contribution_assembly.py`) already meets that bar
-was not verified before this task file was updated; that verification, done from the consumer's
-side by reading its actual code against these three criteria, is the concrete next step before any
-E1 code is written here — not a re-derivation of the registry design from this repo's side. Filed
-here rather than assumed, per `ONBOARDING.md` §9 ("say so and ask, rather than guessing").
+merely "the phase that would need it is finished."
+
+**Verified 2026-09-19, by reading Elite's actual code, not assumed**: `src/core/contracts/
+contribution_descriptor.py`, `place.py`, `size_hint.py`, `i_contribution_registry.py`, and
+`src/shell/contribution_registry.py` (the implementation). Three of TASK-043's four named E1
+pieces are strong matches, one needs a real redesign before it can move:
+
+- **`ContributionDescriptor`** — a frozen dataclass (`contributor_id`, `surface_id`, `place`,
+  `order`, `size_hint`, `factory: Callable[[IContainer], QWidget]`, `title`), plus an `identity()`
+  uniqueness key. Genuinely stable since `PR 0.2` (2026-09-11 or earlier — this task's own filing
+  date) through every phase since; used by every bounded context's `contribute()`, the shell's
+  Welcome/Settings screens, and all four legacy screens — far past the "≥2" bar. `factory`'s
+  `QWidget` reference is `TYPE_CHECKING`-only (the file's own docstring: "`core/` imports no
+  toolkit at runtime"), so it is not a real Elite-app coupling, only a Qt one — no different from
+  what this engine's own `pyside_mvc` already assumes. **Harvestable close to as-is.**
+- **`SizeHint`** (`COMPACT`/`REGULAR`/`TALL`) — generic layout vocabulary, no Elite-specific
+  member. **Harvestable as-is.**
+- **The registry mechanism** (`ContributionRegistry` in `shell/contribution_registry.py`,
+  `IContributionRegistry`/`IContributionTable` split, `contribute()`/`contribute_screen()`,
+  identity-uniqueness enforcement, stable sort by `(order, contributor_id, factory qualname)`,
+  gated-surface contributions silently dropped with one log line) — already close to
+  harvest-shaped: its constructor takes `surfaces: dict[str, Surface] | None = None` as an
+  **injectable** parameter, defaulting to Elite's own global `surfaces_by_id()` only when the
+  caller passes nothing. The validation *behaviour* (raise on unknown surface/place, raise on
+  duplicate identity, drop-with-a-log on a gated surface) is exactly what objective 2 describes as
+  engine mechanism. **Harvestable, once `Surface` (below) stops being implicitly global.**
+- **`Place`** (`Enum`: `SCREEN`/`HEADER`/`CONTEXT_BAR`/`WORKSPACE`/`RAIL`/`CONSOLE`/`MODAL`/
+  `SETTINGS_SECTION`/`STATUS_TILE`/`DEV_PROBE`) is **not** harvestable as written, and this is a
+  real finding, not a technicality: it is a **closed** `Enum` with Elite-specific members
+  (`DEV_PROBE` is Elite's Dev Board; `SETTINGS_SECTION` is Elite's Settings surface shape) —
+  exactly what objective 2's own text already warned against: *"The engine does **not** know which
+  kinds exist — `kind` is an opaque string the app registers."* Lifting this `Enum` wholesale would
+  bake one consumer's screen vocabulary into the engine, the same mistake `IStrategyCatalog` (an
+  Elite-internal example, different repo, same shape) was built and then deleted for. The correct
+  harvest is **not** "copy this enum" — it is: the engine's own `ContributionDescriptor`/registry
+  take `place` (and, by the same argument, `surface_id`) as an **opaque string** (or an
+  `Enum`-like `Protocol`/`NewType`, not a fixed closed set), and Elite's own `Place` `Enum` stays
+  entirely app-side, its members becoming the concrete opaque values Elite happens to pass through
+  that slot. `SizeHint`'s three buckets read as more genuinely universal (any composition surface
+  needs "how much room"), but that call belongs to whoever designs E1's actual shape, not to this
+  note.
+
+**Conclusion:** E1 is **not** a fresh design, and it is **not** a mechanical copy-paste either — it
+is a narrow, well-scoped adaptation: take `ContributionDescriptor`+`SizeHint`+the registry's
+validation behaviour close to as they already exist in Elite's tree, and change exactly one thing
+before they land here — `place`/`surface_id` go from Elite's closed `Place` `Enum`/global
+`Surface` lookup to an opaque, app-supplied identifier, with `Surface` injection (already present
+as a constructor parameter, just not yet mandatory) becoming the only way to configure the
+registry rather than a default. That is a real design decision (how opaque, `str` vs. a typed
+wrapper) worth designing deliberately rather than guessed here — surfaced for the user rather than
+picked unilaterally, per `ONBOARDING.md` §9 and `code-rule.md` §9's own "no commit without being
+asked" standing next to it: this is a shape decision, not a routine implementation choice.
 
 **E3 is separately blocked, not just unstarted**: Elite's `EPIC-025F` names this task
 (`TASK-043`/`EPIC-001D`) as its own blocker, in both directions — a genuine chicken-and-egg the
