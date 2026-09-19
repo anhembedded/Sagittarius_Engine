@@ -1,3 +1,4 @@
+import threading
 import unittest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
@@ -213,6 +214,39 @@ class TestScheduler(unittest.TestCase):
 
         self.assertEqual(mock_context.tasks.spawn.call_count, runs_at_cancel)
         self.assertNotIn(job, scheduler.jobs)
+
+    def test_stop_leaves_a_still_running_thread_tracked_instead_of_discarding_it(self):
+        """`BUG-014`: `stop()` used to run `self._thread = None` unconditionally
+        after `join(timeout=...)`, whether or not the join actually succeeded --
+        a thread still alive past the deadline was silently forgotten rather than
+        reported, which is what let it keep running as an untracked, unjoinable
+        leak. Drives the real thread-lifecycle mechanism directly (not `_run()`'s
+        own scheduling logic, which the other tests already cover): a thread
+        that blocks on a controllable `threading.Event` stands in for a
+        `_run()` tick that is slow to notice `_running is False`."""
+        mock_context = MagicMock(spec=IEngineContext)
+        mock_context.event_bus = MagicMock()
+        scheduler = Scheduler(context=mock_context)
+
+        release = threading.Event()
+        scheduler._thread = threading.Thread(target=release.wait, daemon=True)
+        scheduler._running = True
+        scheduler._thread.start()
+
+        with self.assertLogs("App", level="ERROR") as logs:
+            scheduler.stop(timeout=0.05)
+
+        self.assertIsNotNone(scheduler._thread)
+        self.assertTrue(scheduler._thread.is_alive())
+        self.assertTrue(any("did not stop" in message for message in logs.output))
+        # A failed stop() must not claim success -- no SchedulerStopped event.
+        mock_context.event_bus.emit.assert_not_called()
+
+        # Letting the real thread finish and retrying now succeeds and clears it.
+        release.set()
+        scheduler.stop(timeout=1.0)
+        self.assertIsNone(scheduler._thread)
+        mock_context.event_bus.emit.assert_called_once()
 
     def test_start_stop_idempotent(self):
         # Arrange

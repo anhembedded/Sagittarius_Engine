@@ -523,6 +523,46 @@ def test_async_runtime__background_coro_raises__logged_not_crashed():
     async_rt.stop()
 
 
+def test_async_runtime__stop_thread_still_alive__does_not_close_the_running_loop(
+    caplog,
+):
+    """`BUG-014`: `stop()` used to run `close()` on the loop unconditionally
+    after `join(timeout=...)`, whether or not the background thread's own
+    `run_forever()` had actually returned -- closing a loop still running on
+    another thread is unsafe in asyncio and a live suspect for this bug's
+    segfaults, not just its leaked threads. Drives the real thread-lifecycle
+    mechanism directly: a thread blocking on a controllable `threading.Event`
+    stands in for a loop slow to notice `loop.stop()` was called."""
+    import logging
+    import threading
+
+    from sagittarius_engine.runtime.async_runtime.async_runtime import AsyncRuntime
+
+    async_rt = AsyncRuntime(context=MagicMock())
+    real_loop = async_rt.loop = MagicMock()
+    release = threading.Event()
+    async_rt._thread = threading.Thread(target=release.wait, daemon=True)
+    async_rt._thread.start()
+
+    with caplog.at_level(logging.ERROR, logger="App"):
+        async_rt.stop(timeout=0.05)
+
+    assert async_rt._thread is not None
+    assert async_rt._thread.is_alive()
+    assert any("did not stop" in record.message for record in caplog.records)
+    # A loop still running on its own thread must never be closed out from
+    # under it.
+    real_loop.close.assert_not_called()
+    assert async_rt.loop is real_loop
+
+    # Letting the real thread finish and retrying now succeeds and closes it.
+    release.set()
+    async_rt.stop(timeout=1.0)
+    assert async_rt._thread is None
+    real_loop.close.assert_called_once()
+    assert async_rt.loop is None
+
+
 # ==========================================================
 # 8. INFRASTRUCTURE / StdLibContainer Exception Cases
 # ==========================================================

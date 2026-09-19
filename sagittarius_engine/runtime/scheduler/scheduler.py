@@ -112,18 +112,39 @@ class Scheduler:
         self._logger.info("Scheduler started.")
         self._emit(SchedulerStarted.event_name, SchedulerStarted())
 
-    def stop(self) -> None:
+    def stop(self, timeout: float = 5.0) -> None:
         """
         @brief Stops the scheduler thread gracefully.
+
+        @details `BUG-014`: `self._thread = None` used to run unconditionally after
+        `join(timeout=...)`, whether or not the join actually succeeded — a thread
+        still alive past the deadline was silently forgotten rather than reported,
+        which is what let it keep running as an untracked, unjoinable leak (`TASK-043`
+        E1/E2's own gate runs hit exactly this signature under CI load: dozens of
+        `SagittariusScheduler`/`AsyncRuntimeLoop` threads still alive at a later
+        segfault). A thread that is still alive after `timeout` now stays tracked —
+        `self._thread` is left set rather than cleared — so a caller inspecting it
+        sees the true state, and a second `stop()` call (unlike before, no longer
+        blocked by `self._running` already being `False`) can retry the join.
         """
         with self._lock:
-            if not self._running:
-                return
+            was_running = self._running
             self._running = False
             self._cond.notify_all()
 
+        if not was_running and (self._thread is None or not self._thread.is_alive()):
+            return
+
         if self._thread is not None:
-            self._thread.join(timeout=5.0)
+            self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                self._logger.error(
+                    "Scheduler thread did not stop within %ss — leaving it tracked "
+                    "rather than discarding the reference; call stop() again to "
+                    "retry the join.",
+                    timeout,
+                )
+                return
             self._thread = None
         self._logger.info("Scheduler stopped.")
         self._emit(SchedulerStopped.event_name, SchedulerStopped())

@@ -2,7 +2,7 @@
 
 **Reported date:** 2026-09-19
 **Severity:** Medium (intermittent — roughly 1 in 3 full-suite runs this session — but a hard crash, not a test failure, so it can silently read as "gate never finished" rather than "gate is red")
-**Status:** 🔴 Open
+**Status:** ✅ Fixed (2026-09-19)
 **Found by:** `TASK-043` E1, while verifying the contribution-mechanism harvest's full local gate
 
 ---
@@ -95,9 +95,75 @@ above, for whoever picks this up to confirm or refute against `Scheduler.shutdow
 4. Once fixed, run the full gate several times in a row (the crash's own ~1-in-3 rate means a
    single green run is not proof) before closing.
 
+## Root cause, confirmed 2026-09-19
+
+Requirement 1's own question, answered by reading `Scheduler.stop()` and `AsyncRuntime.stop()`
+directly: both *did* attempt to join their background thread, but **neither checked whether the
+join actually succeeded.**
+
+```python
+# Scheduler.stop() -- before
+if self._thread is not None:
+    self._thread.join(timeout=5.0)
+    self._thread = None          # <- ran unconditionally, whether or not join succeeded
+```
+
+A join that timed out (plausible under the exact CI load `test_stress_task_and_scheduler_under_load`
+creates — 100 spawned tasks plus 20 recurring jobs all contending for `Scheduler._lock`) left the
+real OS thread running, while the code discarded the only reference to it and logged nothing. The
+thread became permanently untracked and unjoinable — exactly the "leaked, never joined" shape every
+crash dump showed.
+
+`AsyncRuntime.stop()` had the same unconditional-clear defect, plus a second, more dangerous one:
+after the same blind `join(timeout=5.0)`, it called `self.loop.close()` **regardless of whether the
+thread's own `run_forever()` had actually returned.** Closing an `asyncio` event loop while another
+thread is still iterating it is undefined behaviour in CPython — not merely a resource leak but a
+live suspect for the segfault itself, not just the thread-count symptom.
+
+## Fix
+
+Both `stop()` methods now check `thread.is_alive()` after `join(timeout=...)`:
+- Still alive → log an `ERROR` naming the timeout, leave `self._thread` (and, for `AsyncRuntime`,
+  `self.loop`) **set rather than discarded**, and return without claiming success. A later `stop()`
+  call — no longer blocked by `_running` already being `False` — can retry the join.
+- `AsyncRuntime` additionally never reaches `loop.close()` on that path, so a loop still running on
+  its own thread is never closed out from under it.
+
+`sagittarius_engine/runtime/scheduler/scheduler.py`, `sagittarius_engine/runtime/async_runtime/
+async_runtime.py`. Both `stop()` methods gained a `timeout: float = 5.0` parameter (previously
+hard-coded) so the honest-failure path is directly testable without a multi-second real wait.
+
+**Regression tests**, both driving the real thread-lifecycle mechanism directly via a
+`threading.Event`-blocked thread standing in for a slow-to-notice tick (not `_run()`'s own
+scheduling logic, which existing tests already cover):
+`tests/runtime/scheduler/test_scheduler.py::test_stop_leaves_a_still_running_thread_tracked_instead_of_discarding_it`,
+`tests/runtime/test_exception_cases.py::test_async_runtime__stop_thread_still_alive__does_not_close_the_running_loop`.
+Mutation-verified: reverted each fix to the pre-fix unconditional-clear behaviour, confirmed the
+matching new test fails for the right reason (no error logged / the loop is discarded and would
+have been closed), restored — `git diff --stat` clean.
+
+**Verification (requirement 4):** 3 consecutive full `pwsh scripts/ci-local.ps1` runs after the fix,
+all `RESULT: PASS` with zero `Segmentation fault`/`Fatal Python error` in the raw log —
+`logs/ci-local-20260919-104944.log`, `logs/ci-local-20260919-105108.log`,
+`logs/ci-local-20260919-105206.log`. The pre-fix rate was 2 segfaults in 5 runs; 3-for-3 clean
+afterward is not absolute proof against a residual, rarer race, but is real evidence against the
+documented ~1-in-3 rate.
+
+**Not fixed, and not claimed to be:** the `gc: N uncollectable objects at shutdown` `ResourceWarning`
+(requirement 3) still appeared in the clean runs above (`45` uncollectable objects, same count as
+before the fix). This looks like a distinct, non-crashing symptom — plausibly native Qt/QML objects,
+not the Python-level thread handles this fix addresses — and stays open as its own question if it
+starts crashing again; this fix's evidence only supports closing the segfault/thread-leak half of
+this report.
+
+**A second, unrelated flake surfaced while verifying this fix**, filed separately rather than folded
+in here: `BUG-015` (`tests/extensions/ui_state/test_ui_state_coordinator.py`'s `QTimer` debounce
+test, load-sensitive, unrelated to `Scheduler`/`AsyncRuntime`).
+
 ## Related
 
-- `TASK-043` E1 — where this was found; not blocking, not caused by that change (evidence above)
+- `TASK-043` E1/E2 — where this was found; not blocking, not caused by that change (evidence above)
 - `EPIC-004C_elite_migration.md` (this repo) — an earlier full-gate report explicitly used "no
-  `ResourceWarning`" as part of its own green-gate bar, so this is a real regression against that
-  bar, not a newly-tolerated class of noise
+  `ResourceWarning`" as part of its own green-gate bar; the `ResourceWarning` half of that bar is
+  still not met (see "Not fixed" above)
+- `BUG-015` — the unrelated flake this fix's own verification runs surfaced
