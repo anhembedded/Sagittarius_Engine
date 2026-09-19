@@ -2,7 +2,7 @@
 
 **Reported date:** 2026-09-19
 **Severity:** Medium (intermittent — roughly 1 in 3 full-suite runs this session — but a hard crash, not a test failure, so it can silently read as "gate never finished" rather than "gate is red")
-**Status:** 🟡 Fix pushed, awaiting GitHub Actions confirmation (2026-09-19) — see "Fixed, 2026-09-19" section; the two earlier "Fixed" closures in this same report were both premature on exactly this point, so this one stays open until the `Test` job is observed green on the pushed commit, not on local evidence alone
+**Status:** ✅ Fixed (2026-09-19) — confirmed on GitHub Actions itself: `Test (Python 3.12 on ubuntu-latest)` (and all 7 other checks) green on commit `976ce7c`, run `35440802725` (https://github.com/anhembedded/Sagittarius_Engine/actions/runs/35440802725/job/105891211463). See "Fixed, 2026-09-19" section for the full root-cause and per-file breakdown. The two earlier "Fixed" closures in this same report were both premature on local evidence alone — this one is not: it is the first closure backed by the authoritative signal (`ci-rule.md` §1's two-tier clause).
 **Found by:** `TASK-043` E1, while verifying the contribution-mechanism harvest's full local gate
 
 ---
@@ -349,9 +349,11 @@ structural difference between environments.
 
 Given the ~1400-test full suite (~13 files, ~40 individual sites) and the demonstrated ~1-in-3ish
 historical rate on GitHub Actions specifically, this fix is reported here with real, empirical,
-census-based evidence rather than "no crash in N runs" — but GitHub Actions' own `Test` job on the
-pushed commit is still the authority this report closes against, per `ci-rule.md` §1's two-tier
-clause. Status left `🔴 Reopened` until that run is observed green.
+census-based evidence rather than "no crash in N runs" — and GitHub Actions' own `Test` job on the
+pushed commit, the authority this report closes against per `ci-rule.md` §1's two-tier clause, is
+now confirmed green: commit `976ce7c`, run `35440802725`, all 8 checks (`Test`, `Lint & Type Check`,
+`Security Audit`, `Package Import Guard`, `Performance Benchmark`, `Build & Distribute Check`,
+`Architecture Guard`, `Reference Applications`) `success`. Closed for real.
 
 ## Requirements (reopened)
 
@@ -365,9 +367,8 @@ clause. Status left `🔴 Reopened` until that run is observed green.
    local never reproduces it was itself not quite right.**
 8. ~~Fix the ~24 test files (and/or add the shared teardown mechanism) that `.boot()` an `App`
    without ever calling `.stop()`~~ — **done, see "Fixed" section above.**
-9. Watch GitHub Actions' `Test` job on the next push and confirm green before treating this report
-   as closed for real — the two prior closures in this same report were both premature on exactly
-   this point.
+9. ~~Watch GitHub Actions' `Test` job on the next push and confirm green before treating this report
+   as closed for real~~ — **done: commit `976ce7c`, run `35440802725`, all 8 checks green.**
 
 ## Related
 
