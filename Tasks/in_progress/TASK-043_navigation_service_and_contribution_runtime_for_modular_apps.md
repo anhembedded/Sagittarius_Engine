@@ -1,11 +1,13 @@
 # TASK-043: Navigation service, contribution runtime and boundary tooling for modular (bounded-context) consumer apps
 
-- **Status**: 🟡 In Progress — **E0 done 2026-09-19** (`ScheduledJob.cancel()`, §"How the consumer
-  feeds this task" table below). E1–E3 not started: each is triggered by the consumer's own
-  corresponding phase landing a stable, zero-app-import, ≥2-consumer version of the mechanism in
-  its own tree first (the harvest pattern that table describes), not a fresh design built here.
-  Consumer's Elite `EPIC-025` Phases 1–4 (which E1/E2 wait on) are done; Phase 5 (which E3 —
-  `NavigationService` itself — waits on) has not started.
+- **Status**: 🟡 In Progress — **E0 done 2026-09-19** (`ScheduledJob.cancel()`), **E1 landed
+  2026-09-19** (`ContributionDescriptor`, `SizeHint`, `SurfaceDeclaration`, `ContributionError`,
+  `IContributionRegistry`, `ContributionRegistry` — §"How the consumer feeds this task" table
+  below). E2–E3 not started: each is triggered by the consumer's own corresponding phase landing a
+  stable, zero-app-import, ≥2-consumer version of the mechanism in its own tree first (the harvest
+  pattern that table describes), not a fresh design built here. Consumer's Elite `EPIC-025` Phases
+  1–4 (which E1/E2 wait on) are done; Phase 5 (which E3 — `NavigationService` itself — waits on)
+  has not started.
 - **Category**: UI Engine / Composition Runtime (`pyside_mvc`) + Core Architecture
 - **Priority**: P2 — first real consumer identified; not needed before that consumer's Phase 5
 - **Filed by**: consumer app `Sagittarius_Elite_Warrior` — `PRO-004` / `EPIC-025` (HLD `Docs/HLD/05_engine_app_split.md`), 2026-09-11
@@ -71,7 +73,7 @@ that the consumer's phases trigger, not as one design:
 | Step | Trigger (consumer) | Lands here |
 | :-: | :--- | :--- |
 | E0 | now | ✅ **Done 2026-09-19.** `ScheduledJob.cancel()` (`runtime/scheduler/scheduler.py`) — a `threading.Event`-backed flag, checked in `Scheduler._run()`'s per-tick evaluation and dropped the same way a dead (`next_run is None`) job already was. Two tests added to `tests/runtime/scheduler/test_scheduler.py` (a pending job cancelled before its first run never spawns; a recurring job cancelled after one run is not rescheduled for a second), mutation-verified against the real diff (`if job.is_cancelled:` forced to `if False:` made both fail for the right reason, then restored — `git diff` confirmed clean). Full local gate green: `ruff`/`mypy`/`bandit`/`pip-audit` clean, `1419 passed, 11 skipped` (full suite, including both new tests — confirmed collected under the gate's own invocation), architecture tests `14 passed`, log scan clean. `context/runtime.md`'s Scheduler section updated in the same change (`doc-code-sync.md`) |
-| E1 | after its Phase 1 | `WorkbenchModule` (`IExtension` + `contribute` / `subscribe`), `ContributionRegistry`, `ContributionDescriptor`, `Place`, `SizeHint` → objectives 2 and 5. **Consumer's Phase 1 is done, but not yet harvested** — see the note added 2026-09-19 below the table |
+| E1 | after its Phase 1 | ✅ **Landed 2026-09-19** (the slot/contribution registry half of objective 2; `WorkbenchModule`/navigation-side objective 5 stays with E3). `sagittarius_engine/extensions/pyside_mvc/runtime/`: `contribution_descriptor.py` (`ContributionDescriptor`, opaque-`str` `place`/`surface_id`), `size_hint.py` (`SizeHint`), `surface_declaration.py` (`SurfaceDeclaration` — narrower than Elite's own `Surface`: no `owner`/`gated_by`, YAGNI per the note below), `contribution_error.py` (`ContributionError`), `i_contribution_registry.py` (`IContributionRegistry`, a `Protocol`), `contribution_registry.py` (`ContributionRegistry` — mandatory `surfaces` constructor arg, no global-lookup default, the one gap the consumer's own registry still has). Exported from both `runtime/__init__.py` and `pyside_mvc/__init__.py`'s `__all__`. 11 tests in `tests/extensions/pyside_mvc/test_contribution_registry.py` covering `identity()`, all three `contribute()` raise paths, the success path, `panels()`'s stable sort, and `surface_declaration()`'s raise path; mutation-verified (each of the three raise-guards forced to `if False:` in turn, confirmed the matching test fails for the right reason, restored — `git diff --stat` clean). `ruff check`/`ruff format --check` clean; `mypy sagittarius_engine` clean (230 files); full `tests/extensions/pyside_mvc/` suite green (177 passed). See the note added 2026-09-19 below the table for the opaque-identifier design reasoning this landing follows |
 | E2 | after its Phase 2 | the surface runtime: a region host with the place slots, per-place models (EPIC-001D objective 2). **Consumer's Phase 2 is done, but not yet harvested** — same note |
 | E3 | with its Phase 5 | `NavigationService`, screen lifecycle + conformance suite, `create_quick_widget(import_paths=)` → objectives 1, 3, 5. **Consumer's Phase 5 has not started** (blocked on this very task, per its own `EPIC-025F`) — see the note below |
 
@@ -132,6 +134,26 @@ registry rather than a default. That is a real design decision (how opaque, `str
 wrapper) worth designing deliberately rather than guessed here — surfaced for the user rather than
 picked unilaterally, per `ONBOARDING.md` §9 and `code-rule.md` §9's own "no commit without being
 asked" standing next to it: this is a shape decision, not a routine implementation choice.
+
+**Decided and landed 2026-09-19, by user instruction, "design the opaque-identifier approach in
+Elite since it owns the mechanism, then harvest to the engine."** The `str` vs. typed-wrapper
+question above resolved to `str`: Elite's own `Place` became `class Place(str, Enum)` (was a bare
+`Enum`) in its `src/core/contracts/place.py`, mixing in `str` rather than switching to `StrEnum` —
+verified empirically on Elite's own Python 3.12 interpreter that the mixin changes nothing about
+`__str__`/formatting (unlike `StrEnum`, which does) and only adds `isinstance(place, str)` /
+`place == "some_string"`; matches Elite's own dominant ~40-file `(str, Enum)` precedent
+(`TradingVenue` etc.) rather than the single `StrEnum` precedent. This satisfies `place: str` on
+this engine's own `ContributionDescriptor` without Elite's `Place` `Enum` ever being imported here
+— exactly the "opaque string the app registers" this file's own text above already required. Full
+verification on Elite's side: `ruff`/`mypy` clean (632 files), `tests/unit/architecture` 420
+passed, 106 targeted tests, full `tests/unit` (4883 passed) and `tests/integration` (161 passed, 4
+skipped) both clean of `FAILED|ERROR|Traceback|ResourceWarning`. The engine-side harvest itself —
+`ContributionDescriptor`/`SizeHint`/`SurfaceDeclaration`/`ContributionError`/
+`IContributionRegistry`/`ContributionRegistry` — is recorded in the E1 table row above; **Elite's
+own consumption of this engine mechanism (replacing its app-side `ContributionRegistry`/
+`contribution_assembly.py` with these types) is not part of this landing** and stays a future
+consumer-side migration, same as this task's own §"Note added 2026-09-19" already flagged for
+`Surface`.
 
 **E3 is separately blocked, not just unstarted**: Elite's `EPIC-025F` names this task
 (`TASK-043`/`EPIC-001D`) as its own blocker, in both directions — a genuine chicken-and-egg the
