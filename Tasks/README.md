@@ -48,7 +48,7 @@ Welcome to the central task management hub for **Sagittarius Engine**. This dire
 
 | Task ID | Title | Category | Priority | Spec File |
 | --- | --- | --- | --- | --- |
-| **TASK-043** | Navigation service (`USER_INTENT` vs `RESTORE`, `can_leave`), slot/contribution registry as mechanism, `create_quick_widget(import_paths=)`, generalised `import_boundary` with ratchet allowlist — the consumer-driven slice of `EPIC-001D` (consumer: Elite `PRO-004`/`EPIC-025`). Delivered in harvest steps per its own table (E0–E3), not as one build — **E0 done 2026-09-19**: `ScheduledJob.cancel()`, the rest still to come | UI Engine / Composition Runtime (`pyside_mvc`) | P2 | [TASK-043_navigation_service_and_contribution_runtime_for_modular_apps.md](in_progress/TASK-043_navigation_service_and_contribution_runtime_for_modular_apps.md) |
+| **TASK-043** | Navigation service (`USER_INTENT` vs `RESTORE`, `can_leave`), slot/contribution registry as mechanism, `create_quick_widget(import_paths=)`, generalised `import_boundary` with ratchet allowlist — the consumer-driven slice of `EPIC-001D` (consumer: Elite `PRO-004`/`EPIC-025`). Delivered in harvest steps per its own table (E0–E3), not as one build — E0–E2 done 2026-09-19; E3's `NavigationService` landed in `EPIC-008D` (2026-10-04); the conformance suite and `import_paths=` remain | UI Engine / Composition Runtime (`pyside_mvc`) | P2 | [TASK-043_navigation_service_and_contribution_runtime_for_modular_apps.md](in_progress/TASK-043_navigation_service_and_contribution_runtime_for_modular_apps.md) |
 
 ### 🔵 Backlog (`Tasks/backlog/`)
 
@@ -90,7 +90,7 @@ link is kept here; content is not duplicated.
 | **[EPIC-005](epics/EPIC-005_audit_telemetry_rebuild/README.md)** | Audit Telemetry Teardown & Trace Recorder — both dashboard clients are 100% non-functional; delete them and the server, rebuild the recorder half of SystemView, export to Perfetto/OpenTelemetry rather than building a timeline UI. Supersedes `TASK-002` | ✅ Complete 2026-08-26 — all four milestones; `sagittarius-trace` ships, the dashboard is deleted |
 | **[EPIC-006](epics/EPIC-006_wiring_and_readiness_diagnostics/README.md)** | Wiring & Readiness Diagnostics — join `EventRegistry` (declared) against `IEventBus` (subscribed) to catch mis-wiring at boot, plus an explicit `app.ready` milestone. Catches the silent-typo class nothing else can | 🟡 In Progress (5/6 subtasks done) |
 | **[EPIC-007](epics/EPIC-007_runtime_state_console/README.md)** | Runtime State Console — attach to a running app and see what is wired, registered and alive. Decided by [ADR-001](decisions/ADR-001_runtime_state_console_scope_and_transport.md)/[ADR-002](decisions/ADR-002_state_console_client_ui_framework.md); every milestone ends in a runnable command, demoed through `examples/student_management` | ✅ 6/6 subtasks done |
-| **[EPIC-008](epics/EPIC-008_qtwidgets_workbench/README.md)** | QtWidgets Workbench — shell, actions, perspectives, Options dialog, Output pane, display conventions; for Elite EPIC-033 | 🔄 In Progress (4/6) |
+| **[EPIC-008](epics/EPIC-008_qtwidgets_workbench/README.md)** | QtWidgets Workbench — shell, actions, perspectives, Options dialog, Output pane, display conventions; for Elite EPIC-033 | ✅ Completed (6/6) |
 
 ---
 

@@ -20,6 +20,8 @@ is reached through its menu's access keys.
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 from PySide6.QtGui import QKeySequence
 
 _PORTABLE = QKeySequence.SequenceFormat.PortableText
@@ -28,14 +30,16 @@ _FREE_KEYS = frozenset(
     {f"Ctrl+{key}" for key in "JL0123456789"} | {"F7", "F8", "F9", "F12"}
 )
 #: Keys Microsoft leaves free that another platform reserves, with its use.
-RESERVED_ELSEWHERE: dict[str, str] = {
-    "Ctrl+G": "FindNext (KDE, GNOME, XFCE, macOS)",
-    "Ctrl+K": "DeleteEndOfLine (KDE, GNOME, XFCE)",
-    "Ctrl+M": "Minimize (macOS)",
-    "Ctrl+Q": "Quit (KDE, GNOME, XFCE, macOS)",
-    "Ctrl+R": "Refresh (GNOME, XFCE)",
-    "Ctrl+T": "AddTab (KDE, GNOME, XFCE, macOS)",
-}
+RESERVED_ELSEWHERE = MappingProxyType(
+    {
+        "Ctrl+G": "FindNext (KDE, GNOME, XFCE, macOS)",
+        "Ctrl+K": "DeleteEndOfLine (KDE, GNOME, XFCE)",
+        "Ctrl+M": "Minimize (macOS)",
+        "Ctrl+Q": "Quit (KDE, GNOME, XFCE, macOS)",
+        "Ctrl+R": "Refresh (GNOME, XFCE)",
+        "Ctrl+T": "AddTab (KDE, GNOME, XFCE, macOS)",
+    }
+)
 
 
 def free_keys() -> frozenset[str]:

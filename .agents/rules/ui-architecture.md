@@ -399,7 +399,9 @@ capitalisation.
 
 - A command is an `ActionDescriptor` contributed to `ActionRegistry` (`workbench/`): one
   `QAction` shared by its menu entry, toolbar button and shortcut (Qt, "Actions";
-  MS `cmd-menus`). Every command is in a menu (`menu_path` is mandatory); a toolbar holds
+  MS `cmd-menus`). Every command is in a menu (`menu_path` is mandatory), with one exception:
+  a pane's local commands (`OutputPane`'s Copy and Clear) live in its own toolbar and context
+  menu, as in Visual Studio's Output window, and take no window shortcut of their own; a toolbar holds
   actions only (`RegionHost.place_action` refuses a button widget) (MS `cmd-toolbars`).
 - Text: sentence case, exactly one access key per item (`&`, `&&` for a literal ampersand),
   unique among its siblings: the menu-bar titles, and the items and submenus of one menu; a
@@ -422,14 +424,25 @@ capitalisation.
 - Commit buttons come from `QDialogButtonBox` with standard buttons, so the platform orders
   them; one default button, the safe one; Esc and the title-bar close act as Cancel
   (MS `win-dialog-box`, Qt `QDialogButtonBox`). A dialog's title names the command.
-- Configuration is one dialog, Tools → Options: sections on the left, pages on the right,
-  OK / Cancel / Apply, Apply enabled only while a change is pending (MS `win-dialog-box`;
-  built by `EPIC-008E`).
+- Configuration is one dialog, Tools → Options (`OptionsDialog`, no ellipsis, shortcut
+  `QKeySequence.Preferences`): sections on the left, pages on the right, OK / Cancel / Apply;
+  Apply enabled only while a page is dirty; OK disabled, with the reason shown, while a page
+  is invalid; Cancel, Esc and the title-bar close revert every page (MS `win-dialog-box`).
+  Each module contributes an `IOptionsPage`; a page never saves on its own.
+- Messages a user may want to read later go to the one Output pane (`OutputPane`, Visual
+  Studio's Output window): a channel per source (`OutputChannel` over a `LogListModel`),
+  read-only lines, Copy and Clear as the pane's own commands.
 
 ### 9.5 Modes, panels and perspectives
 
-- One `QMainWindow` shell with a mode per job; each mode a `RegionHost`: a central widget,
-  docks, toolbars (Qt Creator's shape). A panel is a `QDockWidget` with a title, a close
+- One `QMainWindow` shell with a mode per job (`WorkbenchShell`); each mode a `RegionHost`:
+  a central widget, docks, toolbars (Qt Creator's shape). The menu bar reads File, Edit, View,
+  the application's menus, Tools, Window, Help (MS `cmd-menus`; `shell_menus.menu_order`),
+  each filled when it opens with the showing mode's commands; a menu with nothing in it is
+  disabled. A vertical mode bar (icons only, Ctrl+1…9) switches modes through
+  `NavigationService`, which asks the mode being left `can_leave(USER_INTENT | RESTORE)`.
+  Only the showing mode's commands are live, so two modes may share a key. The window
+  remembers its geometry and last mode (`WorkbenchShell` is an `IStateContributor`). A panel is a `QDockWidget` with a title, a close
   button and its content; every dock and toolbar has a stable object name and a toggle a View
   menu lists (`dock_toggle_actions`, `toolbar_toggle_actions`).
 - The default layout is what contributions build (`capture_default_perspective`); Window →
