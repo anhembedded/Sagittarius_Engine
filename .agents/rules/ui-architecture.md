@@ -402,7 +402,8 @@ capitalisation.
   MS `cmd-menus`). Every command is in a menu (`menu_path` is mandatory), with one exception:
   a pane's local commands (`OutputPane`'s Copy and Clear) live in its own toolbar and context
   menu, as in Visual Studio's Output window, and take no window shortcut of their own; a toolbar holds
-  actions only (`RegionHost.place_action` refuses a button widget) (MS `cmd-toolbars`).
+  actions only (`RegionHost.place_action` refuses a button widget) (MS `cmd-toolbars`); a consumer
+  still migrating opts in to bare toolbar widgets with `legacy_toolbar_widgets=True`, visibly.
 - Text: sentence case, exactly one access key per item (`&`, `&&` for a literal ampersand),
   unique among its siblings: the menu-bar titles, and the items and submenus of one menu; a
   menu is spelled one way in every mode. "…" (U+2026) exactly when the command asks for more

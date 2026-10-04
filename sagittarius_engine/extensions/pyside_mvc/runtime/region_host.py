@@ -97,6 +97,7 @@ class RegionHost(QMainWindow):
         parent: QWidget | None = None,
         *,
         layout_version: int = PERSPECTIVE_VERSION,
+        legacy_toolbar_widgets: bool = False,
     ) -> None:
         if frozenset(place_regions) != surface.accepts:
             raise ContributionError(
@@ -114,6 +115,7 @@ class RegionHost(QMainWindow):
         self._docks: dict[str, QDockWidget] = {}
         self._modals: dict[str, QDialog] = {}
         self._layout_version = layout_version
+        self._legacy_toolbar_widgets = legacy_toolbar_widgets
         self._default_perspective: bytes = b""
         # A parent is not enough: `QMainWindow` sets the `Window` flag on
         # itself, so nested in a page or a stacked widget it would draw its
@@ -142,6 +144,16 @@ class RegionHost(QMainWindow):
                 f"surface {self.surface_id!r} cannot render {place!r}; it "
                 f"accepts {sorted(self._surface.accepts)}."
             )
+        if region in _TOOLBAR_REGIONS and self._legacy_toolbar_widgets:
+            # A consumer still migrating its toolbars to actions opts in
+            # explicitly and visibly; the contract below is the default.
+            toolbar = (
+                self._toolbar_top()
+                if region is RegionKind.TOP_TOOLBAR
+                else self._toolbar_secondary()
+            )
+            toolbar.addWidget(widget)
+            return
         if region in _TOOLBAR_REGIONS:
             raise ContributionError(
                 f"{place!r} on {self.surface_id!r} is a toolbar, and a "
@@ -164,6 +176,12 @@ class RegionHost(QMainWindow):
                 "render — a RegionKind was added without teaching this "
                 "class about it."
             )
+
+    @property
+    def legacy_toolbar_widgets(self) -> bool:
+        """Whether this host still accepts bare widgets on its toolbars, the
+        migration opt-in for a consumer whose toolbars are not actions yet."""
+        return self._legacy_toolbar_widgets
 
     def place_action(self, place: str, action: QAction) -> None:
         """Adds `action` to the toolbar `place` maps to.
