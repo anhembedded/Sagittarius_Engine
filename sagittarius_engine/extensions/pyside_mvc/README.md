@@ -14,7 +14,7 @@ screen composition, and nothing else.
 | **Tokens** | `tokens/` | Every visual value: colour, spacing, radius, typography, motion | Supply a palette dict once, at bootstrap, filling the engine's fixed vocabulary |
 | **Widget Kit** | `kit/` + `Sagittarius/UI/` | The components that render those tokens | Compose them; derive from a base primitive only through the escape hatch |
 | **Runtime** | `runtime/` | Bootstrap/hosting: `configure_app_qml()`, `create_quick_widget()`, `QmlHostView`, `OverlayHost`; regions: `ContributionRegistry`, `RegionHost` (toolbars of actions, View toggles, perspectives), `RegionKind` | Call the bootstrap once; never hand-build layout geometry |
-| **Workbench** | `workbench/` | The QtWidgets desktop contract (`ui-architecture.md` §9, `EPIC-008`): `ActionDescriptor`/`ActionRegistry` (commands as `QAction`s, access keys, shortcuts, confirmations), `PerspectiveStore`, `ColumnKind`/`ColumnSpec`/`configure_item_view()`, `IValueFormatter`, `ReadoutForm`, `EmptyStateStack`, `ItemViewStateStore`, `find_unconfigured_item_views()` | Declare commands and columns as data; never configure an item view or format a value per screen |
+| **Workbench** | `workbench/` | The QtWidgets desktop contract (`ui-architecture.md` §9, `EPIC-008`): `ActionDescriptor`/`ActionRegistry` (commands as `QAction`s, access keys, shortcuts, confirmations), `PerspectiveStore`, `ColumnKind`/`ColumnSpec`/`configure_item_view()`, `IValueFormatter`, `ReadoutForm`, `EmptyStateStack`, `ItemViewStateStore`, `find_unconfigured_item_views()`, `WorkbenchShell`/`NavigationService`, `OptionsDialog`/`IOptionsPage`, `OutputPane`/`OutputChannel` | Declare commands and columns as data; never configure an item view or format a value per screen |
 
 The test for whether this boundary holds: change one token — accent colour, corner radius —
 and count how many consumer files must change to stay visually correct. The answer must be
@@ -300,7 +300,9 @@ extensions/pyside_mvc/
 │   ├── perspective_store.py       Each mode's layout through ui_state
 │   ├── column_kind.py · column_spec.py · configure_item_view.py · i_value_formatter.py
 │   ├── readout_form.py · empty_state.py · item_view_state_store.py
-│   └── item_view_guard.py         find_unconfigured_item_views()
+│   ├── item_view_guard.py         find_unconfigured_item_views()
+│   ├── workbench_shell.py · shell_menus.py · navigation_service.py · access_key_assignment.py   The window, its menus, mode navigation (EPIC-008D)
+│   └── i_options_page.py · options_dialog.py · output_pane.py   Tools > Options and the Output pane (EPIC-008E)
 ├── mvc/                           Presenter/View lifecycle
 │   ├── base_presenter.py · base_view.py · presenter_manager.py
 ├── safety/                        Thread-safety + crash-visibility guardrails

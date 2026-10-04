@@ -265,6 +265,14 @@ class ActionRegistry:
             and _scopes_meet(entry.descriptor.surface_id, surface_id)
         )
 
+    def scoped_actions(self) -> tuple[tuple[str | None, QAction], ...]:
+        """Every action with the mode it belongs to (`None`: every mode), for
+        a shell that keeps only the active mode's shortcuts live."""
+        return tuple(
+            (entry.descriptor.surface_id, entry.action)
+            for entry in self._entries.values()
+        )
+
     def menu_paths(self) -> tuple[tuple[str, ...], ...]:
         """Every distinct menu path, in first-contribution order."""
         return tuple(

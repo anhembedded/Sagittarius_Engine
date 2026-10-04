@@ -1,6 +1,7 @@
 import argparse
 import sys
 
+from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication
 
 from examples.student_management.infrastructure.ui.pyside_mvc_extension import (
@@ -13,6 +14,9 @@ from examples.student_management.presentation.roster.roster_presenter import (
 from examples.student_management.presentation.roster.roster_view_factory import (
     IRosterView,
     register_roster_view,
+)
+from examples.student_management.presentation.workbench.sample_shell import (
+    build_sample_shell,
 )
 from sagittarius_engine.interfaces.i_config import IConfig
 
@@ -42,12 +46,14 @@ def main() -> int:
 
     view = app.container.resolve(IRosterView)
     presenter = RosterPresenter(view, app.container)  # noqa: F841
+    # The roster is the one mode of the engine's workbench shell (EPIC-008):
+    # menu bar, mode bar, Tools > Options, the Output pane.
+    action_owner = QObject()
+    shell, log = build_sample_shell(view, app.container.resolve(IConfig), action_owner)
     backend = "QWidget" if args.qtwidget else "QML"
-    view.setWindowTitle(
-        f"Student Management — Sagittarius Engine sample app ({backend})"
-    )
-    view.resize(900, 600)
-    view.show()
+    log.append(f"Roster rendered with the {backend} view.")
+    shell.resize(900, 600)
+    shell.show()
 
     exit_code = qt_app.exec()
     app.stop()
@@ -65,8 +71,9 @@ def main() -> int:
     # race instead of trying to win it. Harmless (just redundant work) for
     # --qtwidget, which has no QML/Theme machinery to race in the first
     # place.
-    view.close()
+    shell.close()
     del presenter
+    del shell
     del view
     for _ in range(10):
         qt_app.processEvents()
