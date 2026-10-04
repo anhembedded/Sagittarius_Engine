@@ -8,7 +8,7 @@ from functools import partial
 
 import pytest
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QApplication, QLabel, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QMenu, QToolBar, QWidget
 
 from sagittarius_engine.extensions.pyside_mvc import (
     OPTIONS_TITLE,
@@ -307,3 +307,141 @@ class TestRemembered:
 
         assert second.current_mode == "bots"
         assert second.size().width() == 640
+
+
+class TestReviewOfPR225:
+    """Regressions for the independent review of PR #225."""
+
+    def _show(self, qtbot, shell: WorkbenchShell) -> None:
+        shell.show()
+        with qtbot.waitActive(shell):
+            shell.activateWindow()
+
+    def test_a_menu_opened_in_one_mode_keeps_no_command_live_in_another(
+        self, qtbot, shell: WorkbenchShell, registry: ActionRegistry
+    ) -> None:
+        ran: list[str] = []
+        registry.contribute(
+            ActionDescriptor(
+                "market.journal",
+                "&Journal",
+                _TRADE,
+                shortcut="Ctrl+J",
+                surface_id="market",
+            )
+        )
+        registry.bind("market.journal", partial(_record, ran, "market"))
+        registry.contribute(
+            ActionDescriptor("bots.new", "&New bot", _TRADE, surface_id="bots")
+        )
+        registry.bind("bots.new", partial(_record, ran, "bots"))
+        _two_modes(shell)
+        shell.finish_setup()
+        self._show(qtbot, shell)
+        shell.menu("T&rade")
+
+        shell.navigate("bots", NavigationSource.USER_INTENT)
+        qtbot.keyClick(shell, Qt.Key.Key_J, Qt.KeyboardModifier.ControlModifier)
+
+        assert ran == []
+
+    def test_a_shared_key_stays_unambiguous_after_a_menu_was_opened(
+        self, qtbot, shell: WorkbenchShell, registry: ActionRegistry
+    ) -> None:
+        ran: list[str] = []
+        for mode_id in ("market", "bots"):
+            registry.contribute(
+                ActionDescriptor(
+                    f"{mode_id}.load",
+                    "&Load",
+                    _TRADE,
+                    shortcut="Ctrl+L",
+                    surface_id=mode_id,
+                )
+            )
+            registry.bind(f"{mode_id}.load", partial(_record, ran, mode_id))
+        _two_modes(shell)
+        shell.finish_setup()
+        self._show(qtbot, shell)
+        shell.menu("T&rade")
+
+        shell.navigate("bots", NavigationSource.USER_INTENT)
+        qtbot.keyClick(shell, Qt.Key.Key_L, Qt.KeyboardModifier.ControlModifier)
+
+        assert ran == ["bots"]
+
+    def test_reopening_a_menu_does_not_pile_up_submenus(
+        self, shell: WorkbenchShell
+    ) -> None:
+        _two_modes(shell)
+        shell.finish_setup()
+
+        for _ in range(5):
+            shell.menu("&View")
+
+        assert len(shell.findChildren(QMenu, "menu::Toolbars")) == 1
+
+    def test_the_mode_bar_check_follows_the_bar_however_it_is_hidden(
+        self, qtbot, shell: WorkbenchShell, registry: ActionRegistry
+    ) -> None:
+        _two_modes(shell)
+        shell.finish_setup()
+        self._show(qtbot, shell)
+        bar = shell.findChild(QToolBar, "workbench::mode_bar")
+        assert bar is not None
+
+        bar.toggleViewAction().trigger()
+
+        assert not registry.action("workbench.mode_bar").isChecked()
+
+    def test_a_hidden_status_bar_comes_back_hidden(
+        self, qtbot, shell: WorkbenchShell, registry: ActionRegistry
+    ) -> None:
+        _two_modes(shell)
+        shell.finish_setup()
+        registry.action("workbench.status_bar").trigger()
+        saved = shell.capture_state()
+        shell.statusBar().setVisible(True)
+        registry.action("workbench.status_bar").setChecked(True)
+
+        shell.restore_state(saved)
+
+        assert shell.statusBar().isHidden()
+        assert not registry.action("workbench.status_bar").isChecked()
+
+    def test_closing_asks_the_showing_mode_and_a_refusal_keeps_the_window(
+        self, qtbot, shell: WorkbenchShell
+    ) -> None:
+        asked: list[NavigationSource] = []
+
+        def unsaved(source: NavigationSource) -> bool:
+            asked.append(source)
+            return False
+
+        shell.add_mode(ShellMode("bots", "&Bots", _host("bots"), can_leave=unsaved))
+        shell.finish_setup()
+        shell.show()
+
+        assert shell.close() is False
+        assert shell.isVisible()
+        assert asked == [NavigationSource.USER_INTENT]
+
+    def test_restoring_the_last_mode_tells_the_leaving_mode_it_is_a_restore(
+        self, shell: WorkbenchShell
+    ) -> None:
+        asked: list[NavigationSource] = []
+
+        def record(source: NavigationSource) -> bool:
+            asked.append(source)
+            return True
+
+        shell.add_mode(
+            ShellMode("market", "&Market", _host("market"), can_leave=record)
+        )
+        shell.add_mode(ShellMode("bots", "&Bots", _host("bots")))
+        shell.finish_setup()
+
+        shell.restore_state({"mode": "bots"})
+
+        assert shell.current_mode == "bots"
+        assert asked == [NavigationSource.RESTORE]

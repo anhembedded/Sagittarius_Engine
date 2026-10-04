@@ -25,6 +25,8 @@ Windows desktop guidance (MS uxguide `win-dialog-box`: commit buttons, Apply sem
 | :--- | :--- |
 | `sagittarius_engine/extensions/pyside_mvc/workbench/i_options_page.py, options_dialog.py, output_pane.py, output_channel.py` | New |
 
+> The plan table's `output_channel.py` was folded into `output_pane.py`.
+
 ## 🧪 Verification & Test Coverage
 Unit: dirty/apply/revert/validation; channel switching; copy. Full gate: `pwsh scripts/ci-local.ps1`, read `logs/ci-local-latest.log`.
 

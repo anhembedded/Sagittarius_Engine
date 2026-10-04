@@ -71,7 +71,10 @@ def main() -> int:
     # race instead of trying to win it. Harmless (just redundant work) for
     # --qtwidget, which has no QML/Theme machinery to race in the first
     # place.
-    shell.close()
+    # exec() returned because the window closed; closing it again would ask
+    # its mode's can_leave a second time.
+    if shell.isVisible():
+        shell.close()
     del presenter
     del shell
     del view

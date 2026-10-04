@@ -399,7 +399,9 @@ capitalisation.
 
 - A command is an `ActionDescriptor` contributed to `ActionRegistry` (`workbench/`): one
   `QAction` shared by its menu entry, toolbar button and shortcut (Qt, "Actions";
-  MS `cmd-menus`). Every command is in a menu (`menu_path` is mandatory); a toolbar holds
+  MS `cmd-menus`). Every command is in a menu (`menu_path` is mandatory), with one exception:
+  a pane's local commands (`OutputPane`'s Copy and Clear) live in its own toolbar and context
+  menu, as in Visual Studio's Output window, and take no window shortcut of their own; a toolbar holds
   actions only (`RegionHost.place_action` refuses a button widget) (MS `cmd-toolbars`).
 - Text: sentence case, exactly one access key per item (`&`, `&&` for a literal ampersand),
   unique among its siblings: the menu-bar titles, and the items and submenus of one menu; a

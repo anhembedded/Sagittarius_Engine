@@ -32,6 +32,8 @@ Qt Creator's mode selector and per-mode `QMainWindow` (P5); the engine owns mech
 | `examples/student_management/` | Uses the shell |
 | `Tasks/in_progress/TASK-043_*.md` | E3 and the decision updated |
 
+> The plan table's `mode_bar.py`, `view_menu.py` and `navigation_source.py` were folded into `workbench_shell.py`, `shell_menus.py` and `navigation_service.py`.
+
 ## 🧪 Verification & Test Coverage
 Unit: menus, mode switching, View refresh, can_leave refusal. Sample app smoke run. Full gate: `pwsh scripts/ci-local.ps1`, read `logs/ci-local-latest.log`.
 

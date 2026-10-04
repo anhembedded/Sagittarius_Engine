@@ -6,16 +6,27 @@ an `OutputChannel` over a `LogListModel` it appends to; the pane never owns
 the lines, so switching channels loses nothing.
 
 Copy and Clear act on the pane itself, like the commands on Visual Studio's
-Output toolbar: they are the pane's own actions, in its toolbar and in its
-context menu, with Copy on the platform's Copy key while the lines have focus.
+Output toolbar: they are the pane's own commands, in its toolbar and its
+context menu (`ui-architecture.md` §9.3's exception for a pane's local
+commands). The platform's Copy key copies the lines while they have focus,
+claimed through a shortcut override rather than a second `QAction` shortcut,
+so it never competes with the application's Edit → Copy: Qt would call two
+actions on one key ambiguous and run neither.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from PySide6.QtCore import QIdentityProxyModel, QModelIndex, QPersistentModelIndex, Qt
-from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
+from PySide6.QtCore import (
+    QEvent,
+    QIdentityProxyModel,
+    QModelIndex,
+    QPersistentModelIndex,
+    Qt,
+)
+from PySide6.QtGui import QAction, QGuiApplication, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -56,6 +67,31 @@ class _LineText(QIdentityProxyModel):
         return super().data(index, role)
 
 
+class _Lines(QListView):
+    """The read-only lines; claims the Copy key while it has focus."""
+
+    def __init__(self, copy: Callable[[], object]) -> None:
+        super().__init__()
+        self._copy = copy
+
+    def event(self, event: QEvent) -> bool:
+        if (
+            event.type() == QEvent.Type.ShortcutOverride
+            and isinstance(event, QKeyEvent)
+            and event.matches(QKeySequence.StandardKey.Copy)
+        ):
+            event.accept()
+            return True
+        return super().event(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 - Qt override
+        if event.matches(QKeySequence.StandardKey.Copy):
+            self._copy()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 class OutputPane(QDockWidget):
     """The dock. `add_channel()` once per source."""
 
@@ -67,17 +103,13 @@ class OutputPane(QDockWidget):
         self._choice = QComboBox()
         self._choice.setObjectName("workbench::output::channel")
         self._choice.currentIndexChanged.connect(self._show_index)
-        self._lines = QListView()
+        self._lines = _Lines(self.copy_lines)
         self._lines.setObjectName("workbench::output::lines")
         self._lines.setModel(self._proxy)
         self._lines.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._lines.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._lines.setUniformItemSizes(True)
         self.copy_action = self._pane_action("&Copy", self.copy_lines)
-        self.copy_action.setShortcut(QKeySequence.StandardKey.Copy)
-        self.copy_action.setShortcutContext(
-            Qt.ShortcutContext.WidgetWithChildrenShortcut
-        )
         self.clear_action = self._pane_action("C&lear", self.clear_channel)
         self._lines.addAction(self.copy_action)
         self._lines.addAction(self.clear_action)

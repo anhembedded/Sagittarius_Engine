@@ -78,6 +78,7 @@ _MAX_MODE_SHORTCUTS = 9
 _GEOMETRY = "geometry"
 _STATE = "state"
 _MODE = "mode"
+_STATUS_BAR = "status_bar"
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,7 +206,11 @@ class WorkbenchShell(QMainWindow):
             self._registry.contribute(descriptor)
             self._registry.bind(descriptor.action_id, handler)
         self._registry.action("workbench.status_bar").setChecked(True)
-        self._registry.action("workbench.mode_bar").setChecked(True)
+        mode_bar_check = self._registry.action("workbench.mode_bar")
+        mode_bar_check.setChecked(True)
+        # The toolbar-area popup and restoreState() hide the bar without this
+        # action; its own toggle action follows every one of them.
+        self._mode_bar.toggleViewAction().toggled.connect(mode_bar_check.setChecked)
 
     def add_mode(self, mode: ShellMode) -> None:
         """Adds a mode: a page of the stack, a mode-bar button and a View
@@ -278,6 +283,7 @@ class WorkbenchShell(QMainWindow):
         mode = self._modes[mode_id]
         self._stack.setCurrentWidget(mode.host)
         self._mode_actions[mode_id].setChecked(True)
+        self._menus.empty_all()
         self._sync_live_actions(mode_id)
         self._sync_status_widgets()
         self._menus.refresh_enabled()
@@ -361,6 +367,7 @@ class WorkbenchShell(QMainWindow):
             _GEOMETRY: _encode(self.saveGeometry()),
             _STATE: _encode(self.saveState()),
             _MODE: self._navigation.current,
+            _STATUS_BAR: not self.statusBar().isHidden(),
         }
 
     def restore_state(self, data: StateData) -> None:
@@ -370,6 +377,10 @@ class WorkbenchShell(QMainWindow):
         state = _decode(data.get(_STATE))
         if state is not None:
             self.restoreState(state)
+        status_bar = data.get(_STATUS_BAR)
+        if isinstance(status_bar, bool):
+            self.statusBar().setVisible(status_bar)
+            self._registry.action("workbench.status_bar").setChecked(status_bar)
         mode = data.get(_MODE)
         if isinstance(mode, str) and mode in self._modes:
             self.navigate(mode, NavigationSource.RESTORE)

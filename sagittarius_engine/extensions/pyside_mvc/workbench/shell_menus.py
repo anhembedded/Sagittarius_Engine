@@ -41,6 +41,23 @@ type Path = tuple[str, ...]
 type ExtraActions = Callable[[Path], Sequence[QAction]]
 
 
+def _empty(menu: QMenu) -> None:
+    """Clears `menu` and destroys its submenus.
+
+    `QMenu.clear()` deletes the actions the menu owns but not the submenu
+    `QMenu`s, which are its children; refilled on every open, they would
+    accumulate. Detached first so a lookup by object name never finds one
+    still waiting for `deleteLater()`.
+    """
+    for action in menu.actions():
+        submenu = action.menu()
+        if isinstance(submenu, QMenu):
+            _empty(submenu)
+            submenu.setParent(None)
+            submenu.deleteLater()
+    menu.clear()
+
+
 def menu_order(top_titles: Sequence[str]) -> tuple[str, ...]:
     """The standard menus around the application's own, in Windows order."""
     standard = {plain_text(title) for title in (*_LEADING, *_TRAILING)}
@@ -79,6 +96,18 @@ class MenuBarBuilder:
     def menu(self, title: str) -> QMenu:
         return self._top[title]
 
+    def empty_all(self) -> None:
+        """Empties every menu, on a mode change.
+
+        A filled `QMenu` keeps its `QAction`s, and Qt treats an action held
+        by a menu whose menu-bar entry is enabled as live for shortcuts. So a
+        menu filled in the mode just left would keep that mode's commands
+        reachable, or make a key two modes share ambiguous. Each menu refills
+        when it next opens.
+        """
+        for menu in self._top.values():
+            _empty(menu)
+
     def refresh_enabled(self) -> None:
         """Disables a top-level menu with nothing in it for this mode."""
         for title, menu in self._top.items():
@@ -93,7 +122,7 @@ class MenuBarBuilder:
     # -- filling ---------------------------------------------------------------
 
     def _fill(self, menu: QMenu, path: Path) -> None:
-        menu.clear()
+        _empty(menu)
         mode = self._current_mode()
         for action in self._registry.menu_actions(path, mode):
             menu.addAction(action)

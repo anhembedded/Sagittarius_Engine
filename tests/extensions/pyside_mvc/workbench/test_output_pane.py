@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from PySide6.QtCore import QItemSelectionModel
-from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QListView
+from PySide6.QtCore import QItemSelectionModel, Qt
+from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
+from PySide6.QtWidgets import QListView, QMainWindow, QWidget
 
 from sagittarius_engine.extensions.pyside_mvc import (
     LogListModel,
@@ -79,3 +79,36 @@ def test_a_channel_added_twice_is_refused(pane: OutputPane) -> None:
     pane.add_channel(_channel("sync"))
     with pytest.raises(ValueError, match="already added"):
         pane.add_channel(_channel("sync"))
+
+
+def test_the_pane_copy_and_an_edit_copy_coexist_on_the_copy_key(qtbot) -> None:
+    """Review of PR #225: a second Ctrl+C shortcut made both ambiguous."""
+    window = QMainWindow()
+    qtbot.addWidget(window)
+    edit_copies: list[bool] = []
+    edit_copy = QAction("&Copy", window)
+    edit_copy.setShortcut(QKeySequence.StandardKey.Copy)
+    edit_copy.triggered.connect(lambda: edit_copies.append(True))
+    window.addAction(edit_copy)
+    # Takes focus but, unlike a line edit, does not claim Ctrl+C itself.
+    elsewhere = QWidget()
+    elsewhere.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    window.setCentralWidget(elsewhere)
+    pane = OutputPane(window)
+    window.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, pane)
+    pane.add_channel(_channel("sync", "fetched 500 candles"))
+    window.show()
+    with qtbot.waitActive(window):
+        window.activateWindow()
+    QGuiApplication.clipboard().setText("")
+
+    _lines(pane).setFocus()
+    qtbot.keyClick(_lines(pane), Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+
+    assert "fetched 500 candles" in QGuiApplication.clipboard().text()
+    assert edit_copies == []
+
+    elsewhere.setFocus()
+    qtbot.keyClick(elsewhere, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+
+    assert edit_copies == [True]
