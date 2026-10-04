@@ -13,7 +13,8 @@ screen composition, and nothing else.
 | --- | --- | --- | --- |
 | **Tokens** | `tokens/` | Every visual value: colour, spacing, radius, typography, motion | Supply a palette dict once, at bootstrap, filling the engine's fixed vocabulary |
 | **Widget Kit** | `kit/` + `Sagittarius/UI/` | The components that render those tokens | Compose them; derive from a base primitive only through the escape hatch |
-| **Runtime** | `runtime/` | Bootstrap/hosting *(built)*: `configure_app_qml()`, `create_quick_widget()`, `QmlHostView`, `OverlayHost`. Regions/slot registry/screen lifecycle *(not yet — `EPIC-001D`)* | Call the bootstrap once; never hand-build layout geometry |
+| **Runtime** | `runtime/` | Bootstrap/hosting: `configure_app_qml()`, `create_quick_widget()`, `QmlHostView`, `OverlayHost`; regions: `ContributionRegistry`, `RegionHost` (toolbars of actions, View toggles, perspectives), `RegionKind` | Call the bootstrap once; never hand-build layout geometry |
+| **Workbench** | `workbench/` | The QtWidgets desktop contract (`ui-architecture.md` §9, `EPIC-008`): `ActionDescriptor`/`ActionRegistry` (commands as `QAction`s, access keys, shortcuts, confirmations), `PerspectiveStore`, `ColumnKind`/`ColumnSpec`/`configure_item_view()`, `IValueFormatter`, `ReadoutForm`, `EmptyStateStack`, `ItemViewStateStore`, `find_unconfigured_item_views()` | Declare commands and columns as data; never configure an item view or format a value per screen |
 
 The test for whether this boundary holds: change one token — accent colour, corner radius —
 and count how many consumer files must change to stay visually correct. The answer must be
@@ -289,7 +290,17 @@ extensions/pyside_mvc/
 │   ├── qml_style.py               Pins Qt Quick Controls to the customizable style
 │   ├── qml_value_normalizer.py    QML → Python value bridge
 │   ├── base_view_model.py         `BaseQmlViewModel`
-│   └── log_list_model.py          `LogListModel` (real implementation)
+│   ├── log_list_model.py          `LogListModel` (real implementation)
+│   ├── contribution_descriptor.py · contribution_registry.py · i_contribution_registry.py · contribution_error.py
+│   ├── region_host.py · region_kind.py · i_region_host.py   A mode as a `QMainWindow`: actions, docks, perspectives
+│   └── surface_declaration.py · size_hint.py
+├── workbench/                     The QtWidgets desktop contract — EPIC-008 (ui-architecture.md §9)
+│   ├── action_descriptor.py · action_registry.py · action_confirmation.py   Commands as QActions
+│   ├── action_text.py · shortcut_policy.py   Access keys, the ellipsis, the free shortcut set
+│   ├── perspective_store.py       Each mode's layout through ui_state
+│   ├── column_kind.py · column_spec.py · configure_item_view.py · i_value_formatter.py
+│   ├── readout_form.py · empty_state.py · item_view_state_store.py
+│   └── item_view_guard.py         find_unconfigured_item_views()
 ├── mvc/                           Presenter/View lifecycle
 │   ├── base_presenter.py · base_view.py · presenter_manager.py
 ├── safety/                        Thread-safety + crash-visibility guardrails

@@ -293,7 +293,7 @@ owns the *why* and the sequencing; the engine change is committed here, separate
 
 | Epic (in the app repo) | What it is | Engine's part |
 | :--- | :--- | :--- |
-| `EPIC-007_chuan_hoa_card_dung_chung` | Standardising the app's duplicated card widgets onto `pyside_mvc.widgets` | `007A`–`007C`: extend the widget guards to `QWidget`, add the `ConfirmOverlay`/`PickerOverlay` that `BUG-004` reports as missing, add six shared surface shapes and three leaf controls |
+| `EPIC-007_chuan_hoa_card_dung_chung` | Standardising the app's duplicated card widgets onto `pyside_mvc.widgets` (historical: the package left the engine in commit `7a3ac18` and lives in the consumer; the QtWidgets contract today is `ui-architecture.md` §9) | `007A`–`007C`: extend the widget guards to `QWidget`, add the `ConfirmOverlay`/`PickerOverlay` that `BUG-004` reports as missing, add six shared surface shapes and three leaf controls |
 | `EPIC-008_chuan_hoa_luong_event` | Standardising the event flow | `008A`–`008E` are engine work; `008F`–`008H` are app work |
 
 **Read the epic's `README.md` and its `DECISION_*.md` ADR before doing any of its sub-tasks.**
