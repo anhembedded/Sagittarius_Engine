@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import logging
 import threading
@@ -186,6 +187,12 @@ class TaskManager(ITaskManager):
         return wrapper
 
     async def _wrap_coro(self, bg_task: BackgroundTask, coro: Any) -> Any:
+        # `BUG-017` review: `run_coroutine_threadsafe` names the asyncio task
+        # `Task-N`; give it the spawned name, so a runtime warning about a task
+        # that will not stop names the one the consumer knows.
+        current = asyncio.current_task()
+        if current is not None:
+            current.set_name(bg_task.name)
         try:
             res = await coro
             bg_task.status = TaskState.COMPLETED
