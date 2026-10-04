@@ -7,7 +7,8 @@ from __future__ import annotations
 from functools import partial
 
 import pytest
-from PySide6.QtCore import Qt, QTimer
+import shiboken6
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import QApplication, QLabel, QMenu, QToolBar, QWidget
 
 from sagittarius_engine.extensions.pyside_mvc import (
@@ -278,6 +279,25 @@ class TestStatusBarOutputAndOptions:
         shell.show_options()
 
         assert seen == [OPTIONS_TITLE]
+
+    def test_a_closed_options_dialog_is_deleted(self, shell: WorkbenchShell) -> None:
+        """`BUG-018`: every open built a dialog parented to the window and
+        none was ever deleted, so each one lived, and listened to its pages,
+        until the window closed."""
+        _two_modes(shell)
+        shell.finish_setup()
+
+        def close_it() -> None:
+            dialog = QApplication.activeModalWidget()
+            assert isinstance(dialog, OptionsDialog)
+            dialog.reject()
+
+        QTimer.singleShot(0, close_it)
+
+        dialog = shell.show_options()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+        assert not shiboken6.isValid(dialog)
 
 
 class TestRemembered:

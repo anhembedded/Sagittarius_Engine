@@ -38,8 +38,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 | Status | Count |
 | :--- | :---: |
 | 🔴 **Open** | 7 |
-| ✅ **Fixed** | 10 |
-| 📈 **Total** | **17** |
+| ✅ **Fixed** | 11 |
+| 📈 **Total** | **18** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -91,6 +91,7 @@ deliberately independent (see the top of this file).
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-018](completed/BUG-018_options_dialog_closes_after_a_page_fails_to_apply.md)** | The Options dialog closes after a page fails to apply, and no closed dialog is ever deleted | Medium | 2026-10-04 | Fixed 2026-10-04. `accept()` closes only when every page took its edits; otherwise the dialog shows the page that kept them. `show_options()` deletes the dialog on close. Found by the review of Elite PR #348. |
 | **[BUG-017](completed/BUG-017_async_runtime_stop_drops_cancelled_tasks_cleanup.md)** | `AsyncRuntime.stop()` drops the cleanup of every task it cancels | Low | 2026-10-04 | Fixed 2026-10-04. `stop()` stopped the loop before cancelling what was pending, so each task's `finally` never ran (the reference consumer's unclosed `aiohttp` session). The loop is now drained first, within half of `stop()`'s one `timeout`, so `App.stop()` never returns with the loop running; a task that will not stop is named. PR #227 plus its review follow-up. |
 | **[BUG-014](completed/BUG-014_intermittent_segfault_under_scheduler_and_asyncruntime_thread_pressure_in_full_suite.md)** | Intermittent `Segmentation fault` in the full test suite, dozens of leaked `Scheduler`/`AsyncRuntime` threads at crash time | Medium | 2026-09-19 | Fixed 2026-09-19, confirmed on GitHub Actions itself (commit `976ce7c`, run `35440802725`, all 8 checks green) after two premature local-only closures earlier the same day. Real root cause found via an empirical thread census, not grep: 13 test files across the Engine suite `.boot()` a real `App` (starting real `Scheduler`+`AsyncRuntime` threads) without ever joining it on at least one code path each — missing `.stop()`, an exception past `Bootstrap.boot()`'s own try/except, a mocked subsystem swallowing the real join, or a leak entirely inside code the test never gets a handle to. Two full census passes across the whole suite showed **zero** leaked threads post-fix, and one diagnostic run *before* the final fixes reproduced the segfault locally for the first time all session (24 threads), disproving the earlier "local never reproduces it" framing. Full per-file breakdown in the bug file's "Fixed, 2026-09-19" section. |
 | **[BUG-012](completed/BUG-012_tab_button_ignores_its_own_content_when_sizing.md)** | A `TabBar` tab sizes itself from text it does not have, so every label is clipped | Medium | 2026-08-25 | Fixed 2026-08-25: `_TabButton` is a `QPushButton` with no text of its own — its content is a label and badge in a child layout, which `QPushButton.sizeHint()` never consults. Measured 59x24 reported against 195x34 needed. Both size hints now defer to the layout. Invisible until `EPIC-007F` gave `TabBar` its first real consumer; the showcase's "First"/"Second" labels were short enough to survive the wrong hint. |

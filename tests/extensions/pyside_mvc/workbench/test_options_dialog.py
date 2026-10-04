@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialogButtonBox, QLabel, QLineEdit, QWidget
+from PySide6.QtWidgets import QDialogButtonBox, QLabel, QLineEdit, QListWidget, QWidget
 
 from sagittarius_engine.extensions.pyside_mvc import IOptionsPage, OptionsDialog
 
@@ -133,3 +133,36 @@ def test_every_way_out_but_ok_reverts_every_page(
 
     assert (general.edit.text(), data.edit.text()) == ("a", "b")
     assert general.applied == 0 and data.applied == 0
+
+
+class _UnwritablePage(_TextPage):
+    """A page whose write fails: `apply()` keeps the edit and stays dirty,
+    as an app page does when its file cannot be written."""
+
+    def apply(self) -> None:
+        self.applied += 1
+
+
+def test_ok_keeps_the_dialog_open_while_a_page_could_not_apply(qtbot) -> None:
+    """`BUG-018`: OK applied every page and closed regardless, so a page that
+    could not write its file reported the failure in a dialog that had just
+    closed, and the user believed OK had saved."""
+    good, failing = _TextPage("General", "a"), _UnwritablePage("Data", "b")
+    dialog = OptionsDialog([good, failing])
+    qtbot.addWidget(dialog)
+    dialog.show()
+    good.edit.setText("A")
+    good.edit.textEdited.emit("A")
+    failing.edit.setText("B")
+    failing.edit.textEdited.emit("B")
+
+    qtbot.mouseClick(_button(dialog, _Buttons.Ok), Qt.MouseButton.LeftButton)
+
+    assert dialog.isVisible()
+    assert dialog.result() != dialog.DialogCode.Accepted
+    assert (good.saved, failing.applied) == ("A", 1)
+    assert dialog.findChild(QListWidget).currentRow() == 1
+    message = dialog.findChild(QLabel, "workbench::options::message")
+    assert message is not None
+    assert message.isVisibleTo(dialog)
+    assert message.text() == "Data: the changes could not be applied."
