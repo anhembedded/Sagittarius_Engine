@@ -106,10 +106,10 @@ class TestRefusals:
 
     def test_two_modes_may_share_a_key(self, registry: ActionRegistry) -> None:
         registry.contribute(
-            _command("a", "&Start", shortcut="Ctrl+R", surface_id="bots")
+            _command("a", "&Start", shortcut="Ctrl+L", surface_id="bots")
         )
         registry.contribute(
-            _command("b", "&Start", shortcut="Ctrl+R", surface_id="backtest")
+            _command("b", "&Start", shortcut="Ctrl+L", surface_id="backtest")
         )
 
     def test_no_free_key_is_reserved_by_this_platform(self, qapp) -> None:
@@ -123,11 +123,11 @@ class TestRefusals:
         """Defence in depth: should a future Qt reserve a free key, the
         registry refuses it at boot rather than shadow a standard command."""
         monkeypatch.setattr(
-            action_registry_module, "_standard_bindings", lambda: {"Ctrl+R": "FindNext"}
+            action_registry_module, "_standard_bindings", lambda: {"Ctrl+L": "FindNext"}
         )
         registry = ActionRegistry(owner, confirmer)
         with pytest.raises(ActionDeclarationError, match="reserves for FindNext"):
-            registry.contribute(_command("b", "&Run", shortcut="Ctrl+R"))
+            registry.contribute(_command("b", "&Load", shortcut="Ctrl+L"))
 
     def test_two_items_of_one_menu_on_one_access_key(
         self, registry: ActionRegistry

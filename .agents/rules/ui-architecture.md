@@ -407,10 +407,10 @@ capitalisation.
   before it acts (MS `cmd-menus`, KDE, Apple). `action_text.text_problems()` checks one text;
   `ActionRegistry.contribute()` checks siblings and spelling.
 - Shortcuts: a standard command takes its `QKeySequence.StandardKey`; a new one takes Ctrl+J,
-  K, L, M, R, Ctrl+digit, F7, F8, F9 or F12, never Ctrl+Alt: Microsoft's free set less Ctrl+G,
-  Q and T, which KDE, GNOME or macOS bind to FindNext, Quit and AddTab, so the same set is
-  free on every platform (MS `inter-keyboard`; `shortcut_policy.py`). The registry also
-  refuses any key the running platform reserves.
+  Ctrl+L, Ctrl+digit, F7, F8, F9 or F12, never Ctrl+Alt: Microsoft's free set less the keys
+  KDE, GNOME, XFCE or macOS reserve (Ctrl+G, K, M, Q, R, T; `RESERVED_ELSEWHERE` names each
+  use), so the same set is free on every platform (MS `inter-keyboard`; `shortcut_policy.py`).
+  The registry also refuses any key the running platform reserves.
 - Inapplicable commands are disabled, never hidden (MS `cmd-menus`, Apple); an unbound command
   stays disabled and `report_unbound()` logs it.
 - Confirm only risky or irreversible commands, as data (`ActionConfirmation`): the consequence

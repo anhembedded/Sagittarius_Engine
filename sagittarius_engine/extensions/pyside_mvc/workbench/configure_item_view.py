@@ -16,7 +16,7 @@ and no model formats for display.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import partial
 
 from PySide6.QtCore import (
@@ -132,6 +132,17 @@ def _configure_header(header: QHeaderView, specs: Sequence[ColumnSpec]) -> None:
         header.setSectionResizeMode(column, mode)
 
 
+def _fit_when_first_rows_arrive(
+    proxy: QSortFilterProxyModel,
+    fit: Callable[[], None],
+    parent: QModelIndex,
+    first: int,
+    last: int,
+) -> None:
+    if not parent.isValid() and proxy.rowCount() == last - first + 1:
+        fit()
+
+
 def _fit_columns(view: QTableView | QTreeView, specs: Sequence[ColumnSpec]) -> None:
     for column, spec in enumerate(specs):
         if not spec.stretch:
@@ -175,6 +186,10 @@ def configure_item_view(
     header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
     view.setSortingEnabled(True)
     _fit_columns(view, specs)
-    proxy.modelReset.connect(partial(_fit_columns, view, tuple(specs)))
+    fit = partial(_fit_columns, view, tuple(specs))
+    proxy.modelReset.connect(fit)
+    # A table that starts empty fits when its first rows arrive; later
+    # inserts leave the widths alone, so a live table is not re-measured.
+    proxy.rowsInserted.connect(partial(_fit_when_first_rows_arrive, proxy, fit))
     view.setProperty(CONFIGURED_PROPERTY, True)
     return proxy

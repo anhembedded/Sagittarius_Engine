@@ -8,12 +8,14 @@ free, and never `Ctrl+Alt`, which is `AltGr` on many keyboard layouts and
 types a character instead.
 
 The free set is the one those guidelines leave unassigned, less every key
-another platform Qt supports reserves, so a command that boots on Windows
-boots everywhere: `Ctrl` with J, K, L, M or R, `Ctrl` with a digit, and F7,
-F8, F9 and F12. Microsoft also leaves Ctrl+G, Ctrl+Q and Ctrl+T free, but
-`QKeySequence` binds them to FindNext, Quit and AddTab on KDE, GNOME and
-macOS. Anything else a command needs is reached through its menu's access
-keys.
+another platform reserves, so a command that boots on Windows boots
+everywhere: Ctrl+J, Ctrl+L, `Ctrl` with a digit, and F7, F8, F9 and F12.
+Microsoft also leaves Ctrl+G, K, M, Q, R and T free, but `QKeySequence`
+binds G (FindNext), K (DeleteEndOfLine), Q (Quit), R (Refresh) and T
+(AddTab) on KDE, GNOME or XFCE (measured under the xcb platform with each
+`XDG_CURRENT_DESKTOP`), and macOS gives Cmd+M, which Qt spells Ctrl+M, to
+Minimize. `RESERVED_ELSEWHERE` records them. Anything else a command needs
+is reached through its menu's access keys.
 """
 
 from __future__ import annotations
@@ -23,8 +25,23 @@ from PySide6.QtGui import QKeySequence
 _PORTABLE = QKeySequence.SequenceFormat.PortableText
 #: Every key a new command may take, in Qt's portable spelling.
 _FREE_KEYS = frozenset(
-    {f"Ctrl+{key}" for key in "JKLMR0123456789"} | {"F7", "F8", "F9", "F12"}
+    {f"Ctrl+{key}" for key in "JL0123456789"} | {"F7", "F8", "F9", "F12"}
 )
+#: Keys Microsoft leaves free that another platform reserves, with its use.
+RESERVED_ELSEWHERE: dict[str, str] = {
+    "Ctrl+G": "FindNext (KDE, GNOME, XFCE, macOS)",
+    "Ctrl+K": "DeleteEndOfLine (KDE, GNOME, XFCE)",
+    "Ctrl+M": "Minimize (macOS)",
+    "Ctrl+Q": "Quit (KDE, GNOME, XFCE, macOS)",
+    "Ctrl+R": "Refresh (GNOME, XFCE)",
+    "Ctrl+T": "AddTab (KDE, GNOME, XFCE, macOS)",
+}
+
+
+def free_keys() -> frozenset[str]:
+    """Every key a new command may take, in Qt's portable spelling."""
+    return _FREE_KEYS
+
 
 type Shortcut = QKeySequence.StandardKey | str
 
@@ -49,5 +66,5 @@ def shortcut_problem(shortcut: Shortcut | None) -> str | None:
     return (
         f"{shortcut!r} is not free for a new command: use a "
         "QKeySequence.StandardKey for a standard command, or one of Ctrl+J, "
-        "K, L, M, R, Ctrl+digit, F7, F8, F9, F12 (never Ctrl+Alt)"
+        "Ctrl+L, Ctrl+digit, F7, F8, F9, F12 (never Ctrl+Alt)"
     )

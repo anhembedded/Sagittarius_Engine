@@ -297,3 +297,17 @@ def test_a_destroyed_view_is_forgotten(qtbot) -> None:
     view.deleteLater()
 
     qtbot.waitUntil(lambda: store.capture_state() == {})
+
+
+def test_an_empty_table_fits_its_columns_when_the_first_rows_arrive(qtbot) -> None:
+    view = QTableView()
+    qtbot.addWidget(view)
+    model = _model([])
+    configure_item_view(view, model, _SPECS)
+    before = view.columnWidth(1)
+
+    wide = QStandardItem()
+    wide.setData(123456789012345.5, Qt.ItemDataRole.DisplayRole)
+    model.appendRow([QStandardItem("BTC"), wide])
+
+    assert view.columnWidth(1) > before
