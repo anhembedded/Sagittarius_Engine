@@ -7,9 +7,13 @@ and never a hand-typed one; a new command takes a key the platform leaves
 free, and never `Ctrl+Alt`, which is `AltGr` on many keyboard layouts and
 types a character instead.
 
-The free set is the one those guidelines leave unassigned: `Ctrl` with G, J,
-K, L, M, Q, R or T, `Ctrl` with a digit, and F7, F8, F9 and F12. Anything
-else a command needs is reached through its menu's access keys.
+The free set is the one those guidelines leave unassigned, less every key
+another platform Qt supports reserves, so a command that boots on Windows
+boots everywhere: `Ctrl` with J, K, L, M or R, `Ctrl` with a digit, and F7,
+F8, F9 and F12. Microsoft also leaves Ctrl+G, Ctrl+Q and Ctrl+T free, but
+`QKeySequence` binds them to FindNext, Quit and AddTab on KDE, GNOME and
+macOS. Anything else a command needs is reached through its menu's access
+keys.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from PySide6.QtGui import QKeySequence
 _PORTABLE = QKeySequence.SequenceFormat.PortableText
 #: Every key a new command may take, in Qt's portable spelling.
 _FREE_KEYS = frozenset(
-    {f"Ctrl+{key}" for key in "GJKLMQRT0123456789"} | {"F7", "F8", "F9", "F12"}
+    {f"Ctrl+{key}" for key in "JKLMR0123456789"} | {"F7", "F8", "F9", "F12"}
 )
 
 type Shortcut = QKeySequence.StandardKey | str
@@ -44,6 +48,6 @@ def shortcut_problem(shortcut: Shortcut | None) -> str | None:
         return None
     return (
         f"{shortcut!r} is not free for a new command: use a "
-        "QKeySequence.StandardKey for a standard command, or one of Ctrl+G, "
-        "J, K, L, M, Q, R, T, Ctrl+digit, F7, F8, F9, F12 (never Ctrl+Alt)"
+        "QKeySequence.StandardKey for a standard command, or one of Ctrl+J, "
+        "K, L, M, R, Ctrl+digit, F7, F8, F9, F12 (never Ctrl+Alt)"
     )

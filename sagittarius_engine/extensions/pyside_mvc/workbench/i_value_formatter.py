@@ -40,10 +40,12 @@ class IValueFormatter(Protocol):
 
 
 def _duration_text(seconds: float) -> str:
-    whole = int(seconds)
+    # The sign first: `divmod` floors, so -30 s would read -1:59:30.
+    sign = "-" if seconds < 0 else ""
+    whole = int(abs(seconds))
     hours, remainder = divmod(whole, _SECONDS_PER_HOUR)
     minutes, secs = divmod(remainder, _SECONDS_PER_MINUTE)
-    return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{sign}{hours}:{minutes:02d}:{secs:02d}"
 
 
 class PlainValueFormatter:

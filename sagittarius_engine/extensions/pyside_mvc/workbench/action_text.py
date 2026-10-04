@@ -16,17 +16,29 @@ answer the same question the same way.
 
 from __future__ import annotations
 
-import re
-
-ELLIPSIS = "…"
+ELLIPSIS = "\u2026"
 THREE_DOTS = "..."
-#: A lone `&` followed by the character it marks: not part of `&&`.
-_ACCESS_KEY = re.compile(r"(?<!&)&(?!&)(.)")
+_MARKER = "&"
 
 
 def access_keys(text: str) -> tuple[str, ...]:
-    """Every access key `text` marks, lower-cased, in order."""
-    return tuple(match.group(1).lower() for match in _ACCESS_KEY.finditer(text))
+    """Every access key `text` marks, lower-cased, in order.
+
+    Read left to right the way Qt reads it: `&&` is one literal ampersand,
+    and `&` before any other character marks that character, so
+    `"Save &&&As"` is "Save &As" with the access key A.
+    """
+    keys: list[str] = []
+    index = 0
+    while index < len(text) - 1:
+        if text[index] != _MARKER:
+            index += 1
+            continue
+        following = text[index + 1]
+        if following != _MARKER:
+            keys.append(following.lower())
+        index += 2
+    return tuple(keys)
 
 
 def plain_text(text: str) -> str:

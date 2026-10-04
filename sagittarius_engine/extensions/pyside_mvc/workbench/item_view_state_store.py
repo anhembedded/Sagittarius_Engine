@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+from functools import partial
 
 from PySide6.QtCore import QByteArray
 from PySide6.QtWidgets import QHeaderView
@@ -41,6 +42,11 @@ class ItemViewStateStore:
         if view_id in self._headers:
             raise ValueError(f"a view {view_id!r} is already registered")
         self._headers[view_id] = header
+        header.destroyed.connect(partial(self.unregister, view_id))
+
+    def unregister(self, view_id: str) -> None:
+        """Forgets a view; unknown ids are ignored."""
+        self._headers.pop(view_id, None)
 
     def capture_state(self) -> StateData:
         captured: dict[str, JsonValue] = {}

@@ -40,3 +40,8 @@ def test_a_command_that_asks_for_more_ends_with_the_ellipsis() -> None:
 def test_a_command_that_acts_at_once_takes_no_ellipsis() -> None:
     (problem,) = text_problems(f"&Options{ELLIPSIS}", needs_input=False)
     assert "acts at once" in problem
+
+
+def test_an_escaped_ampersand_before_the_marker_is_read_as_qt_reads_it() -> None:
+    assert access_keys("Save &&&As") == ("a",)
+    assert plain_text("Save &&&As") == "Save &As"

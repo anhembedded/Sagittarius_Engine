@@ -103,3 +103,15 @@ def test_two_hosts_for_one_surface_are_refused(qtbot) -> None:
     store.register(_host(qtbot))
     with pytest.raises(ValueError, match="already registered"):
         store.register(_host(qtbot))
+
+
+def test_a_destroyed_host_is_forgotten(qtbot) -> None:
+    host = RegionHost(
+        SurfaceDeclaration(surface_id="bots", accepts=frozenset(_REGIONS)), _REGIONS
+    )
+    store = PerspectiveStore()
+    store.register(host)
+
+    host.deleteLater()
+
+    qtbot.waitUntil(lambda: store.capture_state() == {})

@@ -262,9 +262,13 @@ class TestToolbarsHoldActions:
         top = trading.findChild(QToolBar, f"{trading.objectName()}::top_toolbar")
         assert top is not None and start in top.actions()
 
-    def test_a_bare_widget_on_a_toolbar_is_refused(self, trading: RegionHost) -> None:
+    def test_a_bare_widget_on_a_toolbar_is_refused(
+        self, qtbot, trading: RegionHost
+    ) -> None:
+        button = QPushButton("Start")
+        qtbot.addWidget(button)
         with pytest.raises(ContributionError, match="holds actions, not widgets"):
-            trading.place_widget("header", QPushButton("Start"))
+            trading.place_widget("header", button)
 
     def test_a_combo_box_wrapped_in_a_widget_action_is_accepted(
         self, trading: RegionHost

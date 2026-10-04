@@ -19,7 +19,7 @@ The engine has no `QAction`, `QShortcut` or `QKeySequence` anywhere; the consume
 - [x] An action with `confirm` raises a `QMessageBox` naming the consequence before its handler runs; Cancel runs nothing.
 - [x] Menu text carries an access key (`&`), unique within its menu; a literal ampersand is written `&&`; the registry refuses a duplicate access key in one menu.
 - [x] A command that needs more input before it acts ends its text with "…" (U+2026, never "..."); the descriptor's `needs_input` flag and the ellipsis must agree.
-- [x] Shortcuts are a `QKeySequence.StandardKey` or from the allowed set for new bindings (Ctrl+G/J/K/L/M/Q/R/T, Ctrl+digit, F7/F8/F9/F12); Ctrl+Alt combinations are refused (MS uxguide `inter-keyboard`).
+- [x] Shortcuts are a `QKeySequence.StandardKey` or from the allowed set for new bindings (Ctrl+J/K/L/M/R, Ctrl+digit, F7/F8/F9/F12; Ctrl+G/Q/T dropped as not portable, see notes); Ctrl+Alt combinations are refused (MS uxguide `inter-keyboard`).
 - [x] A confirmation names the consequence, uses specific verbs (never OK/Cancel) and makes the safe choice the default (MS uxguide `mess-confirm`).
 - [x] Every toolbar action is also reachable from a menu; an icon-only toolbar action's tooltip includes its shortcut (MS uxguide `cmd-toolbars`).
 
@@ -38,3 +38,5 @@ Unit: each refusal, binding, confirmation path. Full gate: `pwsh scripts/ci-loca
 - Refusals: duplicate id; one key twice in one scope (global meets every mode; two modes may share); a free key the platform reserves (on Linux Ctrl+G is FindNext and Ctrl+T AddTab, found by asking `QKeySequence.keyBindings`); two items of one menu on one access key; one menu spelled with two access keys; OK/Yes answers.
 - Departure: the handler gets the checked state read from the action, because PySide gives a `functools.partial` slot the zero-argument `triggered()` overload. A rejected confirmation of a checkable command reverts its check.
 - Tests: `workbench/test_action_text.py`, `test_shortcut_policy.py`, `test_action_descriptor.py`, `test_action_confirmation.py`, `test_action_registry.py`. Mutation-verified: removing the confirmation gate fails 2 tests; removing the access-key check fails 1.
+- Review round 1 (PR #224): access keys are now checked among siblings — menu-bar titles, and the items and submenus of one menu — and a menu's spelling is checked across modes, since modes share the menu bar. A refused confirmation reverts a checkable command without blocking signals, so `toggled` listeners hear the way back. `bind(initially_enabled=)` keeps a not-yet-applicable command disabled until its signal fires. The free set drops Ctrl+G, Q and T, which KDE, GNOME or macOS reserve. `access_keys()` reads text left to right as Qt does (`"Save &&&As"` marks A). `MessageBoxConfirmer` is tested on Escape, Enter, the title-bar close and the accept button.
+

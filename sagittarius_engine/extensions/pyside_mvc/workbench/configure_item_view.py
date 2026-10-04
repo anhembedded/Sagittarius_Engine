@@ -17,6 +17,7 @@ and no model formats for display.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import partial
 
 from PySide6.QtCore import (
     QAbstractItemModel,
@@ -119,12 +120,22 @@ def _configure_header(header: QHeaderView, specs: Sequence[ColumnSpec]) -> None:
     header.setSortIndicatorShown(True)
     header.setStretchLastSection(False)
     for column, spec in enumerate(specs):
+        # `Interactive`, not `ResizeToContents`: the latter measures every
+        # row on every change, which Qt warns against for large, live models.
+        # Widths fit the content on configure and on each model reset; the
+        # user may resize in between.
         mode = (
             QHeaderView.ResizeMode.Stretch
             if spec.stretch
-            else QHeaderView.ResizeMode.ResizeToContents
+            else QHeaderView.ResizeMode.Interactive
         )
         header.setSectionResizeMode(column, mode)
+
+
+def _fit_columns(view: QTableView | QTreeView, specs: Sequence[ColumnSpec]) -> None:
+    for column, spec in enumerate(specs):
+        if not spec.stretch:
+            view.resizeColumnToContents(column)
 
 
 def configure_item_view(
@@ -163,5 +174,7 @@ def configure_item_view(
     # column sorts it ascending (`ctrl-list-views`).
     header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
     view.setSortingEnabled(True)
+    _fit_columns(view, specs)
+    proxy.modelReset.connect(partial(_fit_columns, view, tuple(specs)))
     view.setProperty(CONFIGURED_PROPERTY, True)
     return proxy

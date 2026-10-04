@@ -281,3 +281,19 @@ class TestItemViewStateStore:
         store.restore_state({"v": "%%%"})
 
         assert view.horizontalHeader().visualIndex(1) == 1
+
+
+def test_a_negative_duration_keeps_its_sign() -> None:
+    formatter = PlainValueFormatter()
+    assert formatter.format(ColumnKind.DURATION, -30, FormatContext("d")) == "-0:00:30"
+
+
+def test_a_destroyed_view_is_forgotten(qtbot) -> None:
+    view = QTableView()
+    configure_item_view(view, _model([]), _SPECS)
+    store = ItemViewStateStore()
+    store.register("gone", view.horizontalHeader())
+
+    view.deleteLater()
+
+    qtbot.waitUntil(lambda: store.capture_state() == {})

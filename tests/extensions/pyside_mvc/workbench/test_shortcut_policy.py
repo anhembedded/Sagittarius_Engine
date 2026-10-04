@@ -14,7 +14,21 @@ def test_a_free_key_is_accepted(qapp, key: str) -> None:
     assert shortcut_problem(key) is None
 
 
-@pytest.mark.parametrize("key", ["Ctrl+Alt+R", "Ctrl+Shift+R", "Ctrl+B", "F5", "Alt+X"])
+@pytest.mark.parametrize(
+    "key",
+    # Ctrl+G, Q and T: Microsoft leaves them free, but KDE, GNOME or macOS
+    # bind them (FindNext, Quit, AddTab), so they are not portable.
+    [
+        "Ctrl+Alt+R",
+        "Ctrl+Shift+R",
+        "Ctrl+B",
+        "F5",
+        "Alt+X",
+        "Ctrl+G",
+        "Ctrl+Q",
+        "Ctrl+T",
+    ],
+)
 def test_a_key_outside_the_free_set_is_refused(qapp, key: str) -> None:
     problem = shortcut_problem(key)
     assert problem is not None and "not free" in problem

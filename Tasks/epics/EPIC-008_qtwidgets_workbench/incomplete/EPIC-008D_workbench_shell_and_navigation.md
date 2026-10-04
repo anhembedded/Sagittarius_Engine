@@ -18,6 +18,7 @@
 - [ ] View lists the current mode's dock toggles and toolbars and refreshes on mode change; Window → Reset layout calls `reset_perspective()` on the current mode.
 - [ ] A status bar with permanent slots that modes contribute to.
 - [ ] `NavigationService.navigate(mode_id, source=USER_INTENT|RESTORE)` asks the current mode's `can_leave()`; a refusal keeps the mode and the checked action in sync.
+- [ ] Only the active mode's actions are live: two modes may share a shortcut (`ActionRegistry` allows it), so the shell removes or disables the inactive mode's actions; a test proves a shared key reaches only the active mode (review of PR #224, finding 14).
 - [ ] The sample app `examples/student_management` runs on the shell.
 - [ ] TASK-043 is updated: E3 delivered here; its harvest-first rule superseded for the workbench by ADR-003.
 

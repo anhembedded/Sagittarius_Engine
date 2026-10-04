@@ -17,6 +17,9 @@ from sagittarius_engine.extensions.pyside_mvc.workbench import (
     ActionRegistry,
     shortcut_problem,
 )
+from sagittarius_engine.extensions.pyside_mvc.workbench import (
+    action_registry as action_registry_module,
+)
 
 _TRADE = ("T&rade",)
 _STOP = ActionConfirmation(
@@ -109,17 +112,22 @@ class TestRefusals:
             _command("b", "&Start", shortcut="Ctrl+R", surface_id="backtest")
         )
 
-    def test_a_free_key_the_platform_reserves_is_refused(
-        self, registry: ActionRegistry
+    def test_no_free_key_is_reserved_by_this_platform(self, qapp) -> None:
+        """The free set drops every key KDE, GNOME or macOS reserves, so a
+        consumer that boots on Windows boots here too."""
+        assert _reserved_free_key() is None
+
+    def test_a_key_the_platform_reserves_is_refused(
+        self, owner: QWidget, confirmer: _AnsweringConfirmer, monkeypatch
     ) -> None:
-        """The free set is Microsoft's; another platform may give one of those
-        keys a standard meaning (on Linux, Ctrl+G is Find next). The registry
-        asks the platform, not the list."""
-        reserved = _reserved_free_key()
-        if reserved is None:
-            pytest.skip("this platform reserves none of the free keys")
-        with pytest.raises(ActionDeclarationError, match="reserves for"):
-            registry.contribute(_command("b", "&Go", shortcut=reserved))
+        """Defence in depth: should a future Qt reserve a free key, the
+        registry refuses it at boot rather than shadow a standard command."""
+        monkeypatch.setattr(
+            action_registry_module, "_standard_bindings", lambda: {"Ctrl+R": "FindNext"}
+        )
+        registry = ActionRegistry(owner, confirmer)
+        with pytest.raises(ActionDeclarationError, match="reserves for FindNext"):
+            registry.contribute(_command("b", "&Run", shortcut="Ctrl+R"))
 
     def test_two_items_of_one_menu_on_one_access_key(
         self, registry: ActionRegistry
@@ -189,9 +197,7 @@ class TestRunning:
     ) -> None:
         confirmer.answer = False
         ran: list[bool] = []
-        action = registry.contribute(
-            _command("a", "S&top…", needs_input=True, confirm=_STOP)
-        )
+        action = registry.contribute(_command("a", "S&top", confirm=_STOP))
         registry.bind("a", ran.append)
 
         action.trigger()
@@ -203,9 +209,7 @@ class TestRunning:
         self, registry: ActionRegistry, confirmer: _AnsweringConfirmer
     ) -> None:
         ran: list[bool] = []
-        action = registry.contribute(
-            _command("a", "S&top…", needs_input=True, confirm=_STOP)
-        )
+        action = registry.contribute(_command("a", "S&top", confirm=_STOP))
         registry.bind("a", ran.append)
 
         action.trigger()
@@ -216,14 +220,17 @@ class TestRunning:
         self, registry: ActionRegistry, confirmer: _AnsweringConfirmer
     ) -> None:
         confirmer.answer = False
+        heard: list[bool] = []
         action = registry.contribute(
             _command("a", "&Live trading", checkable=True, confirm=_STOP)
         )
+        action.toggled.connect(heard.append)
         registry.bind("a", lambda checked: None)
 
         action.trigger()
 
         assert not action.isChecked()
+        assert heard == [True, False], "a toggled listener must hear the way back"
 
 
 class TestReading:
@@ -264,3 +271,61 @@ class TestReading:
         registry.contribute(_command("c", "S&top", menu_path=("&Bots",)))
 
         assert registry.menu_paths() == (("&Bots",), ("&Data",))
+
+
+class TestAccessKeysAcrossMenus:
+    """Access keys are unique among siblings: menu-bar titles, and the items
+    and submenus of one menu (`ui-architecture.md` §9.3)."""
+
+    def test_one_menu_spelled_two_ways_by_two_modes(
+        self, registry: ActionRegistry
+    ) -> None:
+        """Modes share the menu bar, so the spelling check ignores scope."""
+        registry.contribute(
+            _command("a", "&Start", menu_path=("T&rade",), surface_id="bots")
+        )
+        with pytest.raises(ActionDeclarationError, match="one menu has one access key"):
+            registry.contribute(
+                _command("b", "S&top", menu_path=("&Trade",), surface_id="backtest")
+            )
+
+    def test_two_menu_bar_titles_on_one_access_key(
+        self, registry: ActionRegistry
+    ) -> None:
+        registry.contribute(_command("a", "&Start", menu_path=("&Trade",)))
+        with pytest.raises(ActionDeclarationError, match="in the menu bar"):
+            registry.contribute(_command("b", "&Options", menu_path=("&Tools",)))
+
+    def test_an_item_and_a_submenu_on_one_access_key(
+        self, registry: ActionRegistry
+    ) -> None:
+        registry.contribute(_command("a", "&Toolbars", menu_path=("&View",)))
+        with pytest.raises(ActionDeclarationError, match="share an access key"):
+            registry.contribute(_command("b", "&Close", menu_path=("&View", "&Tabs")))
+
+    def test_distinct_keys_across_the_tree_are_accepted(
+        self, registry: ActionRegistry
+    ) -> None:
+        registry.contribute(_command("a", "&Start", menu_path=("T&rade",)))
+        registry.contribute(_command("b", "&Options", menu_path=("&Tools",)))
+        registry.contribute(_command("c", "&Close", menu_path=("&View", "&Tabs")))
+        registry.contribute(_command("d", "T&oolbars", menu_path=("&View",)))
+
+
+class TestStartingDisabled:
+    def test_it_can_stay_disabled_until_its_signal_fires(
+        self, registry: ActionRegistry
+    ) -> None:
+        presenter = _Presenter()
+        action = registry.contribute(_command("a", "&Start"))
+
+        registry.bind(
+            "a",
+            lambda checked: None,
+            enabled=presenter.can_start,
+            initially_enabled=False,
+        )
+        assert not action.isEnabled()
+
+        presenter.can_start.emit(True)
+        assert action.isEnabled()

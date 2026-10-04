@@ -57,6 +57,51 @@ class _Entry:
     handler: ActionHandler | None = field(default=None)
 
 
+@dataclass(frozen=True, slots=True)
+class _Label:
+    """One thing a user reads in a menu: a submenu title or an item, under
+    the menu (or the menu bar, `()`) that holds it."""
+
+    parent: tuple[str, ...]
+    text: str
+    is_menu: bool
+
+
+def _labels(descriptor: ActionDescriptor) -> tuple[_Label, ...]:
+    path = descriptor.menu_path
+    titles = tuple(
+        _Label(path[:depth], path[depth], True) for depth in range(len(path))
+    )
+    return (*titles, _Label(path, descriptor.text, False))
+
+
+def _where(parent: tuple[str, ...]) -> str:
+    return "the menu bar" if not parent else f"menu {parent!r}"
+
+
+def _refuse_label_clash(mine: _Label, theirs: _Label, *, scopes_meet: bool) -> None:
+    """Two labels under one parent: one menu must be spelled one way (in every
+    mode, since modes share the menu bar), and two different labels must not
+    share an access key (where both can be on screen at once)."""
+    same_menu = (
+        mine.is_menu
+        and theirs.is_menu
+        and plain_text(mine.text) == plain_text(theirs.text)
+    )
+    if same_menu:
+        if mine.text != theirs.text:
+            raise ActionDeclarationError(
+                f"menu {plain_text(mine.text)!r} is spelled {mine.text!r} and "
+                f"{theirs.text!r}; one menu has one access key"
+            )
+        return
+    if scopes_meet and access_keys(mine.text) == access_keys(theirs.text):
+        raise ActionDeclarationError(
+            f"{mine.text!r} and {theirs.text!r} share an access key in "
+            f"{_where(mine.parent)}"
+        )
+
+
 def _scopes_meet(first: str | None, second: str | None) -> bool:
     return first is None or second is None or first == second
 
@@ -124,36 +169,22 @@ class ActionRegistry:
                         f"QKeySequence.StandardKey.{meaning} if it is that command"
                     )
         for other in self._entries.values():
-            if _scopes_meet(other.descriptor.surface_id, descriptor.surface_id):
-                self._refuse_against(descriptor, keys, other)
+            self._refuse_against(descriptor, keys, other)
 
     def _refuse_against(
         self, descriptor: ActionDescriptor, keys: frozenset[str], other: _Entry
     ) -> None:
+        scopes_meet = _scopes_meet(other.descriptor.surface_id, descriptor.surface_id)
         shared = keys & other.keys
-        if shared:
+        if scopes_meet and shared:
             raise ActionDeclarationError(
                 f"{descriptor.action_id!r} and {other.descriptor.action_id!r} "
                 f"both bind {sorted(shared)}"
             )
-        for mine, theirs in zip(
-            descriptor.menu_path, other.descriptor.menu_path, strict=False
-        ):
-            if plain_text(mine) != plain_text(theirs):
-                return
-            if mine != theirs:
-                raise ActionDeclarationError(
-                    f"menu {plain_text(mine)!r} is spelled {mine!r} by "
-                    f"{descriptor.action_id!r} and {theirs!r} by "
-                    f"{other.descriptor.action_id!r}; one menu has one access key"
-                )
-        if descriptor.menu_path != other.descriptor.menu_path:
-            return
-        if access_keys(descriptor.text) == access_keys(other.descriptor.text):
-            raise ActionDeclarationError(
-                f"{descriptor.text!r} and {other.descriptor.text!r} share an "
-                f"access key in menu {descriptor.menu_path!r}"
-            )
+        for mine in _labels(descriptor):
+            for theirs in _labels(other.descriptor):
+                if mine.parent == theirs.parent:
+                    _refuse_label_clash(mine, theirs, scopes_meet=scopes_meet)
 
     def _build(self, descriptor: ActionDescriptor) -> QAction:
         action = QAction(descriptor.text, self._owner)
@@ -182,14 +213,17 @@ class ActionRegistry:
         *,
         enabled: SignalInstance | None = None,
         checked: SignalInstance | None = None,
+        initially_enabled: bool = True,
     ) -> None:
         """Connects the presenter that performs `action_id`. `handler` gets
-        the checked state (always `False` for a plain command)."""
+        the checked state (always `False` for a plain command).
+        `initially_enabled` is the state until `enabled` first fires, so a
+        command that does not apply yet never looks available."""
         entry = self._entry(action_id)
         if entry.handler is not None:
             raise ActionDeclarationError(f"action {action_id!r} is already bound")
         entry.handler = handler
-        entry.action.setEnabled(True)
+        entry.action.setEnabled(initially_enabled)
         if enabled is not None:
             enabled.connect(entry.action.setEnabled)
         if checked is not None:
@@ -269,8 +303,10 @@ class ActionRegistry:
             QApplication.activeWindow(), confirmation
         ):
             if entry.descriptor.checkable:
-                entry.action.blockSignals(True)
+                # Not under blockSignals: `toggled` already went out with the
+                # new state, so its listeners must hear the way back too.
+                # `setChecked` emits `toggled`, never `triggered`, so this
+                # cannot recurse.
                 entry.action.setChecked(not checked)
-                entry.action.blockSignals(False)
             return
         entry.handler(checked)

@@ -18,6 +18,7 @@ import base64
 import binascii
 import logging
 from collections.abc import Mapping
+from functools import partial
 
 from sagittarius_engine.extensions.pyside_mvc.runtime.region_host import RegionHost
 from sagittarius_engine.extensions.ui_state.state_scope import (
@@ -58,6 +59,13 @@ class PerspectiveStore:
                 "two hosts would overwrite each other's saved layout."
             )
         self._hosts[host.surface_id] = host
+        # A host destroyed before shutdown must not be captured: its C++
+        # object is gone and `saveState()` would raise.
+        host.destroyed.connect(partial(self.unregister, host.surface_id))
+
+    def unregister(self, surface_id: str) -> None:
+        """Forgets a host; unknown ids are ignored."""
+        self._hosts.pop(surface_id, None)
 
     def capture_state(self) -> StateData:
         captured: dict[str, JsonValue] = {}

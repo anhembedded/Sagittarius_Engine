@@ -402,12 +402,15 @@ capitalisation.
   MS `cmd-menus`). Every command is in a menu (`menu_path` is mandatory); a toolbar holds
   actions only (`RegionHost.place_action` refuses a button widget) (MS `cmd-toolbars`).
 - Text: sentence case, exactly one access key per item (`&`, `&&` for a literal ampersand),
-  unique within its menu and among the menu-bar titles; "…" (U+2026) exactly when the command
-  asks for more before it acts (MS `cmd-menus`, KDE, Apple). `action_text.text_problems()`
-  and the registry refuse the rest.
-- Shortcuts: a standard command takes its `QKeySequence.StandardKey`; a new one takes Ctrl+G,
-  J, K, L, M, Q, R, T, Ctrl+digit, F7, F8, F9 or F12, never Ctrl+Alt, and never a key the
-  platform reserves (MS `inter-keyboard`; `shortcut_policy.py`, `ActionRegistry`).
+  unique among its siblings: the menu-bar titles, and the items and submenus of one menu; a
+  menu is spelled one way in every mode. "…" (U+2026) exactly when the command asks for more
+  before it acts (MS `cmd-menus`, KDE, Apple). `action_text.text_problems()` checks one text;
+  `ActionRegistry.contribute()` checks siblings and spelling.
+- Shortcuts: a standard command takes its `QKeySequence.StandardKey`; a new one takes Ctrl+J,
+  K, L, M, R, Ctrl+digit, F7, F8, F9 or F12, never Ctrl+Alt: Microsoft's free set less Ctrl+G,
+  Q and T, which KDE, GNOME or macOS bind to FindNext, Quit and AddTab, so the same set is
+  free on every platform (MS `inter-keyboard`; `shortcut_policy.py`). The registry also
+  refuses any key the running platform reserves.
 - Inapplicable commands are disabled, never hidden (MS `cmd-menus`, Apple); an unbound command
   stays disabled and `report_unbound()` logs it.
 - Confirm only risky or irreversible commands, as data (`ActionConfirmation`): the consequence
