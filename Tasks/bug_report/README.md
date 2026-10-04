@@ -37,9 +37,9 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 
 | Status | Count |
 | :--- | :---: |
-| 🔴 **Open** | 7 |
+| 🔴 **Open** | 8 |
 | ✅ **Fixed** | 9 |
-| 📈 **Total** | **16** |
+| 📈 **Total** | **17** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -77,6 +77,7 @@ deliberately independent (see the top of this file).
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-017](incomplete/BUG-017_async_runtime_stop_drops_cancelled_tasks_cleanup.md)** | `AsyncRuntime.stop()` drops the cleanup of every task it cancels | Low | 2026-10-04 | Found by the reference consumer's first live user-data stream run: `stop()` stopped the loop before cancelling what was pending, so each task's `finally` never ran (`Task was destroyed but it is pending!`, unclosed `aiohttp` session). Fix drains the loop first; closes when green on GitHub Actions. |
 | **[BUG-016](incomplete/BUG-016_scheduler_sleep_time_fallback_test_races_a_leaked_background_thread.md)** | `test_scheduler_sleep_time_fallback` races a leaked real `Scheduler` thread through a process-global mock | Low | 2026-09-19 | Found while re-investigating `BUG-014`'s reopening. A `Scheduler`'s module-level `datetime` mock gets a `StopIteration` from a *different* test's leaked, still-running `_run()` thread calling `datetime.now()` after the mock's 2-item `side_effect` is exhausted — only visible under `-W error::pytest.PytestUnhandledThreadExceptionWarning`, does not fail the gate under normal settings. Direct evidence for `BUG-014`'s own open question: background scheduler threads do sometimes outlive their test. |
 | **[BUG-015](incomplete/BUG-015_ui_state_coordinator_debounce_test_is_load_sensitive.md)** | `UiStateCoordinator`'s `QTimer` debounce-restart test intermittently fails under full-suite load | Low | 2026-09-19 | Surfaced while verifying `BUG-014`'s fix, unrelated to that bug's own mechanism. 5/5 passed in isolation; failed once under full-suite CPU contention (`assert 1900 > 1900` on two `remainingTime()` reads). Not yet established whether this is a real timer-restart defect under load or a millisecond-rounding test artifact. |
 | **[BUG-013](incomplete/BUG-013_appdatatable_adjacent_alignment_has_no_column_gutter.md)** | `AppDataTable` renders a right-aligned column and the left-aligned column after it with zero visual gap | Low | 2026-08-27 | Two adjacent values fuse into one string (`"FailuresRegistered"`, `"0yes"`) when `align: Text.AlignRight` is immediately followed by the default left alignment — no per-cell padding anywhere in the header or data `Row`s. Reproduced against the new Events & wiring screen (`EPIC-007E`) and against the already-shipped `RosterScreen.qml` (`gpa`→`enrolledAt`), so it predates this epic. Worked around locally in both new screens; the shared kit component itself is unfixed. |
