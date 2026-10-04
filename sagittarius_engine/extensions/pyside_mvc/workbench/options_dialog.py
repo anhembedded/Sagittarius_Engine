@@ -100,20 +100,33 @@ class OptionsDialog(QDialog):
 
     # -- the commit buttons ----------------------------------------------------
 
-    def apply(self) -> None:
-        """Applies every page holding edits; the dialog stays open."""
+    def apply(self) -> bool:
+        """Applies every page holding edits; the dialog stays open. `True`
+        when every page took its edits. A page still dirty after `apply()`
+        could not save them (its file could not be written, say): the dialog
+        shows that page and says so (`BUG-018`)."""
         if self._first_problem() is not None:
-            return
+            return False
         for page in self._pages:
             if page.is_dirty():
                 page.apply()
         self._refresh()
+        unapplied = next(
+            (row for row, page in enumerate(self._pages) if page.is_dirty()), None
+        )
+        if unapplied is None:
+            return True
+        self._sections.setCurrentRow(unapplied)
+        self._message.setText(
+            f"{self._pages[unapplied].title}: the changes could not be applied."
+        )
+        self._message.setVisible(True)
+        return False
 
     def accept(self) -> None:
-        if self._first_problem() is not None:
-            return
-        self.apply()
-        super().accept()
+        """OK closes only once every page took its edits."""
+        if self.apply():
+            super().accept()
 
     def reject(self) -> None:
         """Cancel, Esc and the title-bar close all land here."""

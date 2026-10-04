@@ -327,8 +327,12 @@ class WorkbenchShell(QMainWindow):
         self.navigate(mode_id, NavigationSource.USER_INTENT)
 
     def show_options(self) -> OptionsDialog:
-        """Opens Tools → Options modally and returns the dialog once closed."""
+        """Opens Tools → Options modally and returns the dialog once closed.
+        The dialog is deleted when the event loop next runs: each open builds
+        a new one, and a closed one kept alive would keep listening to its
+        pages (`BUG-018`)."""
         dialog = OptionsDialog(self._options_pages, self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.exec()
         return dialog
 
