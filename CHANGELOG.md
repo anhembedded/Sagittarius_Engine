@@ -7,6 +7,88 @@ their history is in `git log`.
 
 ---
 
+## [3.0.0] — 2026-10-04
+
+Version component `a`, per `rules/release.md` §2: features changed — the QtWidgets workbench
+(`EPIC-008`), the contribution registry and region host (`TASK-043` E1/E2) and
+`ScheduledJob.cancel()` (`TASK-043` E0). `sagittarius_engine.__all__` is unchanged
+(`git diff 1f5c10d..HEAD -- sagittarius_engine/__init__.py` is empty); every new name is
+exported from `sagittarius_engine.extensions.pyside_mvc`, the extension's one supported import
+surface (`ui-architecture.md` §8.1). Change set: `git log 1f5c10d..HEAD~1`, the 29 commits between the `2.4.0` release commit and
+this one.
+
+### ⚠️ Breaking
+
+- **`RegionHost` toolbars take actions only.** `place_widget()` on a toolbar region now raises
+  `ContributionError`; use `place_action()` with a `QAction`, or a `QWidgetAction` for a combo box
+  or a search field (a `QWidgetAction` wrapping a button is refused too). A consumer still
+  migrating passes `RegionHost(..., legacy_toolbar_widgets=True)` to keep the old behaviour; it is
+  explicit so the debt stays visible (`ui-architecture.md` §9.3). Measured on the reference
+  consumer before the opt-in: 48 failed and 180 errors across its integration suite, all
+  `'header' on '<surface>' is a toolbar, and a toolbar holds actions` (`pytest tests/integration
+  -n 8`); with it, 287 passed.
+- **`RegionHost` toolbars are movable** and listed by `toolbar_toggle_actions()`; they were fixed.
+
+### Added
+
+- **`ScheduledJob.cancel()`** (`TASK-043` E0, `runtime/scheduler/`) — a pending or recurring job
+  can be cancelled; a run already handed to `ITaskManager.spawn()` is not interrupted.
+- **Contribution registry** (`TASK-043` E1, `extensions/pyside_mvc/runtime/`) —
+  `ContributionDescriptor`, `SizeHint`, `SurfaceDeclaration`, `ContributionError`,
+  `IContributionRegistry`, `ContributionRegistry`, with opaque-`str` `place`/`surface_id`.
+- **Region host** (`TASK-043` E2, `EPIC-008B`) — `RegionKind`, `IRegionHost`, `RegionHost`: a
+  mode as a nested `QMainWindow`. Toolbars take actions only (`place_action`; a bare widget, or a
+  `QWidgetAction` wrapping a button, is refused), are movable and listed by
+  `toolbar_toggle_actions()`; docks are listed by `dock_toggle_actions()`; `layout_version`,
+  `capture_default_perspective()`, `reset_perspective()`. `PerspectiveStore` keeps each mode's
+  layout through `ui_state`.
+- **Commands** (`EPIC-008C`, `extensions/pyside_mvc/workbench/`) — `ActionDescriptor`,
+  `ActionConfirmation`, `ActionRegistry`: one `QAction` per command, refusing duplicate ids,
+  two commands on one key in one scope, a free key the platform reserves, sibling access-key
+  clashes, a menu spelled two ways, `...` for the ellipsis, OK/Yes answers. Free shortcut set:
+  Ctrl+J, Ctrl+L, Ctrl+digit, F7, F8, F9, F12 (`RESERVED_ELSEWHERE` names the keys KDE, GNOME,
+  XFCE or macOS reserve). `MessageBoxConfirmer` makes the safe answer the default and escape.
+- **Display conventions** (`EPIC-008F`) — `ColumnKind`, `ColumnSpec`, `configure_item_view()`
+  (whole-row selection, no editing, sorting on raw values, ascending first, kind-decided
+  alignment), `IValueFormatter`/`PlainValueFormatter`, `KindDelegate`, `ReadoutForm`,
+  `EmptyStateStack`, `ItemViewStateStore`, `find_unconfigured_item_views()`.
+- **Workbench shell** (`EPIC-008D`) — `WorkbenchShell`, `ShellMode`, `NavigationService`,
+  `NavigationSource`: the Windows menu order filled per mode, a mode bar (Ctrl+1…9), View built
+  from the mode's docks and toolbars, Window → Reset layout, `can_leave(USER_INTENT|RESTORE)`,
+  only the showing mode's commands live, remembered geometry and mode.
+- **Options and Output** (`EPIC-008E`) — `IOptionsPage`, `OptionsDialog` (Apply only while dirty
+  and valid, OK blocked while invalid, Cancel/Esc/close revert); `OutputPane`, `OutputChannel`.
+- **`ui-architecture.md` §9** — the QtWidgets desktop contract, each clause sourced (Microsoft,
+  KDE, Apple, GNOME, Qt). Tokens and the QML kit (§2–§3) now bind QML consumers only.
+- The sample app (`examples/student_management`) runs on `WorkbenchShell`.
+
+### Fixed
+
+- **`BUG-014`, intermittent full-suite segfault** — `Scheduler.stop()`/`AsyncRuntime.stop()` no
+  longer discard a thread whose join timed out (and `AsyncRuntime` no longer closes a loop still
+  running); `App.stop()` passes its `step_timeout` to both; `Scheduler.start()` refuses to orphan
+  a thread a failed stop left alive; 13 test files that booted an `App` without joining its
+  threads now stop it.
+
+### Changed — behaviour
+
+- `Scheduler.stop()` and `AsyncRuntime.stop()` log an ERROR and keep tracking a thread that did
+  not join in time, so a later `stop()` can retry, instead of silently forgetting it.
+
+### Known issues
+
+- The full suite still ends with one `ResourceWarning: gc: 45 uncollectable objects at
+  shutdown`; it predates this release (present on `main` before `EPIC-008`).
+
+### Upgrade checklist
+
+- A consumer pinning by commit moves its pin to the `v3.0.0` tag's commit.
+- A consumer whose `RegionHost` toolbars hold widgets passes `legacy_toolbar_widgets=True` until
+  they are actions, then drops it.
+- New UI code imports the workbench from `sagittarius_engine.extensions.pyside_mvc` only.
+
+---
+
 ## [2.4.0] — 2026-09-10
 
 Version component `b`, per `rules/release.md` §2: the published API changed (`create_quick_widget`

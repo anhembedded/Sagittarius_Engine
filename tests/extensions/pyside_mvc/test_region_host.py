@@ -270,6 +270,23 @@ class TestToolbarsHoldActions:
         with pytest.raises(ContributionError, match="holds actions, not widgets"):
             trading.place_widget("header", button)
 
+    def test_a_migrating_consumer_may_opt_in_to_bare_toolbar_widgets(
+        self, qtbot
+    ) -> None:
+        """A consumer whose toolbars still hold widgets opts in explicitly
+        while it moves them to actions; the default stays the contract."""
+        host = RegionHost(
+            _trading_surface(), _TRADING_PLACE_REGIONS, legacy_toolbar_widgets=True
+        )
+        qtbot.addWidget(host)
+        button = QPushButton("Start")
+
+        host.place_widget("header", button)
+
+        top = host.findChild(QToolBar, f"{host.objectName()}::top_toolbar")
+        assert top is not None and top.isAncestorOf(button)
+        assert host.legacy_toolbar_widgets
+
     def test_a_combo_box_wrapped_in_a_widget_action_is_accepted(
         self, trading: RegionHost
     ) -> None:
