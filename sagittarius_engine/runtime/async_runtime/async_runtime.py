@@ -1,8 +1,13 @@
 import asyncio
+import concurrent.futures
 import logging
 import threading
 from collections.abc import Coroutine
 from typing import Any
+
+#: Extra wait on the drain's own future beyond the drain's `timeout`, so the
+#: drain reports its own timeout instead of this thread giving up first.
+_DRAIN_RESULT_MARGIN_SECONDS = 1.0
 
 
 class AsyncRuntime:
@@ -57,11 +62,17 @@ class AsyncRuntime:
         `timeout` now stops this method before `close()` ever runs, and leaves
         `self._thread`/`self.loop` set rather than discarding them, so the state
         stays honest and a second `stop()` call can retry.
+
+        `BUG-017`: the loop is drained before it stops (`_drain`). Cancelling a
+        task only after its loop had stopped meant it never ran again, so every
+        pending `finally` (an `aiohttp` session's close, a websocket's) was
+        dropped and the task was destroyed while `cancelling`.
         """
         if self.loop is None:
             return
 
         self._logger.info("Stopping AsyncRuntime event loop...")
+        self._drain(timeout)
         self.loop.call_soon_threadsafe(self.loop.stop)
 
         if self._thread is not None:
@@ -89,3 +100,46 @@ class AsyncRuntime:
         self.loop.close()
         self.loop = None
         self._logger.info("AsyncRuntime event loop stopped.")
+
+    def _drain(self, timeout: float) -> None:
+        """
+        @brief Cancels every task on the running loop and waits, up to `timeout`,
+        for each to finish its cancellation, then shuts down async generators.
+
+        @details A task already `cancelling()` is not cancelled again: a second
+        cancel would abort the `await` inside its `finally`, the very cleanup this
+        exists to let run. Skipped when the loop is not running, or when called
+        from the loop's own thread, where waiting on the loop would deadlock.
+        """
+        loop = self.loop
+        if loop is None or not loop.is_running():
+            return
+        if self._thread is not None and threading.current_thread() is self._thread:
+            return
+
+        async def drain() -> None:
+            current = asyncio.current_task()
+            tasks = [task for task in asyncio.all_tasks() if task is not current]
+            for task in tasks:
+                if not task.cancelling():
+                    task.cancel()
+            if tasks:
+                _, still_pending = await asyncio.wait(tasks, timeout=timeout)
+                if still_pending:
+                    self._logger.warning(
+                        "AsyncRuntime: %d task(s) did not finish cancelling within "
+                        "%ss and are left to the loop's close: %s",
+                        len(still_pending),
+                        timeout,
+                        ", ".join(sorted(task.get_name() for task in still_pending)),
+                    )
+            await loop.shutdown_asyncgens()
+
+        future = asyncio.run_coroutine_threadsafe(drain(), loop)
+        try:
+            future.result(timeout + _DRAIN_RESULT_MARGIN_SECONDS)
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            self._logger.warning(
+                "AsyncRuntime: draining the loop did not finish within %ss.", timeout
+            )
