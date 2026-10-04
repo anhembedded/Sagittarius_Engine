@@ -1,6 +1,6 @@
 # EPIC-008: QtWidgets Workbench
 
-- **Status**: 🔵 Planned (0/6)
+- **Status**: 🔄 In Progress (4/6)
 - **Created**: 2026-10-04
 - **Priority**: P1 — the only consumer's UI rebuild (Elite EPIC-033) waits on it
 - **Category**: UI Engine / Workbench (`pyside_mvc`)
@@ -121,12 +121,12 @@ note right of WorkbenchShell : every widget is a stock Qt class\nwith defaults; 
 ## 4. Subtasks
 | ID | Subtask | Status |
 | :--- | :--- | :---: |
-| [EPIC-008A](incomplete/EPIC-008A_qtwidgets_rule_rewrite.md) | The UI rule describes a QtWidgets workbench in the platform style | 🔵 Backlog |
-| [EPIC-008B](incomplete/EPIC-008B_region_host_actions_and_perspectives.md) | A mode host takes actions on its toolbars, exposes its docks to a View menu and keeps a named perspective | 🔵 Backlog |
-| [EPIC-008C](incomplete/EPIC-008C_action_contributions.md) | Every command is an ActionDescriptor: one QAction for its menu entry, toolbar button and shortcut | 🔵 Backlog |
+| [EPIC-008A](completed/EPIC-008A_qtwidgets_rule_rewrite.md) | The UI rule describes a QtWidgets workbench in the platform style | ✅ Completed (2026-10-04) |
+| [EPIC-008B](completed/EPIC-008B_region_host_actions_and_perspectives.md) | A mode host takes actions on its toolbars, exposes its docks to a View menu and keeps a named perspective | ✅ Completed (2026-10-04) |
+| [EPIC-008C](completed/EPIC-008C_action_contributions.md) | Every command is an ActionDescriptor: one QAction for its menu entry, toolbar button and shortcut | ✅ Completed (2026-10-04) |
 | [EPIC-008D](incomplete/EPIC-008D_workbench_shell_and_navigation.md) | WorkbenchShell: the top-level window with the standard menu bar, a mode bar, View built from docks, Reset layout and a status bar | 🔵 Backlog |
 | [EPIC-008E](incomplete/EPIC-008E_options_dialog_and_output_pane.md) | One Options dialog with contributed pages, and one Output dock with contributed channels | 🔵 Backlog |
-| [EPIC-008F](incomplete/EPIC-008F_display_conventions.md) | Tables, lists and read-outs of one kind share their properties: column and value kinds decide them | 🔵 Backlog |
+| [EPIC-008F](completed/EPIC-008F_display_conventions.md) | Tables, lists and read-outs of one kind share their properties: column and value kinds decide them | ✅ Completed (2026-10-04) |
 
 Order: A (rule) → B, C, F (independent) → D (needs B, C) → E (needs D's shell for Ctrl+,).
 

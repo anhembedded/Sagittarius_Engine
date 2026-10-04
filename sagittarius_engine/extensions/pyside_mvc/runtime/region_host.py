@@ -43,14 +43,17 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QDialog,
     QDockWidget,
     QMainWindow,
     QToolBar,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 
 from sagittarius_engine.extensions.pyside_mvc.runtime.contribution_error import (
@@ -68,6 +71,8 @@ logger = logging.getLogger("App")
 #: `QMainWindow.restoreState` compares it and refuses a mismatch, which is
 #: what turns "migrate or reset" into something the toolkit does for us.
 PERSPECTIVE_VERSION = 1
+
+_TOOLBAR_REGIONS = frozenset({RegionKind.TOP_TOOLBAR, RegionKind.SECONDARY_TOOLBAR})
 
 _DOCK_AREA: dict[RegionKind, Qt.DockWidgetArea] = {
     RegionKind.DOCK_LEFT: Qt.DockWidgetArea.LeftDockWidgetArea,
@@ -90,6 +95,8 @@ class RegionHost(QMainWindow):
         surface: SurfaceDeclaration,
         place_regions: Mapping[str, RegionKind],
         parent: QWidget | None = None,
+        *,
+        layout_version: int = PERSPECTIVE_VERSION,
     ) -> None:
         if frozenset(place_regions) != surface.accepts:
             raise ContributionError(
@@ -106,6 +113,8 @@ class RegionHost(QMainWindow):
         self._secondary_toolbar: QToolBar | None = None
         self._docks: dict[str, QDockWidget] = {}
         self._modals: dict[str, QDialog] = {}
+        self._layout_version = layout_version
+        self._default_perspective: bytes = b""
         # A parent is not enough: `QMainWindow` sets the `Window` flag on
         # itself, so nested in a page or a stacked widget it would draw its
         # own title bar and frame. `Qt.WindowType.Widget` is `0`, so this
@@ -133,11 +142,14 @@ class RegionHost(QMainWindow):
                 f"surface {self.surface_id!r} cannot render {place!r}; it "
                 f"accepts {sorted(self._surface.accepts)}."
             )
-        if region is RegionKind.TOP_TOOLBAR:
-            self._toolbar_top().addWidget(widget)
-        elif region is RegionKind.SECONDARY_TOOLBAR:
-            self._toolbar_secondary().addWidget(widget)
-        elif region is RegionKind.CENTRAL:
+        if region in _TOOLBAR_REGIONS:
+            raise ContributionError(
+                f"{place!r} on {self.surface_id!r} is a toolbar, and a "
+                "toolbar holds actions, not widgets: call place_action() "
+                "with a QAction, or a QWidgetAction for a combo box or a "
+                "search field (ui-architecture.md, menus and toolbars)."
+            )
+        if region is RegionKind.CENTRAL:
             self._set_central(widget)
         elif region in _DOCK_AREA:
             self._add_dock(place, region, widget, title)
@@ -153,7 +165,73 @@ class RegionHost(QMainWindow):
                 "class about it."
             )
 
+    def place_action(self, place: str, action: QAction) -> None:
+        """Adds `action` to the toolbar `place` maps to.
+
+        A toolbar shows commands, and a command is a `QAction`: the same
+        object a menu entry and a shortcut carry, so its text, icon, enabled
+        and checked state cannot drift between the three. A `QWidgetAction`
+        is accepted for the one widget a toolbar legitimately holds (a combo
+        box, a search field); one that wraps a push button is refused,
+        because that is a command drawn as a widget, outside every menu.
+        """
+        region = self._place_regions.get(place)
+        if region not in _TOOLBAR_REGIONS:
+            raise ContributionError(
+                f"surface {self.surface_id!r} maps {place!r} to {region!r}; "
+                "only a toolbar region takes an action."
+            )
+        if isinstance(action, QWidgetAction) and isinstance(
+            action.defaultWidget(), QAbstractButton
+        ):
+            raise ContributionError(
+                f"the action {action.text()!r} on {self.surface_id!r} wraps "
+                "a button. Give the QAction itself the text, icon and "
+                "handler; the toolbar draws its button."
+            )
+        if region is RegionKind.TOP_TOOLBAR:
+            self._toolbar_top().addAction(action)
+        else:
+            self._toolbar_secondary().addAction(action)
+
+    # -- what a View menu lists -----------------------------------------
+
+    def dock_toggle_actions(self) -> tuple[QAction, ...]:
+        """Each panel's show/hide action, in the order the panels were
+        contributed — what a View menu lists so a closed panel can come back."""
+        return tuple(dock.toggleViewAction() for dock in self._docks.values())
+
+    def toolbar_toggle_actions(self) -> tuple[QAction, ...]:
+        """Each toolbar's show/hide action, top row first."""
+        bars = (self._top_toolbar, self._secondary_toolbar)
+        return tuple(bar.toggleViewAction() for bar in bars if bar is not None)
+
     # -- the perspective ------------------------------------------------
+
+    @property
+    def layout_version(self) -> int:
+        """The version a saved perspective must carry to be applied."""
+        return self._layout_version
+
+    def capture_default_perspective(self) -> None:
+        """Records the layout as built, for `reset_perspective()`.
+
+        Called once by whoever placed the contributions, after the last one:
+        "the default" is what contributions produce, never a layout this
+        class invents.
+        """
+        self._default_perspective = self.save_perspective()
+
+    def reset_perspective(self) -> bool:
+        """Puts the captured default layout back (Window, Reset layout).
+        `False` when no default was captured."""
+        if not self._default_perspective:
+            return False
+        return bool(
+            self.restoreState(
+                QByteArray(self._default_perspective), self._layout_version
+            )
+        )
 
     def save_perspective(self) -> bytes:
         """This user's dock layout, for `restore_perspective()` to put back."""
@@ -161,20 +239,20 @@ class RegionHost(QMainWindow):
         # no `bytes()` overload, and whose `.data()` is typed
         # `bytes | bytearray | memoryview`. `bytes(...)` around *that*
         # narrows it.
-        return bytes(self.saveState(PERSPECTIVE_VERSION).data())
+        return bytes(self.saveState(self._layout_version).data())
 
     def restore_perspective(self, blob: bytes) -> bool:
         """Applies a saved layout. `False` (and a log line) when it does not
         apply, leaving the default layout standing — never an exception."""
         if not blob:
             return False
-        if self.restoreState(blob, PERSPECTIVE_VERSION):
+        if self.restoreState(QByteArray(blob), self._layout_version):
             return True
         logger.info(
             "Surface %r kept its default layout: the saved perspective "
             "does not apply (version %d, %d bytes).",
             self.surface_id,
-            PERSPECTIVE_VERSION,
+            self._layout_version,
             len(blob),
         )
         return False
@@ -207,7 +285,7 @@ class RegionHost(QMainWindow):
         if self._top_toolbar is None:
             self._top_toolbar = QToolBar("Top", self)
             self._top_toolbar.setObjectName(f"{self.objectName()}::top_toolbar")
-            self._top_toolbar.setMovable(False)
+            self._top_toolbar.setMovable(True)
             self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._top_toolbar)
         return self._top_toolbar
 
@@ -220,7 +298,7 @@ class RegionHost(QMainWindow):
             self._secondary_toolbar.setObjectName(
                 f"{self.objectName()}::secondary_toolbar"
             )
-            self._secondary_toolbar.setMovable(False)
+            self._secondary_toolbar.setMovable(True)
             self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._secondary_toolbar)
         return self._secondary_toolbar
 

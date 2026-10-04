@@ -1,27 +1,44 @@
 ---
 name: UI Engine Architecture
-description: Ownership boundaries, component-boundary law, and enforcement guards for the pyside_mvc (PySide6 + QML) extension. Load for any UI / QML work.
+description: The pyside_mvc contract. QtWidgets consumers get a desktop workbench of stock controls in the platform style (§9, sourced from Microsoft, KDE, Apple, GNOME and Qt guidance); QML consumers get the token and kit boundary (§2-§3). The component-boundary law (§1.2) governs both. Load for any UI work.
 trigger: model_decision
 ---
 
-# 🎛️ UI Engine Architecture — PySide6 + QML
+# 🎛️ UI Engine Architecture — PySide6: a QtWidgets workbench, and the QML kit
 
-This document governs `sagittarius_engine.extensions.pyside_mvc` — the engine's opinionated
-UI framework for PySide6 + QML applications. It replaces the previous QtWidgets/QFrame/QSS
-doctrine (retired 2026-08-22, see [`EPIC-001A`](../../Tasks/epics/EPIC-001_ui_engine_foundation/completed/EPIC-001A_architecture_rule_rewrite.md))
-which described a pre-QML shape of this extension that no longer matches what ships.
+This document governs `sagittarius_engine.extensions.pyside_mvc`. It serves two kinds of
+consumer, and says which clauses bind which:
+
+| Consumer | Its contract | Sections |
+| :--- | :--- | :--- |
+| **QtWidgets** (the default; the reference consumer since its ADR D20-D22) | A Windows desktop workbench of **stock Qt controls in the platform style**: menus, toolbars of actions, docks, dialogs, item views configured by kind. No tokens, no kit, no style sheets. | §1, §1.2, §4-§9 |
+| **QML** | Engine-owned design tokens and the QML widget kit | §1-§8 (§2, §3 and §1.1 bind only QML) |
+
+History: a QtWidgets/QFrame/QSS doctrine was retired for QML on 2026-08-22
+([`EPIC-001A`](../../Tasks/epics/EPIC-001_ui_engine_foundation/completed/EPIC-001A_architecture_rule_rewrite.md));
+the reference consumer then left QML for stock QtWidgets, and `EPIC-008` / `ADR-003` made
+that the engine's default contract. Stock controls are not the QSS doctrine coming back: that
+one styled every widget by hand, this one styles none.
 
 **Scope discipline:** this file describes what the **engine** provides and requires of any
 consumer. It must never name a specific consuming application, screen, or domain concept —
 that content belongs in the consumer's own rules (e.g. `Sagittarius_Elite_Warrior`'s
-`qml-rule.md`, which this document's structure deliberately mirrors, adapted from an
-application's QML standard to an engine's contract).
+`ui-presentation-rule.md`, whose desktop clauses §9 carries over as the engine's contract;
+the consumer's earlier `qml-rule.md`, which §2-§8 once mirrored, was deleted with its last
+`.qml`).
 
 ---
 
 ## 1. 🏛️ Ownership Boundary — the core contract
 
-The UI Engine holds three monopolies. A consuming application holds domain vocabulary and
+**For a QtWidgets consumer** the three owners are: the **platform** owns the look (its style,
+its font, its metrics, its colours, its button order); the **engine** owns the mechanism that
+is the same on every use (the workbench host, commands as actions, saved layouts, item-view
+configuration by kind — §4, §9); the **consumer** owns its vocabulary and composition (which
+modes, which commands, which columns). The test: switch the operating system's theme, or its
+high-contrast mode, and count the consumer files that must change. The answer must be zero.
+
+**For a QML consumer** the UI Engine holds three monopolies. A consuming application holds domain vocabulary and
 composition, and nothing else. This is not a style preference — it is the mechanism that
 keeps a multi-screen application visually consistent without relying on every contributor
 remembering a convention.
@@ -37,7 +54,7 @@ colour, corner radius, spacing scale — and count how many consumer files must 
 stay visually correct. The answer must be zero. Any number above zero means the consumer is
 still deciding a visual value itself, which this boundary exists to prevent.
 
-### 1.1 Escape hatch — permitted, never free of tokens
+### 1.1 Escape hatch — permitted, never free of tokens (QML consumers)
 
 A consumer will occasionally need something the kit does not yet provide. This is
 permitted, through exactly one mechanism:
@@ -106,6 +123,8 @@ than being fitted to one case:
 | Should a button know a background task is running? | It knows **`busy`** (tier 1). It does not know what a "task" is (tier 3) |
 | Should a card decide its own width? | **No** — the region decides; the card expresses intent only |
 | Should a log panel know `error`/`warn`/`info`? | **Yes** — universal vocabulary (tier 1). *Which events are errors* is the consumer's (tier 2) |
+| Should a table know a price column aligns right? | **Yes** — the column's kind decides it on every table (tier 1, `ColumnKind`). *Which* columns, and a price's precision, are the consumer's (tier 2: `ColumnSpec`, `IValueFormatter`) |
+| Should a command know it needs a confirmation? | **Yes**, as data on its `ActionDescriptor` (tier 2), so the registry asks before every run (tier 1). The handler never asks itself |
 
 **Why this is the shape:** a design system's product is **consistency, not capability**. A
 field component promises *"whatever is invalid will look invalid, the same way, everywhere."*
@@ -126,7 +145,10 @@ resulting state in (tier 2).
 
 ---
 
-## 2. 🎨 Design Tokens
+## 2. 🎨 Design Tokens (QML consumers)
+
+Nothing in this section binds a QtWidgets consumer: its colours, spacing and fonts are the
+platform's (§9.2), and a token layer in front of them would be a second look.
 
 ### 2.1 Fixed semantic vocabulary, consumer-supplied values
 
@@ -162,7 +184,10 @@ of the token layer, not optional follow-up — see the token-layer epic subtask.
 
 ---
 
-## 3. 🧩 Widget Kit — Composition, Not Deep Inheritance
+## 3. 🧩 Widget Kit — Composition, Not Deep Inheritance (QML consumers)
+
+The QtWidgets consumer's kit is Qt's own widget set (§9.2); the engine adds mechanism, not
+widgets.
 
 QML is composition-first. Deep inheritance chains produce fragile base classes and property
 name collisions; the kit's shape is therefore shallow — one level of inheritance for a base
@@ -192,8 +217,11 @@ everything above that.
 
 ## 4. 🧱 Runtime — Shell, Regions, Lifecycle
 
-The runtime layer (in progress, see `EPIC-001D`) owns window chrome, navigation, the overlay
-host, and named regions that consumer screens contribute into.
+The runtime layer owns window chrome, navigation, the overlay host, and named regions that
+consumer screens contribute into: `ContributionRegistry`, `RegionHost` and `RegionKind`
+(`runtime/`, `TASK-043`), extended by `EPIC-008` with toolbars of actions, View-menu toggles
+and remembered perspectives (`RegionHost.place_action`, `dock_toggle_actions`,
+`PerspectiveStore`).
 
 - **A screen contributes; it does not build layout.** What region a piece of UI belongs in
   (toolbar, primary content, sidebar, status) is a declaration from the screen; how that
@@ -226,6 +254,9 @@ host, and named regions that consumer screens contribute into.
 
 ## 5. 🔒 Security & Quality Baseline
 
+- **Plain text for outside data, QtWidgets too:** a `QLabel` showing a value that
+  originates outside the code (a log line, an exchange's error message) sets
+  `Qt.TextFormat.PlainText`; `ReadoutForm` and `EmptyStateStack` do.
 - **Enforce `textFormat: Text.PlainText`** on any `Text` item rendering data that
   originates outside the QML file itself (log lines, error messages, any value that could
   contain markup), to prevent HTML/RichText injection through display text.
@@ -330,3 +361,98 @@ that predate this rule — not an escape hatch for new code, and not the same me
 §1.1's component escape hatch (that one frees behaviour inside a component; this one draws
 the outer edge of the whole extension). A sanctioned entry shrinks when the referencing
 consumer is updated, never grows because a deep import happened to be convenient.
+
+---
+
+## 9. 🪟 The QtWidgets Workbench Contract
+
+### 9.1 Sources, and which one wins
+
+Every clause below names its source (read 2026-10-04, `ADR-003`): **MS** = Microsoft Windows
+User Experience Interaction Guidelines (`learn.microsoft.com/en-us/windows/win32/uxguide/<page>`;
+Microsoft says they still apply in principle); **Fluent** = Microsoft's Windows app design
+guidance; **KDE** = KDE Human Interface Guidelines (`develop.kde.org/hig`); **Apple** = Apple
+HIG; **GNOME** = GNOME HIG; **Qt** = `doc.qt.io/qt-6`. Where they disagree, the Windows
+desktop choice wins, and Qt's platform-aware API settles the detail, so the same code is
+right on every platform: button order through `QDialogButtonBox`, metrics through
+`QStyle.pixelMetric`, standard shortcuts through `QKeySequence.StandardKey`, Tools → Options
+with `QKeySequence.Preferences` (empty on Windows by the platform's own definition), Windows
+capitalisation.
+
+### 9.2 Stock controls in the platform style
+
+- Every control is a stock Qt class constructed with its defaults; one look per control kind,
+  the platform's. MS `vis-fonts`: "always using the system font, sizes, and colors"; KDE:
+  avoid custom styling; Qt `qtwidgets-styling-approaches`: style sheets are "not for the
+  production look of an application".
+- No per-widget style sheet, palette, font family or fixed/minimum/maximum size on a control:
+  the style's metrics decide (MS `vis-layout`: a standard button is 75×23 px at 96 dpi
+  because the style says so). Margins and spacing are the layout's defaults.
+- Colour only where it carries meaning, from `QPalette` roles, never an RGB literal, never as
+  the only signal (MS `vis-color`); usable in Windows High Contrast.
+- No widget drawn over another (`move()` onto a canvas); controls live in toolbars, docks,
+  dialogs or context menus. No scroll area inside a scroll area.
+- No checkable push button: state is a check box, a radio button or a checkable action
+  (MS `ctrl-command-buttons`, KDE).
+
+### 9.3 Commands: one `QAction` each
+
+- A command is an `ActionDescriptor` contributed to `ActionRegistry` (`workbench/`): one
+  `QAction` shared by its menu entry, toolbar button and shortcut (Qt, "Actions";
+  MS `cmd-menus`). Every command is in a menu (`menu_path` is mandatory); a toolbar holds
+  actions only (`RegionHost.place_action` refuses a button widget) (MS `cmd-toolbars`).
+- Text: sentence case, exactly one access key per item (`&`, `&&` for a literal ampersand),
+  unique among its siblings: the menu-bar titles, and the items and submenus of one menu; a
+  menu is spelled one way in every mode. "…" (U+2026) exactly when the command asks for more
+  before it acts (MS `cmd-menus`, KDE, Apple). `action_text.text_problems()` checks one text;
+  `ActionRegistry.contribute()` checks siblings and spelling.
+- Shortcuts: a standard command takes its `QKeySequence.StandardKey`; a new one takes Ctrl+J,
+  Ctrl+L, Ctrl+digit, F7, F8, F9 or F12, never Ctrl+Alt: Microsoft's free set less the keys
+  KDE, GNOME, XFCE or macOS reserve (Ctrl+G, K, M, Q, R, T; `RESERVED_ELSEWHERE` names each
+  use), so the same set is free on every platform (MS `inter-keyboard`; `shortcut_policy.py`).
+  The registry also refuses any key the running platform reserves.
+- Inapplicable commands are disabled, never hidden (MS `cmd-menus`, Apple); an unbound command
+  stays disabled and `report_unbound()` logs it.
+- Confirm only risky or irreversible commands, as data (`ActionConfirmation`): the consequence
+  in a sentence, specific verbs (never OK/Yes), the safe answer the default and the escape
+  (MS `mess-confirm`; `build_confirmation_box()`).
+
+### 9.4 Dialogs and options
+
+- Commit buttons come from `QDialogButtonBox` with standard buttons, so the platform orders
+  them; one default button, the safe one; Esc and the title-bar close act as Cancel
+  (MS `win-dialog-box`, Qt `QDialogButtonBox`). A dialog's title names the command.
+- Configuration is one dialog, Tools → Options: sections on the left, pages on the right,
+  OK / Cancel / Apply, Apply enabled only while a change is pending (MS `win-dialog-box`;
+  built by `EPIC-008E`).
+
+### 9.5 Modes, panels and perspectives
+
+- One `QMainWindow` shell with a mode per job; each mode a `RegionHost`: a central widget,
+  docks, toolbars (Qt Creator's shape). A panel is a `QDockWidget` with a title, a close
+  button and its content; every dock and toolbar has a stable object name and a toggle a View
+  menu lists (`dock_toggle_actions`, `toolbar_toggle_actions`).
+- The default layout is what contributions build (`capture_default_perspective`); Window →
+  Reset layout restores it (`reset_perspective`). The user's layout is saved per mode and
+  restored on start, keyed by mode and layout version; a version mismatch restores the
+  default and logs once (`PerspectiveStore`).
+
+### 9.6 Tables, lists and read-outs
+
+- A display widget is configured by the kind of value it shows, never per view
+  (`configure_item_view`, `ColumnKind`, `ColumnSpec`): whole-row selection, no in-place
+  editing, sorting on the raw value, numbers right-aligned and text and dates left
+  (MS `ctrl-list-views`), movable columns remembered per view (`ItemViewStateStore`), the
+  first click on a header sorting ascending. Values are written by one `IValueFormatter`
+  through `KindDelegate` and `ReadoutForm`; the consumer supplies precision, the engine the
+  place it is applied.
+- An empty view says what to do (`EmptyStateStack`; MS `ctrl-list-views`).
+- `find_unconfigured_item_views()` is the guard a consumer's booted-app test calls.
+
+### 9.7 Feedback
+
+- Anything taking 2 s or more shows feedback; past about 5 s a determinate progress bar where
+  possible; an operation with side effects stops with "Stop", not "Cancel"
+  (MS `progress-bars`). The status bar carries useful, non-critical state in plain text, never
+  an alarm alone (MS `ctrl-status-bars`). Errors name what failed and what to do
+  (MS `mess-error`, KDE).

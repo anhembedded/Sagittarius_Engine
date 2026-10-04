@@ -14,7 +14,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QComboBox,
+    QLabel,
+    QPushButton,
+    QToolBar,
+    QWidget,
+    QWidgetAction,
+)
 
 from sagittarius_engine.extensions.pyside_mvc.runtime import (
     ContributionError,
@@ -112,8 +120,8 @@ class TestThePlaceRegions:
             trading.place_widget("workspace", QLabel("second chart"))
 
     def test_top_and_secondary_toolbars_are_two_rows(self, trading: RegionHost) -> None:
-        trading.place_widget("header", QLabel("actions"))
-        trading.place_widget("context_bar", QLabel("BTCUSDT 1m"))
+        trading.place_action("header", QAction("&Start", trading))
+        trading.place_action("context_bar", QAction("&Refresh", trading))
 
         top = trading.findChild(QWidget, f"{trading.objectName()}::top_toolbar")
         secondary = trading.findChild(
@@ -241,3 +249,104 @@ class TestThePerspective:
 
         assert not dock.isHidden()
         assert any("default layout" in record.message for record in caplog.records)
+
+
+class TestToolbarsHoldActions:
+    """A toolbar shows commands, and a command is a `QAction` (`EPIC-008B`)."""
+
+    def test_an_action_lands_on_the_toolbar(self, trading: RegionHost) -> None:
+        start = QAction("&Start", trading)
+
+        trading.place_action("header", start)
+
+        top = trading.findChild(QToolBar, f"{trading.objectName()}::top_toolbar")
+        assert top is not None and start in top.actions()
+
+    def test_a_bare_widget_on_a_toolbar_is_refused(
+        self, qtbot, trading: RegionHost
+    ) -> None:
+        button = QPushButton("Start")
+        qtbot.addWidget(button)
+        with pytest.raises(ContributionError, match="holds actions, not widgets"):
+            trading.place_widget("header", button)
+
+    def test_a_combo_box_wrapped_in_a_widget_action_is_accepted(
+        self, trading: RegionHost
+    ) -> None:
+        wrapper = QWidgetAction(trading)
+        wrapper.setDefaultWidget(QComboBox())
+
+        trading.place_action("context_bar", wrapper)
+
+        secondary = trading.findChild(
+            QToolBar, f"{trading.objectName()}::secondary_toolbar"
+        )
+        assert secondary is not None and wrapper in secondary.actions()
+
+    def test_a_widget_action_wrapping_a_button_is_refused(
+        self, trading: RegionHost
+    ) -> None:
+        wrapper = QWidgetAction(trading)
+        wrapper.setDefaultWidget(QPushButton("Start"))
+
+        with pytest.raises(ContributionError, match="wraps a button"):
+            trading.place_action("header", wrapper)
+
+    def test_an_action_for_a_region_that_is_not_a_toolbar_is_refused(
+        self, trading: RegionHost
+    ) -> None:
+        with pytest.raises(ContributionError, match="only a toolbar region"):
+            trading.place_action("rail", QAction("&Start", trading))
+
+    def test_toolbars_can_be_moved_and_hidden(self, trading: RegionHost) -> None:
+        trading.place_action("header", QAction("&Start", trading))
+
+        (toggle,) = trading.toolbar_toggle_actions()
+        top = trading.findChild(QToolBar, f"{trading.objectName()}::top_toolbar")
+        assert top is not None and top.isMovable()
+        assert toggle is top.toggleViewAction()
+
+
+class TestViewMenuAndPerspective:
+    def test_every_dock_has_a_toggle_in_contribution_order(
+        self, trading: RegionHost
+    ) -> None:
+        trading.place_widget("rail", QLabel("p"), title="Positions")
+        trading.place_widget("console", QLabel("l"), title="Log")
+        trading.place_widget("rail", QLabel("o"), title="Open orders")
+
+        titles = [action.text() for action in trading.dock_toggle_actions()]
+
+        assert titles == ["Positions", "Log", "Open orders"]
+
+    def test_reset_puts_the_captured_default_back(
+        self, qtbot, trading: RegionHost
+    ) -> None:
+        trading.place_widget("rail", QLabel("p"), title="Positions")
+        trading.show()
+        trading.capture_default_perspective()
+        (toggle,) = trading.dock_toggle_actions()
+        toggle.trigger()
+        assert not toggle.isChecked()
+
+        assert trading.reset_perspective() is True
+
+        assert toggle.isChecked()
+
+    def test_reset_without_a_captured_default_does_nothing(
+        self, trading: RegionHost
+    ) -> None:
+        assert trading.reset_perspective() is False
+
+    def test_a_saved_layout_of_another_version_is_not_applied(
+        self, qapp, qtbot, caplog
+    ) -> None:
+        older = RegionHost(_trading_surface(), _TRADING_PLACE_REGIONS, layout_version=1)
+        newer = RegionHost(_trading_surface(), _TRADING_PLACE_REGIONS, layout_version=2)
+        qtbot.addWidget(older)
+        qtbot.addWidget(newer)
+
+        with caplog.at_level(logging.INFO, logger="App"):
+            assert newer.restore_perspective(older.save_perspective()) is False
+
+        assert "version 2" in caplog.text
