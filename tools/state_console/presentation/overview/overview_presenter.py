@@ -1,8 +1,8 @@
 """`OverviewPresenter` — `EPIC-007E` §1.1/§3/§4.
 
 Subscribes to `ConsoleAttached`/`ConsoleDetached`/`SnapshotReceived` through
-`self.subscribe()` — `BasePresenter`'s `QtEventBridge`-backed helper, not the
-raw `event_bus.on()` `RosterPresenter` uses. `SnapshotReceived` genuinely
+`self.subscribe()` — `BasePresenter`'s `QtEventBridge`-backed helper, never
+the raw `event_bus.on()` (`BUG-019`). `SnapshotReceived` genuinely
 arrives on the websocket receive loop's thread, not the Qt thread; `subscribe()`
 is what marshals delivery onto this presenter's thread before
 `_on_snapshot()` ever runs — no new bridge, timer, or queue written for this

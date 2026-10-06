@@ -89,9 +89,9 @@ class RosterPresenter(BasePresenter):
         self.view_model.dateFilterRequested.connect(self._on_date_filter_requested)
 
     def _connect_engine_events(self) -> None:
-        self.event_bus.on(StudentEnrolled, self._on_student_enrolled)
-        self.event_bus.on(StudentUpdated, self._on_student_updated)
-        self.event_bus.on(StudentRemoved, self._on_student_removed)
+        self.subscribe(StudentEnrolled, self._on_student_enrolled)
+        self.subscribe(StudentUpdated, self._on_student_updated)
+        self.subscribe(StudentRemoved, self._on_student_removed)
 
     def _on_student_enrolled(self, event: StudentEnrolled) -> None:
         self.view_model.log(
