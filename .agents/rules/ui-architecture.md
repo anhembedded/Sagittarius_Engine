@@ -455,7 +455,8 @@ capitalisation.
 
 - A display widget is configured by the kind of value it shows, never per view
   (`configure_item_view`, `ColumnKind`, `ColumnSpec`): whole-row selection, no in-place
-  editing, sorting on the raw value, numbers right-aligned and text and dates left
+  editing, sorting on the raw value (`SpecProxyModel.lessThan` orders numbers, `Decimal`,
+  `datetime`, `timedelta` and text, unknown last ascending — `display_value_order`), numbers right-aligned and text and dates left
   (MS `ctrl-list-views`), movable columns remembered per view (`ItemViewStateStore`), the
   first click on a header sorting ascending. Values are written by one `IValueFormatter`
   through `KindDelegate` and `ReadoutForm`; the consumer supplies precision, the engine the

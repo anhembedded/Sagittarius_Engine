@@ -8,9 +8,10 @@ written by one `IValueFormatter`, movable columns, no row-number header,
 alternating rows. Microsoft's list-view guidance (`ctrl-list-views`) is the
 source for each.
 
-The model keeps raw values in `DisplayRole`; a `SpecProxyModel` adds the
-header and the alignment and sorts on those raw values, and a `KindDelegate`
-writes them. So a price sorts as a number and prints as the formatter says,
+The model keeps raw values in `DisplayRole` — numbers, `Decimal`s,
+`datetime`s, text, `None` for unknown — and a `SpecProxyModel` adds the
+header and the alignment and sorts on those raw values in one order
+(`display_value_order`); a `KindDelegate` writes them. So a price sorts as a number and prints as the formatter says,
 and no model formats for display.
 
 A model that knows a cell's precision — a price's tick size from its row's
@@ -46,6 +47,10 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.column_spec import (
     Selection,
     spec_problems,
 )
+from sagittarius_engine.extensions.pyside_mvc.workbench.display_value_order import (
+    display_value_less_than,
+    needs_text_comparison,
+)
 from sagittarius_engine.extensions.pyside_mvc.workbench.i_value_formatter import (
     FormatContext,
     IValueFormatter,
@@ -72,7 +77,12 @@ type AnyIndex = QModelIndex | QPersistentModelIndex
 
 
 class SpecProxyModel(QSortFilterProxyModel):
-    """Header titles and alignment from the specs; sorts on raw values."""
+    """Header titles and alignment from the specs; sorts on raw values.
+
+    Qt's own `lessThan` cannot order a Python `Decimal` or `datetime`, so a
+    column of them would stay in model order; this one orders every display
+    value (`display_value_order`). Text against text stays Qt's, so the
+    proxy's case-sensitivity and locale settings still apply."""
 
     def __init__(
         self, specs: Sequence[ColumnSpec], parent: QObject | None = None
@@ -103,6 +113,13 @@ class SpecProxyModel(QSortFilterProxyModel):
         if role == Qt.ItemDataRole.TextAlignmentRole and 0 <= column < len(self._specs):
             return self._specs[column].kind.alignment
         return super().data(index, role)
+
+    def lessThan(self, source_left: AnyIndex, source_right: AnyIndex) -> bool:  # noqa: N802 - Qt override
+        left = source_left.data(self.sortRole())
+        right = source_right.data(self.sortRole())
+        if needs_text_comparison(left, right):
+            return super().lessThan(source_left, source_right)
+        return display_value_less_than(left, right)
 
 
 class KindDelegate(QStyledItemDelegate):
