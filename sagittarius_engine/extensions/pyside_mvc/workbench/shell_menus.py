@@ -8,7 +8,10 @@ nothing in it for this mode is disabled, never hidden.
 
 Related commands sit together: one separator between adjacent groups
 (`ActionDescriptor.group`), and before the shell's own extras, never at
-either end of a menu and never two in a row (MS `cmd-menus`).
+either end of a menu and never two in a row (MS `cmd-menus`). A menu reads,
+group by group: its commands' groups; its submenus, a group of their own, so
+a submenu is never drawn into the last commands' group; the window group
+(View → Toolbars › with `WINDOW_GROUP`'s commands, Status bar); the extras.
 """
 
 from __future__ import annotations
@@ -36,6 +39,10 @@ TOOLS_MENU = "&Tools"
 WINDOW_MENU = "&Window"
 HELP_MENU = "&Help"
 TOOLBARS_MENU = "T&oolbars"
+#: The group of View's window controls (Status bar), shown beside Toolbars ›
+#: after the application's groups and submenus.
+WINDOW_GROUP = "workbench.window"
+_TOOLBARS_PATH = (VIEW_MENU, TOOLBARS_MENU)
 #: Before the application's own menus, then after them.
 _LEADING = (FILE_MENU, EDIT_MENU, VIEW_MENU)
 _TRAILING = (TOOLS_MENU, WINDOW_MENU, HELP_MENU)
@@ -128,27 +135,38 @@ class MenuBarBuilder:
     def _fill(self, menu: QMenu, path: Path) -> None:
         _empty(menu)
         mode = self._current_mode()
-        for group in self._registry.menu_action_groups(path, mode):
-            # Between groups only: never first, and never two together,
-            # since `menu_action_groups` yields no empty group.
-            if menu.actions():
-                menu.addSeparator()
+        window: list[QAction] = []
+        for name, group in self._registry.menu_groups(path, mode):
+            if name == WINDOW_GROUP:
+                window.extend(group)
+                continue
+            _separate(menu)
             menu.addActions(list(group))
-        for child in self._children(path):
-            submenu = menu.addMenu(child)
-            submenu.setObjectName(f"menu::{plain_text(child)}")
-            self._fill(submenu, (*path, child))
+        children = self._children(path)
+        window_children = [c for c in children if (*path, c) == _TOOLBARS_PATH]
+        own_children = [c for c in children if c not in window_children]
+        if own_children:
+            _separate(menu)
+            for child in own_children:
+                self._add_submenu(menu, path, child)
+        if window or window_children:
+            _separate(menu)
+            for child in window_children:
+                self._add_submenu(menu, path, child)
+            menu.addActions(window)
         extras = list(self._extra_actions(path))
         if extras:
-            # The extras are a group of their own; a menu holding only them
-            # starts with them, not with a separator.
-            if menu.actions():
-                menu.addSeparator()
+            _separate(menu)
             taken = [key for item in menu.actions() for key in access_keys(item.text())]
             labels = assign_access_keys([plain_text(a.text()) for a in extras], taken)
             for action, label in zip(extras, labels, strict=True):
                 action.setText(label)
                 menu.addAction(action)
+
+    def _add_submenu(self, menu: QMenu, path: Path, child: str) -> None:
+        submenu = menu.addMenu(child)
+        submenu.setObjectName(f"menu::{plain_text(child)}")
+        self._fill(submenu, (*path, child))
 
     def _children(self, path: Path) -> tuple[str, ...]:
         depth = len(path)
@@ -170,3 +188,10 @@ class MenuBarBuilder:
         return self._has_actions(path, self._current_mode()) or bool(
             self._extra_actions(path)
         )
+
+
+def _separate(menu: QMenu) -> None:
+    """A separator before the next group: never first, and never two
+    together, since no group the filler adds is empty."""
+    if menu.actions():
+        menu.addSeparator()

@@ -271,6 +271,13 @@ class ActionRegistry:
         """The actions of one menu in mode `surface_id`, by `group`: groups
         in the order their first command was contributed, each group's
         commands in contribution order. Never an empty group."""
+        return tuple(actions for _, actions in self.menu_groups(menu_path, surface_id))
+
+    def menu_groups(
+        self, menu_path: tuple[str, ...], surface_id: str | None
+    ) -> tuple[tuple[str | None, tuple[QAction, ...]], ...]:
+        """`menu_action_groups()` with each group's name, for a menu filler
+        that places a named group of its own."""
         groups: dict[str | None, list[QAction]] = {}
         for entry in self._entries.values():
             descriptor = entry.descriptor
@@ -278,7 +285,7 @@ class ActionRegistry:
                 descriptor.surface_id, surface_id
             ):
                 groups.setdefault(descriptor.group, []).append(entry.action)
-        return tuple(tuple(actions) for actions in groups.values())
+        return tuple((name, tuple(actions)) for name, actions in groups.items())
 
     def scoped_actions(self) -> tuple[tuple[str | None, QAction], ...]:
         """Every action with the mode it belongs to (`None`: every mode), for

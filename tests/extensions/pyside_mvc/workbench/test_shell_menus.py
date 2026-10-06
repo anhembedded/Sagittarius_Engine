@@ -18,6 +18,9 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.action_confirmation impo
     MessageBoxConfirmer,
 )
 from sagittarius_engine.extensions.pyside_mvc.workbench.shell_menus import (
+    TOOLBARS_MENU,
+    VIEW_MENU,
+    WINDOW_GROUP,
     MenuBarBuilder,
 )
 
@@ -156,6 +159,57 @@ class TestTheShellsExtras:
         menu = builder.fill_now("&Tools")
 
         assert _layout(menu) == ["&Output"]
+
+
+class TestSubmenus:
+    """Review of the reference consumer's PR #374: Market's View menu put
+    Toolbars › and Chart › in the chart-history group, after Back to live,
+    and set Toolbars › apart from Status bar."""
+
+    def test_a_submenu_is_not_drawn_into_the_last_group(
+        self, owner: QWidget, registry: ActionRegistry
+    ) -> None:
+        registry.contribute(_command("live", "&Back to live", "history"))
+        registry.contribute(
+            ActionDescriptor("zoom", "Zoom &in", (*_CHART, "&Zoom"), group="zoom")
+        )
+
+        menu = _builder(owner, registry).fill_now("&Chart")
+
+        assert _layout(menu) == ["&Back to live", _SEPARATOR, "&Zoom"]
+
+    def test_toolbars_and_the_window_group_close_the_view_menu(
+        self, owner: QWidget, registry: ActionRegistry
+    ) -> None:
+        view = (VIEW_MENU,)
+        registry.contribute(
+            ActionDescriptor("status", "Stat&us bar", view, group=WINDOW_GROUP)
+        )
+        registry.contribute(ActionDescriptor("mode", "&Market", view))
+        registry.contribute(
+            ActionDescriptor("bar", "&Mode bar", (VIEW_MENU, TOOLBARS_MENU))
+        )
+        registry.contribute(ActionDescriptor("live", "&Back to live", view, group="h"))
+        registry.contribute(
+            ActionDescriptor("zoom", "Zoom &in", (VIEW_MENU, "C&hart"), group="z")
+        )
+        toggle = QAction("&Watchlist", owner)
+
+        menu = _builder(owner, registry, {view: [toggle]}).fill_now(VIEW_MENU)
+
+        _assert_separators_only_between(menu)
+        assert _layout(menu) == [
+            "&Market",
+            _SEPARATOR,
+            "&Back to live",
+            _SEPARATOR,
+            "C&hart",
+            _SEPARATOR,
+            TOOLBARS_MENU,
+            "Stat&us bar",
+            _SEPARATOR,
+            "&Watchlist",
+        ]
 
 
 def test_an_action_descriptor_names_no_group_by_default() -> None:

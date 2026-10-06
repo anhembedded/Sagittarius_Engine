@@ -61,6 +61,7 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.shell_menus import (
     TOOLBARS_MENU,
     TOOLS_MENU,
     VIEW_MENU,
+    WINDOW_GROUP,
     WINDOW_MENU,
     MenuBarBuilder,
     Path,
@@ -188,7 +189,11 @@ class WorkbenchShell(QMainWindow):
             ),
             (
                 ActionDescriptor(
-                    "workbench.status_bar", "Stat&us bar", (VIEW_MENU,), checkable=True
+                    "workbench.status_bar",
+                    "Stat&us bar",
+                    (VIEW_MENU,),
+                    checkable=True,
+                    group=WINDOW_GROUP,
                 ),
                 self._on_status_bar,
             ),
