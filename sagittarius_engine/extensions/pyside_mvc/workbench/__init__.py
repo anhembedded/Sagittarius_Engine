@@ -41,6 +41,7 @@ from .perspective_store import PERSPECTIVE_SCOPE_KEY, PerspectiveStore, perspect
 from .readout_form import ReadoutForm
 from .shell_menus import menu_order
 from .shortcut_policy import shortcut_problem
+from .spec_tree_item import SpecTreeItem
 from .value_precision import Precision
 from .workbench_shell import SHELL_SCOPE_KEY, ShellMode, WorkbenchShell
 
@@ -69,6 +70,7 @@ __all__ = [
     "ReadoutForm",
     "Selection",
     "SpecProxyModel",
+    "SpecTreeItem",
     "UnconfiguredItemView",
     "access_keys",
     "build_confirmation_box",

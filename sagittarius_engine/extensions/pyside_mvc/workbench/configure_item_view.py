@@ -14,6 +14,10 @@ header and the alignment and sorts on those raw values in one order
 (`display_value_order`); a `KindDelegate` writes them. So a price sorts as a number and prints as the formatter says,
 and no model formats for display.
 
+A grouped `QTreeWidget` (headings with rows under them) owns its model, so
+it is configured in place — `configure_item_view(tree, None, specs)` — with
+the same rules; its rows are `SpecTreeItem`s so they sort on raw values too.
+
 A model that knows a cell's precision — a price's tick size from its row's
 symbol — answers `PRECISION_ROLE` for that cell with a `Precision`; the
 delegate hands it to the formatter in `FormatContext.precision`, ahead of the
@@ -24,7 +28,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from functools import partial
+from typing import overload
 
+import shiboken6
 from PySide6.QtCore import (
     QAbstractItemModel,
     QModelIndex,
@@ -40,6 +46,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QTableView,
     QTreeView,
+    QTreeWidget,
 )
 
 from sagittarius_engine.extensions.pyside_mvc.workbench.column_spec import (
@@ -147,6 +154,9 @@ class KindDelegate(QStyledItemDelegate):
         precision = hint if isinstance(hint, Precision) else spec.precision
         context = FormatContext(spec.key, precision)
         option.text = self._formatter.format(spec.kind, raw, context)  # type: ignore[attr-defined]
+        # The kind decides the alignment here too, for a view with no proxy
+        # to serve it (a `QTreeWidget`); with one, it is the same value.
+        option.displayAlignment = spec.kind.alignment  # type: ignore[attr-defined]
 
 
 def _configure_header(header: QHeaderView, specs: Sequence[ColumnSpec]) -> None:
@@ -167,43 +177,74 @@ def _configure_header(header: QHeaderView, specs: Sequence[ColumnSpec]) -> None:
 
 
 def _fit_when_first_rows_arrive(
-    proxy: QSortFilterProxyModel,
+    model: QAbstractItemModel,
     fit: Callable[[], None],
     parent: QModelIndex,
     first: int,
     last: int,
 ) -> None:
-    if not parent.isValid() and proxy.rowCount() == last - first + 1:
+    # The first rows under a parent: a table's first rows, or a group's in a
+    # tree, whose rows arrive after their heading.
+    if model.rowCount(parent) == last - first + 1:
         fit()
 
 
 def _fit_columns(view: QTableView | QTreeView, specs: Sequence[ColumnSpec]) -> None:
+    # A `QTreeWidget` resets its own model from its destructor, after PySide
+    # has already invalidated the Python wrapper (measured: "Internal C++
+    # object (QTreeWidget) already deleted"). A view being destroyed has
+    # nothing to measure; every other reset reaches a live view.
+    if not shiboken6.isValid(view):
+        return
     for column, spec in enumerate(specs):
         if not spec.stretch:
             view.resizeColumnToContents(column)
 
 
-def configure_item_view(
+def _model_to_show(
     view: QTableView | QTreeView,
-    model: QAbstractItemModel,
+    model: QAbstractItemModel | None,
     specs: Sequence[ColumnSpec],
-    *,
-    formatter: IValueFormatter | None = None,
-    selection: Selection = Selection.SINGLE,
-) -> SpecProxyModel:
-    """Shows `model` in `view` the one way every view of the application
-    behaves. Returns the proxy, which a caller maps selections through."""
+) -> QAbstractItemModel:
+    """The model the view will show — a `QTreeWidget`'s own, any other
+    view's `model` — or a `ValueError` naming everything unusable."""
     problems = list(spec_problems(specs))
-    if model.columnCount() != len(specs):
+    shown: QAbstractItemModel | None = model
+    if isinstance(view, QTreeWidget):
+        shown = view.model()
+        if model is not None:
+            problems.append(
+                "a QTreeWidget shows its own items; pass None for the model"
+            )
+    elif model is None:
+        problems.append(f"a {type(view).__name__} needs a model")
+    elif model.columnCount() != len(specs):
         problems.append(
             f"the model has {model.columnCount()} columns and {len(specs)} specs"
         )
-    if problems:
+    if problems or shown is None:
         raise ValueError("; ".join(problems))
-    proxy = SpecProxyModel(specs, view)
-    proxy.setSourceModel(model)
-    view.setModel(proxy)
-    view.setItemDelegate(KindDelegate(specs, formatter or PlainValueFormatter(), view))
+    return shown
+
+
+def _set_up_tree_widget(tree: QTreeWidget, specs: Sequence[ColumnSpec]) -> None:
+    """The header a proxy would serve, written on the widget's own header
+    item: titles and alignment from the specs."""
+    tree.setColumnCount(len(specs))
+    tree.setHeaderLabels([spec.title for spec in specs])
+    header_item = tree.headerItem()
+    for column, spec in enumerate(specs):
+        header_item.setTextAlignment(column, spec.kind.alignment)
+
+
+def _apply_conventions(
+    view: QTableView | QTreeView,
+    specs: Sequence[ColumnSpec],
+    formatter: IValueFormatter,
+    selection: Selection,
+    sortable: bool,
+) -> None:
+    view.setItemDelegate(KindDelegate(specs, formatter, view))
     view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     view.setSelectionMode(_SELECTION_MODE[selection])
     view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -212,18 +253,89 @@ def configure_item_view(
         view.verticalHeader().hide()
         header = view.horizontalHeader()
     else:
-        view.setRootIsDecorated(False)
         header = view.header()
     _configure_header(header, specs)
+    header.setSortIndicatorShown(sortable)
     # No column is sorted until the user clicks one; the first click on a
     # column sorts it ascending (`ctrl-list-views`).
     header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-    view.setSortingEnabled(True)
+    view.setSortingEnabled(sortable)
+
+
+def _fit_and_keep_fitting(
+    view: QTableView | QTreeView,
+    model: QAbstractItemModel,
+    specs: Sequence[ColumnSpec],
+) -> None:
     _fit_columns(view, specs)
     fit = partial(_fit_columns, view, tuple(specs))
-    proxy.modelReset.connect(fit)
-    # A table that starts empty fits when its first rows arrive; later
+    model.modelReset.connect(fit)
+    # A view that starts empty fits when its first rows arrive; later
     # inserts leave the widths alone, so a live table is not re-measured.
-    proxy.rowsInserted.connect(partial(_fit_when_first_rows_arrive, proxy, fit))
+    model.rowsInserted.connect(partial(_fit_when_first_rows_arrive, model, fit))
+
+
+@overload
+def configure_item_view(
+    view: QTreeWidget,
+    model: None,
+    specs: Sequence[ColumnSpec],
+    *,
+    formatter: IValueFormatter | None = None,
+    selection: Selection = Selection.SINGLE,
+    sortable: bool = True,
+) -> None: ...
+
+
+@overload
+def configure_item_view(
+    view: QTableView | QTreeView,
+    model: QAbstractItemModel,
+    specs: Sequence[ColumnSpec],
+    *,
+    formatter: IValueFormatter | None = None,
+    selection: Selection = Selection.SINGLE,
+    sortable: bool = True,
+) -> SpecProxyModel: ...
+
+
+def configure_item_view(
+    view: QTableView | QTreeView,
+    model: QAbstractItemModel | None,
+    specs: Sequence[ColumnSpec],
+    *,
+    formatter: IValueFormatter | None = None,
+    selection: Selection = Selection.SINGLE,
+    sortable: bool = True,
+) -> SpecProxyModel | None:
+    """Shows `model` in `view` the one way every view of the application
+    behaves. Returns the proxy, which a caller maps selections through.
+
+    A `QTreeWidget` — a grouped tree whose headings and rows are items —
+    owns its model and forbids `setModel`, so it is configured in place:
+    `model` is `None`, nothing is returned, the header is written from the
+    specs, and the same delegate, selection, editing, sorting and header
+    rules apply. Its rows sort on their raw values when they are
+    `SpecTreeItem`s; sorting orders each heading's rows among themselves, so
+    a group's rows stay under it.
+
+    `sortable=False` turns sorting off and hides the sort indicator, for a
+    view whose order is its meaning (a readout in the order its rules build).
+    """
+    shown = _model_to_show(view, model, specs)
+    chosen_formatter = formatter or PlainValueFormatter()
+    if isinstance(view, QTreeWidget):
+        _set_up_tree_widget(view, specs)
+        _apply_conventions(view, specs, chosen_formatter, selection, sortable)
+        _fit_and_keep_fitting(view, shown, specs)
+        view.setProperty(CONFIGURED_PROPERTY, True)
+        return None
+    proxy = SpecProxyModel(specs, view)
+    proxy.setSourceModel(shown)
+    view.setModel(proxy)
+    if isinstance(view, QTreeView):
+        view.setRootIsDecorated(False)
+    _apply_conventions(view, specs, chosen_formatter, selection, sortable)
+    _fit_and_keep_fitting(view, proxy, specs)
     view.setProperty(CONFIGURED_PROPERTY, True)
     return proxy

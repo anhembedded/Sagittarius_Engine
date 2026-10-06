@@ -464,6 +464,10 @@ capitalisation.
   formatter as `FormatContext.precision`, a `Precision` from the column
   (`ColumnSpec.precision`) or from the cell (a model answering `PRECISION_ROLE`), the cell's
   winning.
+- A grouped tree — headings with rows under them — is a `QTreeWidget` configured the same
+  way (`configure_item_view(tree, None, specs)`), its rows `SpecTreeItem`s holding raw values;
+  sorting orders each heading's rows among themselves. `sortable=False` turns sorting off on
+  any view whose order is its meaning.
 - An empty view says what to do (`EmptyStateStack`; MS `ctrl-list-views`).
 - `find_unconfigured_item_views()` is the guard a consumer's booted-app test calls.
 
