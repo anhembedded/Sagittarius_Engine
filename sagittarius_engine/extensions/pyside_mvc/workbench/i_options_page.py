@@ -23,7 +23,9 @@ class IOptionsPage(Protocol):
         ...
 
     def widget(self) -> QWidget:
-        """The page itself: stock controls, built once."""
+        """The page itself: stock controls, built once and kept by the page.
+        The dialog only borrows it, and hands it back (unparented) when it
+        closes."""
         ...
 
     def apply(self) -> None:
@@ -44,5 +46,7 @@ class IOptionsPage(Protocol):
 
     def set_change_listener(self, listener: Callable[[], None]) -> None:
         """The dialog's callback for any edit, so it can re-evaluate Apply and
-        OK without polling. Called once, before the dialog shows."""
+        OK without polling. Called before the dialog shows, and again with a
+        callback that does nothing when it closes: a page outlives its dialog
+        and is shown by the next one, which sets its own listener."""
         ...
