@@ -42,6 +42,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QAbstractScrollArea,
     QHeaderView,
     QStyledItemDelegate,
     QStyleOptionViewItem,
@@ -63,6 +64,9 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.i_value_formatter import
     FormatContext,
     IValueFormatter,
     PlainValueFormatter,
+)
+from sagittarius_engine.extensions.pyside_mvc.workbench.stretch_column import (
+    StretchColumnFiller,
 )
 from sagittarius_engine.extensions.pyside_mvc.workbench.value_precision import (
     Precision,
@@ -164,17 +168,14 @@ def _configure_header(header: QHeaderView, specs: Sequence[ColumnSpec]) -> None:
     header.setSectionsMovable(True)
     header.setSortIndicatorShown(True)
     header.setStretchLastSection(False)
-    for column, spec in enumerate(specs):
+    for column in range(len(specs)):
         # `Interactive`, not `ResizeToContents`: the latter measures every
         # row on every change, which Qt warns against for large, live models.
         # Widths fit the content on configure and on each model reset; the
-        # user may resize in between.
-        mode = (
-            QHeaderView.ResizeMode.Stretch
-            if spec.stretch
-            else QHeaderView.ResizeMode.Interactive
-        )
-        header.setSectionResizeMode(column, mode)
+        # user may resize in between. Not `Stretch` for the stretch column
+        # either: in a narrow view Qt squeezes it to the minimum section
+        # size; `StretchColumnFiller` widens it instead, never below content.
+        header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
 
 
 class _FirstRowsFitter(QObject):
@@ -226,16 +227,23 @@ class _FirstRowsFitter(QObject):
         QTimer.singleShot(0, self._fit)
 
 
-def _fit_columns(view: QTableView | QTreeView, specs: Sequence[ColumnSpec]) -> None:
+def _fit_columns(
+    view: QTableView | QTreeView,
+    specs: Sequence[ColumnSpec],
+    fillers: Sequence[StretchColumnFiller] = (),
+) -> None:
     # A `QTreeWidget` resets its own model from its destructor, after PySide
     # has already invalidated the Python wrapper (measured: "Internal C++
     # object (QTreeWidget) already deleted"). A view being destroyed has
     # nothing to measure; every other reset reaches a live view.
     if not shiboken6.isValid(view):
         return
-    for column, spec in enumerate(specs):
-        if not spec.stretch:
-            view.resizeColumnToContents(column)
+    # Every column to its content, the stretch column included; its filler
+    # then widens it to what the others leave in the viewport.
+    for column in range(len(specs)):
+        view.resizeColumnToContents(column)
+    for filler in fillers:
+        filler.fill()
 
 
 def _model_to_show(
@@ -304,8 +312,18 @@ def _fit_and_keep_fitting(
     model: QAbstractItemModel,
     specs: Sequence[ColumnSpec],
 ) -> None:
-    _fit_columns(view, specs)
-    fit = partial(_fit_columns, view, tuple(specs))
+    fillers = tuple(
+        StretchColumnFiller(view, column)
+        for column, spec in enumerate(specs)
+        if spec.stretch
+    )
+    # A scroll area's default size hint ignores its content (a fixed 256 px),
+    # so a dock around the view would open too narrow for its columns.
+    view.setSizeAdjustPolicy(
+        QAbstractScrollArea.SizeAdjustPolicy.AdjustToContentsOnFirstShow
+    )
+    _fit_columns(view, specs, fillers)
+    fit = partial(_fit_columns, view, tuple(specs), fillers)
     # A view that starts empty fits when its first rows arrive; later
     # inserts leave the widths alone, so a live table is not re-measured.
     fitter = _FirstRowsFitter(model, fit, view)

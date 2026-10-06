@@ -466,6 +466,11 @@ capitalisation.
   formatter as `FormatContext.precision`, a `Precision` from the column
   (`ColumnSpec.precision`) or from the cell (a model answering `PRECISION_ROLE`), the cell's
   winning.
+- The `ColumnSpec.stretch` column takes the width the others leave but never less than its
+  content (`StretchColumnFiller`, not Qt's `Stretch` mode, which squeezes it to the minimum
+  section size in a narrow dock); a view narrower than its columns scrolls horizontally with
+  every column whole. A view's size hint follows its columns on first show
+  (`AdjustToContentsOnFirstShow`), so a dock opens wide enough for them.
 - A grouped tree — headings with rows under them — is a `QTreeWidget` configured the same
   way (`configure_item_view(tree, None, specs)`), its rows `SpecTreeItem`s holding raw values;
   sorting orders each heading's rows among themselves. `sortable=False` turns sorting off on

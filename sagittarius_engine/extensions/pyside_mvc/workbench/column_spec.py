@@ -31,6 +31,8 @@ class ColumnSpec:
     title: str
     kind: ColumnKind
     #: The one column that takes the remaining width; others fit their content.
+    #: Never narrower than its own content: a view too narrow for every column
+    #: scrolls horizontally instead (`StretchColumnFiller`).
     stretch: bool = False
     #: The precision every value of this column is quoted in, handed to the
     #: formatter as `FormatContext.precision`. A cell's own hint
