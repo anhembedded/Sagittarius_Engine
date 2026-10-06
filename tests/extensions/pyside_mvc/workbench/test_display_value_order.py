@@ -154,3 +154,7 @@ class TestEdgesFromReview:
 
         assert display_value_less_than(numpy.float32(5), numpy.float32("nan"))
         assert not display_value_less_than(numpy.float32("nan"), numpy.float32(5))
+
+    def test_an_integer_too_large_for_a_float_still_orders(self) -> None:
+        assert display_value_less_than(1, 10**400)
+        assert not display_value_less_than(10**400, 1)

@@ -56,7 +56,12 @@ def _is_unknown(value: object) -> bool:
         return value.is_nan()
     # Any real number, a NumPy NaN included, which would otherwise compare
     # equal to every number (review of PR #230).
-    return isinstance(value, Real) and math.isnan(float(value))
+    # An integer is never NaN, and a huge one would overflow `float()`.
+    return (
+        isinstance(value, Real)
+        and not isinstance(value, Integral)
+        and math.isnan(float(value))
+    )
 
 
 def _sort_key(value: object) -> _Key:
