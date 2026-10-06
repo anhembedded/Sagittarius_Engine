@@ -257,8 +257,9 @@ class ActionRegistry:
     def menu_actions(
         self, menu_path: tuple[str, ...], surface_id: str | None
     ) -> tuple[QAction, ...]:
-        """The actions of one menu in mode `surface_id`, in the order the menu
-        shows them: `menu_action_groups()`, one group after another."""
+        """The actions of one menu in mode `surface_id`: `menu_action_groups()`,
+        one group after another. Not the order the menu shows them: the shell
+        moves `WINDOW_GROUP` after the menu's submenus (`shell_menus`)."""
         return tuple(
             action
             for group in self.menu_action_groups(menu_path, surface_id)

@@ -38,8 +38,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 | Status | Count |
 | :--- | :---: |
 | 🔴 **Open** | 7 |
-| ✅ **Fixed** | 12 |
-| 📈 **Total** | **19** |
+| ✅ **Fixed** | 13 |
+| 📈 **Total** | **20** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -91,6 +91,7 @@ deliberately independent (see the top of this file).
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-020](completed/BUG-020_sample_shell_tests_leak_a_running_app.md)** | The example app's sample-shell tests leave a running `App` behind | Low | 2026-10-06 | Fixed 2026-10-06. Three tests in `test_sample_shell.py` booted an `App` through `build_app()` and never stopped it, leaking a `SagittariusScheduler` and an `AsyncRuntimeLoop` thread each (`BUG-014`'s family). A `config` fixture now stops the app; an autouse guard in the example tests' `conftest.py` fails any test there that leaks one. |
 | **[BUG-019](completed/BUG-019_event_bridge_reference_cycle_crashes_the_suite.md)** | `QtEventBridge` made every subscriber a reference cycle, and the full suite crashed natively about one run in seven | Medium | 2026-10-06 | Fixed 2026-10-06. The bridge holds its subscribers and itself weakly, so the collector never frees a presenter with an active `QTimer` mid-dispatch; the example's `RosterPresenter` subscribes through the bridge. |
 | **[BUG-018](completed/BUG-018_options_dialog_closes_after_a_page_fails_to_apply.md)** | The Options dialog closes after a page fails to apply, and no closed dialog is ever deleted | Medium | 2026-10-04 | Fixed 2026-10-04. `accept()` closes only when every page took its edits; otherwise the dialog shows the page that kept them. `show_options()` deletes the dialog on close. Found by the review of Elite PR #348. |
 | **[BUG-017](completed/BUG-017_async_runtime_stop_drops_cancelled_tasks_cleanup.md)** | `AsyncRuntime.stop()` drops the cleanup of every task it cancels | Low | 2026-10-04 | Fixed 2026-10-04. `stop()` stopped the loop before cancelling what was pending, so each task's `finally` never ran (the reference consumer's unclosed `aiohttp` session). The loop is now drained first, within half of `stop()`'s one `timeout`, so `App.stop()` never returns with the loop running; a task that will not stop is named. PR #227 plus its review follow-up. |

@@ -442,7 +442,10 @@ capitalisation.
   each filled when it opens with the showing mode's commands; a menu with nothing in it is
   disabled. Related commands sit together, one separator between adjacent groups
   (`ActionDescriptor.group`, `ActionRegistry.menu_action_groups`) and before the shell's own
-  extras, never at either end of a menu and never two in a row. A vertical mode bar (icons only, Ctrl+1…9) switches modes through
+  extras, never at either end of a menu and never two in a row. A menu's submenus form a group of
+  their own, after its command groups. View's window group (`WINDOW_GROUP` in
+  `shell_menus.py`: Toolbars ›, Status bar) ends that menu, after the application's groups and
+  submenus and before the shell's extras. A vertical mode bar (icons only, Ctrl+1…9) switches modes through
   `NavigationService`, which asks the mode being left `can_leave(USER_INTENT | RESTORE)`.
   Only the showing mode's commands are live, so two modes may share a key. The window
   remembers its geometry and last mode (`WorkbenchShell` is an `IStateContributor`). A panel is a `QDockWidget` with a title, a close
