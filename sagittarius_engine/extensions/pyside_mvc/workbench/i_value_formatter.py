@@ -4,29 +4,47 @@ The engine decides *where* a value is formatted (one delegate, one read-out
 form) so no screen formats its own; the consumer decides *how* (a price's
 precision is a symbol's tick size, which only the consumer knows). The
 `PlainValueFormatter` is the engine's default: correct, unopinionated.
+
+The consumer's knowledge reaches the formatter through `FormatContext`: the
+column's key, and, when the column or the row knows it, the `Precision` a
+value is quoted in (`ColumnSpec.precision`, or a model's `PRECISION_ROLE` for
+one cell). A formatter that ignores `precision` keeps working unchanged.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Protocol
 
 from sagittarius_engine.extensions.pyside_mvc.workbench.column_kind import ColumnKind
+from sagittarius_engine.extensions.pyside_mvc.workbench.value_precision import (
+    Precision,
+)
 
 _PERCENT_DIGITS = 2
 _SECONDS_PER_MINUTE = 60
 _SECONDS_PER_HOUR = 3600
 _TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-type DisplayValue = str | int | float | datetime | timedelta | None
+type DisplayValue = str | int | float | Decimal | datetime | timedelta | None
+
+#: The kinds a `Precision` hint applies to in `PlainValueFormatter`. A percent
+#: and a duration have units of their own; a quantum is a price's tick, a
+#: quantity's step or a currency's smallest unit.
+_QUANTIZED = frozenset({ColumnKind.PRICE, ColumnKind.QUANTITY, ColumnKind.MONEY})
 
 
 @dataclass(frozen=True, slots=True)
 class FormatContext:
-    """Which column or read-out row the value belongs to."""
+    """Which column or read-out row the value belongs to, and the precision
+    it is quoted in when the column or its row knows one."""
 
     key: str
+    #: `None`: no hint; the formatter decides (by magnitude, say).
+    precision: Precision | None = None
 
 
 class IValueFormatter(Protocol):
@@ -50,7 +68,9 @@ def _duration_text(seconds: float) -> str:
 
 class PlainValueFormatter:
     """The default: numbers with grouping, percents with two decimals,
-    timestamps to the second, durations as h:mm:ss."""
+    timestamps to the second, durations as h:mm:ss. A price, quantity or
+    money value with a `precision` hint is rounded to its quantum and written
+    with exactly the quantum's decimals."""
 
     def format(
         self, kind: ColumnKind, value: DisplayValue, context: FormatContext
@@ -67,4 +87,13 @@ class PlainValueFormatter:
             return f"{value:,.{_PERCENT_DIGITS}f}%"
         if kind is ColumnKind.DURATION:
             return _duration_text(float(value))
+        # A non-finite value is written as it is, with or without a hint, so
+        # one column never spells infinity two ways (review of PR #230).
+        if context.precision is not None and kind in _QUANTIZED and _is_finite(value):
+            quantized = context.precision.quantize(value)
+            return f"{quantized:,.{context.precision.decimals}f}"
         return f"{value:,}"
+
+
+def _is_finite(value: int | float | Decimal) -> bool:
+    return value.is_finite() if isinstance(value, Decimal) else math.isfinite(value)

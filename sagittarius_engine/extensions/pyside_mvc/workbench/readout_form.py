@@ -60,7 +60,8 @@ class ReadoutForm(QWidget):
             raise KeyError(f"no read-out row for {unknown}")
         for key, raw in values.items():
             spec = self._specs[key]
-            text = self._formatter.format(spec.kind, raw, FormatContext(key))
+            context = FormatContext(key, spec.precision)
+            text = self._formatter.format(spec.kind, raw, context)
             self._values[key].setText(text)
 
     def value_text(self, key: str) -> str:

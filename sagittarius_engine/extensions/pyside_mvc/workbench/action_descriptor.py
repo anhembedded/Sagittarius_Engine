@@ -9,8 +9,8 @@ the action, the way `ContributionRegistry` treats a contributed widget.
 
 `menu_path` is mandatory: every command is in a menu, because a command
 reachable only from a toolbar or a shortcut cannot be found (`cmd-toolbars`).
-`surface_id` and `toolbar` are the consumer's opaque identities, as in
-`ContributionDescriptor`.
+`surface_id`, `toolbar` and `group` are the consumer's opaque identities, as
+in `ContributionDescriptor`.
 """
 
 from __future__ import annotations
@@ -85,6 +85,11 @@ class ActionDescriptor:
     confirm: ActionConfirmation | None = None
     #: The mode it belongs to, or `None` for one present in every mode.
     surface_id: str | None = None
+    #: The group of related commands it belongs to in its menu. A menu shows
+    #: each group together, in the order its first command was contributed,
+    #: with one separator between adjacent groups (MS `cmd-menus`). `None` is
+    #: a group too: the commands that name none.
+    group: str | None = None
 
     def __post_init__(self) -> None:
         problems = list(text_problems(self.text, needs_input=self.needs_input))

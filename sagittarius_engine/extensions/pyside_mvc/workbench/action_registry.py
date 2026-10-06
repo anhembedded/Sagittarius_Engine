@@ -6,7 +6,7 @@ shapes that would look fine and be wrong — a duplicate id, two commands on
 one key, a standard key bound to a new meaning, two items in one menu on one
 access key — and builds one `QAction` per command. A presenter later `bind`s
 its handler and, optionally, the signals that enable or check it. The shell
-asks `menu_actions()` and `toolbar_actions()` to build its menus and toolbars
+asks `menu_action_groups()` and `toolbar_actions()` to build its menus and toolbars
 (`EPIC-008D`), so the menu bar is the complete catalogue by construction.
 
 Scope: a command with `surface_id=None` exists in every mode and conflicts
@@ -257,13 +257,35 @@ class ActionRegistry:
     def menu_actions(
         self, menu_path: tuple[str, ...], surface_id: str | None
     ) -> tuple[QAction, ...]:
-        """The actions of one menu in mode `surface_id`, in contribution order."""
+        """The actions of one menu in mode `surface_id`, in the order the menu
+        shows them: `menu_action_groups()`, one group after another."""
         return tuple(
-            entry.action
-            for entry in self._entries.values()
-            if entry.descriptor.menu_path == menu_path
-            and _scopes_meet(entry.descriptor.surface_id, surface_id)
+            action
+            for group in self.menu_action_groups(menu_path, surface_id)
+            for action in group
         )
+
+    def menu_action_groups(
+        self, menu_path: tuple[str, ...], surface_id: str | None
+    ) -> tuple[tuple[QAction, ...], ...]:
+        """The actions of one menu in mode `surface_id`, by `group`: groups
+        in the order their first command was contributed, each group's
+        commands in contribution order. Never an empty group."""
+        return tuple(actions for _, actions in self.menu_groups(menu_path, surface_id))
+
+    def menu_groups(
+        self, menu_path: tuple[str, ...], surface_id: str | None
+    ) -> tuple[tuple[str | None, tuple[QAction, ...]], ...]:
+        """`menu_action_groups()` with each group's name, for a menu filler
+        that places a named group of its own."""
+        groups: dict[str | None, list[QAction]] = {}
+        for entry in self._entries.values():
+            descriptor = entry.descriptor
+            if descriptor.menu_path == menu_path and _scopes_meet(
+                descriptor.surface_id, surface_id
+            ):
+                groups.setdefault(descriptor.group, []).append(entry.action)
+        return tuple((name, tuple(actions)) for name, actions in groups.items())
 
     def scoped_actions(self) -> tuple[tuple[str | None, QAction], ...]:
         """Every action with the mode it belongs to (`None`: every mode), for

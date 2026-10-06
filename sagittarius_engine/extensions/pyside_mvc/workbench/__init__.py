@@ -18,7 +18,12 @@ from .action_registry import ActionRegistry
 from .action_text import ELLIPSIS, access_keys, plain_text, text_problems
 from .column_kind import ColumnKind
 from .column_spec import ColumnSpec, Selection, spec_problems
-from .configure_item_view import KindDelegate, SpecProxyModel, configure_item_view
+from .configure_item_view import (
+    PRECISION_ROLE,
+    KindDelegate,
+    SpecProxyModel,
+    configure_item_view,
+)
 from .empty_state import EmptyStateStack
 from .i_options_page import IOptionsPage
 from .i_value_formatter import (
@@ -36,12 +41,15 @@ from .perspective_store import PERSPECTIVE_SCOPE_KEY, PerspectiveStore, perspect
 from .readout_form import ReadoutForm
 from .shell_menus import menu_order
 from .shortcut_policy import shortcut_problem
+from .spec_tree_item import SpecTreeItem
+from .value_precision import Precision
 from .workbench_shell import SHELL_SCOPE_KEY, ShellMode, WorkbenchShell
 
 __all__ = [
     "ELLIPSIS",
     "ITEM_VIEW_SCOPE_KEY",
     "PERSPECTIVE_SCOPE_KEY",
+    "PRECISION_ROLE",
     "ActionConfirmation",
     "ActionDeclarationError",
     "ActionDescriptor",
@@ -58,9 +66,11 @@ __all__ = [
     "MessageBoxConfirmer",
     "PerspectiveStore",
     "PlainValueFormatter",
+    "Precision",
     "ReadoutForm",
     "Selection",
     "SpecProxyModel",
+    "SpecTreeItem",
     "UnconfiguredItemView",
     "access_keys",
     "build_confirmation_box",

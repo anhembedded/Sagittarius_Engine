@@ -440,7 +440,9 @@ capitalisation.
   a central widget, docks, toolbars (Qt Creator's shape). The menu bar reads File, Edit, View,
   the application's menus, Tools, Window, Help (MS `cmd-menus`; `shell_menus.menu_order`),
   each filled when it opens with the showing mode's commands; a menu with nothing in it is
-  disabled. A vertical mode bar (icons only, Ctrl+1…9) switches modes through
+  disabled. Related commands sit together, one separator between adjacent groups
+  (`ActionDescriptor.group`, `ActionRegistry.menu_action_groups`) and before the shell's own
+  extras, never at either end of a menu and never two in a row. A vertical mode bar (icons only, Ctrl+1…9) switches modes through
   `NavigationService`, which asks the mode being left `can_leave(USER_INTENT | RESTORE)`.
   Only the showing mode's commands are live, so two modes may share a key. The window
   remembers its geometry and last mode (`WorkbenchShell` is an `IStateContributor`). A panel is a `QDockWidget` with a title, a close
@@ -455,11 +457,24 @@ capitalisation.
 
 - A display widget is configured by the kind of value it shows, never per view
   (`configure_item_view`, `ColumnKind`, `ColumnSpec`): whole-row selection, no in-place
-  editing, sorting on the raw value, numbers right-aligned and text and dates left
+  editing, sorting on the raw value (`SpecProxyModel.lessThan` orders numbers, `Decimal`,
+  `datetime`, `timedelta` and text, unknown last ascending — `display_value_order`), numbers right-aligned and text and dates left
   (MS `ctrl-list-views`), movable columns remembered per view (`ItemViewStateStore`), the
   first click on a header sorting ascending. Values are written by one `IValueFormatter`
   through `KindDelegate` and `ReadoutForm`; the consumer supplies precision, the engine the
-  place it is applied.
+  place it is applied. A value's quantum (a price's tick, a quantity's step) reaches the
+  formatter as `FormatContext.precision`, a `Precision` from the column
+  (`ColumnSpec.precision`) or from the cell (a model answering `PRECISION_ROLE`), the cell's
+  winning.
+- The `ColumnSpec.stretch` column takes the width the others leave but never less than its
+  content (`StretchColumnFiller`, not Qt's `Stretch` mode, which squeezes it to the minimum
+  section size in a narrow dock); a view narrower than its columns scrolls horizontally with
+  every column whole. A view's size hint follows its columns on first show
+  (`AdjustToContentsOnFirstShow`), so a dock opens wide enough for them.
+- A grouped tree — headings with rows under them — is a `QTreeWidget` configured the same
+  way (`configure_item_view(tree, None, specs)`), its rows `SpecTreeItem`s holding raw values;
+  sorting orders each heading's rows among themselves. `sortable=False` turns sorting off on
+  any view whose order is its meaning.
 - An empty view says what to do (`EmptyStateStack`; MS `ctrl-list-views`).
 - `find_unconfigured_item_views()` is the guard a consumer's booted-app test calls.
 
