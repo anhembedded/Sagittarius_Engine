@@ -38,8 +38,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 | Status | Count |
 | :--- | :---: |
 | 🔴 **Open** | 7 |
-| ✅ **Fixed** | 12 |
-| 📈 **Total** | **19** |
+| ✅ **Fixed** | 13 |
+| 📈 **Total** | **20** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
