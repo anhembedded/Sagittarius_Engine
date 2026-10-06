@@ -224,7 +224,10 @@ class _FirstRowsFitter(QObject):
         # A tree lays out rows under a heading after the signal, so a fit now
         # measures nothing new; the next turn of the event loop sees them
         # (measured: 67 px now, 213 px a turn later).
-        QTimer.singleShot(0, self._fit)
+        # With the fitter as context: a view (and so this fitter) destroyed
+        # within that turn cancels the call instead of running it on a dead
+        # view (review of Engine PR #230).
+        QTimer.singleShot(0, self, self._fit)
 
 
 def _fit_columns(
@@ -243,7 +246,7 @@ def _fit_columns(
     for column in range(len(specs)):
         view.resizeColumnToContents(column)
     for filler in fillers:
-        filler.fill()
+        filler.remeasure()
 
 
 def _model_to_show(

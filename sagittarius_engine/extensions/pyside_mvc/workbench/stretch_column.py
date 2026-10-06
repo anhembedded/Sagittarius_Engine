@@ -15,7 +15,7 @@ narrower than its columns then scrolls horizontally with every column whole
 from __future__ import annotations
 
 import shiboken6
-from PySide6.QtCore import QEvent, QModelIndex, QObject
+from PySide6.QtCore import QEvent, QObject
 from PySide6.QtWidgets import QHeaderView, QTableView, QTreeView
 
 
@@ -34,18 +34,21 @@ class StretchColumnFiller(QObject):
     never less than its content. A child of the view, so it lives and dies
     with it.
 
-    Refills on the viewport's resize and show, on another column's resize,
-    and on a model reset or row insert (the content may have grown)."""
+    The content width is measured only when the view's columns are fitted
+    (`remeasure`, on configure, a reset and a view's first rows) and kept as
+    the floor; a resize then only compares that floor with the space left.
+    Measuring is `sizeHintForColumn`, up to a thousand rows each time, so
+    measuring on every row insert made appending a thousand rows to a shown
+    table take 21 s instead of 0.05 s, and reset a width the person dragged
+    on each insert (review of Engine PR #230)."""
 
     def __init__(self, view: QTableView | QTreeView, column: int) -> None:
         super().__init__(view)
         self._view = view
         self._column = column
+        self._floor = header_of(view).sectionSizeHint(column)
         header_of(view).sectionResized.connect(self._on_section_resized)
         view.viewport().installEventFilter(self)
-        model = view.model()
-        model.modelReset.connect(self.fill)
-        model.rowsInserted.connect(self._on_rows_inserted)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt override
         if event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
@@ -56,11 +59,15 @@ class StretchColumnFiller(QObject):
         if column != self._column:
             self.fill()
 
-    def _on_rows_inserted(self, _parent: QModelIndex, _first: int, _last: int) -> None:
+    def remeasure(self) -> None:
+        """Takes the column's content width as its new floor, then fills."""
+        if not shiboken6.isValid(self._view):
+            return
+        self._floor = content_width(self._view, self._column)
         self.fill()
 
     def fill(self) -> None:
-        """Content width while the view is hidden: a hidden viewport's size
+        """The floor alone while the view is hidden: a hidden viewport's size
         is Qt's placeholder, and a size hint taken before the first show
         would grow the dock to fit it."""
         # A `QTreeWidget` resets its own model from its destructor, after
@@ -68,7 +75,7 @@ class StretchColumnFiller(QObject):
         if not shiboken6.isValid(self._view):
             return
         header = header_of(self._view)
-        width = content_width(self._view, self._column)
+        width = self._floor
         if self._view.isVisible():
             others = header.length() - header.sectionSize(self._column)
             width = max(width, self._view.viewport().width() - others)

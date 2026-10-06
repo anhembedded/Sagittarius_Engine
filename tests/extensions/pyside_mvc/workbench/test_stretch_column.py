@@ -146,3 +146,52 @@ def test_a_tree_widget_stretch_column_fills_it_too(qtbot) -> None:
     assert header.length() == tree.viewport().width()
     assert header.sectionSize(0) > content_width(tree, 0)
     assert header.sectionResizeMode(0) is QHeaderView.ResizeMode.Interactive
+
+
+class _CountingTable(QTableView):
+    """A table that counts how often its columns' content is measured."""
+
+    measured = 0
+
+    def sizeHintForColumn(self, column: int) -> int:  # noqa: N802 - Qt override
+        type(self).measured += 1
+        return super().sizeHintForColumn(column)
+
+
+def _append(model: QStandardItemModel, symbol: str) -> None:
+    cells = [QStandardItem() for _ in _SPECS]
+    for item, value in zip(cells, (symbol, 1.0, 1.0), strict=True):
+        item.setData(value, Qt.ItemDataRole.DisplayRole)
+    model.appendRow(cells)
+
+
+def test_appending_rows_to_a_shown_table_measures_nothing(qtbot) -> None:
+    """Review of Engine PR #230: measuring the content on every insert made a
+    thousand appended rows take 21 s instead of 0.05 s. Rows after the first
+    leave the widths alone."""
+    panel = QWidget()
+    qtbot.addWidget(panel)
+    view = _CountingTable(panel)
+    model = _quotes()
+    configure_item_view(view, model, _SPECS)
+    QVBoxLayout(panel).addWidget(view)
+    panel.resize(_WIDE, _PANEL_HEIGHT)
+    panel.show()
+    qtbot.waitExposed(panel)
+    _CountingTable.measured = 0
+
+    for number in range(200):
+        _append(model, f"SYM{number}")
+
+    assert _CountingTable.measured == 0
+
+
+def test_a_width_dragged_on_the_stretch_column_survives_an_insert(qtbot) -> None:
+    shown = _shown(qtbot, _WIDE)
+    header = shown.view.horizontalHeader()
+    header.resizeSection(0, 400)
+    model = shown.view.model().sourceModel()
+
+    _append(model, "ETHUSDT")
+
+    assert header.sectionSize(0) == 400
