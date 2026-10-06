@@ -54,7 +54,9 @@ def _is_unknown(value: object) -> bool:
         return True
     if isinstance(value, Decimal):
         return value.is_nan()
-    return isinstance(value, float) and math.isnan(value)
+    # Any real number, a NumPy NaN included, which would otherwise compare
+    # equal to every number (review of PR #230).
+    return isinstance(value, Real) and math.isnan(float(value))
 
 
 def _sort_key(value: object) -> _Key:

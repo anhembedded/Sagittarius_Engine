@@ -148,3 +148,9 @@ class TestEdgesFromReview:
 
         assert display_value_less_than(numpy.int64(9), numpy.int64(10))
         assert display_value_less_than(numpy.float64(2.5), Decimal("10"))
+
+    def test_a_numpy_nan_is_unknown_and_sorts_last(self) -> None:
+        numpy = pytest.importorskip("numpy")
+
+        assert display_value_less_than(numpy.float32(5), numpy.float32("nan"))
+        assert not display_value_less_than(numpy.float32("nan"), numpy.float32(5))

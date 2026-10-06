@@ -217,3 +217,17 @@ class TestWidthsSurviveALiveTree:
         heading.addChild(_row("a much longer metric name", None))
         # The fit waits one turn of the event loop for the tree's layout.
         qtbot.waitUntil(lambda: tree.columnWidth(0) > headings_only, timeout=1000)
+
+    def test_a_heading_added_with_its_rows_fits_when_first_opened(
+        self, tree: QTreeWidget, qtbot
+    ) -> None:
+        configure_item_view(tree, None, self._NARROW_SPECS)
+        heading = QTreeWidgetItem(["R"])
+        heading.addChild(_row("a much longer metric name", None))
+        tree.addTopLevelItem(heading)
+        QApplication.processEvents()
+        closed = tree.columnWidth(0)
+
+        heading.setExpanded(True)
+
+        qtbot.waitUntil(lambda: tree.columnWidth(0) > closed, timeout=1000)

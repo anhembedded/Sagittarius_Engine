@@ -207,12 +207,23 @@ class _FirstRowsFitter(QObject):
         if not parent.isValid():
             if self._model.rowCount(parent) == last - first + 1:
                 self._fit()
-        elif not self._fitted_children:
-            self._fitted_children = True
-            # A tree lays out rows under a heading after this signal, so a
-            # fit now measures nothing new; the next turn of the event loop
-            # sees them (measured: 67 px now, 213 px a turn later).
-            QTimer.singleShot(0, self._fit)
+        else:
+            self._fit_children_once()
+
+    def on_expanded(self, _index: QModelIndex) -> None:
+        """A heading added with its rows already under it raises no insert
+        for them, and Qt measures only shown rows: the first time a heading
+        opens is when its rows can first be measured (review of PR #230)."""
+        self._fit_children_once()
+
+    def _fit_children_once(self) -> None:
+        if self._fitted_children:
+            return
+        self._fitted_children = True
+        # A tree lays out rows under a heading after the signal, so a fit now
+        # measures nothing new; the next turn of the event loop sees them
+        # (measured: 67 px now, 213 px a turn later).
+        QTimer.singleShot(0, self._fit)
 
 
 def _fit_columns(view: QTableView | QTreeView, specs: Sequence[ColumnSpec]) -> None:
@@ -300,6 +311,8 @@ def _fit_and_keep_fitting(
     fitter = _FirstRowsFitter(model, fit, view)
     model.modelReset.connect(fitter.on_reset)
     model.rowsInserted.connect(fitter.on_rows_inserted)
+    if isinstance(view, QTreeView):
+        view.expanded.connect(fitter.on_expanded)
 
 
 @overload
