@@ -231,3 +231,25 @@ class TestWidthsSurviveALiveTree:
         heading.setExpanded(True)
 
         qtbot.waitUntil(lambda: tree.columnWidth(0) > closed, timeout=1000)
+
+
+def test_text_rows_sort_without_recursing(tree: QTreeWidget) -> None:
+    """Adopting PR #230: two text values reached `super().__lt__`, which
+    PySide sends back to the Python override, and the process crashed on the
+    first header click."""
+    configure_item_view(tree, None, (ColumnSpec("name", "Name", ColumnKind.TEXT),))
+    heading = QTreeWidgetItem(["H"])
+    tree.addTopLevelItem(heading)
+    for name in ("b", "a", "C"):
+        item = SpecTreeItem()
+        item.setData(0, Qt.ItemDataRole.DisplayRole, name)
+        heading.addChild(item)
+
+    tree.sortItems(0, Qt.SortOrder.AscendingOrder)
+
+    rows = [heading.child(row) for row in range(3)]
+    assert [row.data(0, Qt.ItemDataRole.DisplayRole) for row in rows if row] == [
+        "C",
+        "a",
+        "b",
+    ]

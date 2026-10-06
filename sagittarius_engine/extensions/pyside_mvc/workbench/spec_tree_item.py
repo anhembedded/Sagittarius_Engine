@@ -38,6 +38,10 @@ class SpecTreeItem(QTreeWidgetItem):
         left = self.data(column, Qt.ItemDataRole.DisplayRole)
         right = other.data(column, Qt.ItemDataRole.DisplayRole)
         if needs_text_comparison(left, right):
-            # Qt's text comparison, as `SpecProxyModel` keeps it.
-            return super().__lt__(other)
+            # Text orders as a `QTreeWidget` orders it by default: case
+            # sensitive, not locale aware, by code point. Not
+            # `super().__lt__`: PySide dispatches the base operator back to
+            # this override, which recursed until the process crashed on the
+            # first header click (found adopting PR #230).
+            return str(left) < str(right)
         return display_value_less_than(left, right)
