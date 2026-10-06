@@ -6,8 +6,16 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialogButtonBox, QLabel, QLineEdit, QListWidget, QWidget
+import shiboken6
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialogButtonBox,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QWidget,
+)
 
 from sagittarius_engine.extensions.pyside_mvc import IOptionsPage, OptionsDialog
 
@@ -166,3 +174,39 @@ def test_ok_keeps_the_dialog_open_while_a_page_could_not_apply(qtbot) -> None:
     assert message is not None
     assert message.isVisibleTo(dialog)
     assert message.text() == "Data: the changes could not be applied."
+
+
+def _delete(dialog: OptionsDialog) -> None:
+    """What `WA_DeleteOnClose` does once the event loop next runs."""
+    dialog.deleteLater()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+@pytest.mark.parametrize("way_out", ["accept", "reject"])
+def test_deleting_a_closed_dialog_leaves_its_pages_alive(
+    qtbot, pages, way_out: str
+) -> None:
+    """`BUG-024`: the pages belong to the modules that contributed them and
+    outlive the dialog, which re-shows them on the next open. The dialog
+    deleted its stack, and the pages' widgets with it."""
+    first = OptionsDialog(list(pages))
+    getattr(first, way_out)()
+    _delete(first)
+
+    assert all(shiboken6.isValid(page.edit) for page in pages)
+    second = OptionsDialog(list(pages))
+    qtbot.addWidget(second)
+    assert second.findChild(QListWidget).count() == len(pages)
+    assert all(page.edit.window() is second for page in pages)
+
+
+def test_a_closed_dialog_no_longer_listens_to_its_pages(qtbot, pages) -> None:
+    """`BUG-024`: the page kept calling the closed dialog's refresh."""
+    dialog = OptionsDialog(list(pages))
+    qtbot.addWidget(dialog)
+    dialog.reject()
+
+    pages[0].edit.setText("changed")
+    pages[0].edit.textEdited.emit("changed")
+
+    assert not _button(dialog, _Buttons.Apply).isEnabled()

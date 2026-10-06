@@ -30,6 +30,12 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.i_options_page import (
 )
 
 OPTIONS_TITLE = "Options"
+
+
+def _ignore_change() -> None:
+    """The listener a page keeps once its dialog has closed."""
+
+
 _Buttons = QDialogButtonBox.StandardButton
 
 
@@ -133,3 +139,20 @@ class OptionsDialog(QDialog):
         for page in self._pages:
             page.revert()
         super().reject()
+
+    def done(self, result: int) -> None:
+        """Every way out ends here: the dialog lets go of the pages first.
+        The pages belong to the modules that contributed them and are shown
+        again by the next dialog, but a dialog deletes its children, so the
+        page widgets are taken out of it, and the pages stop calling it,
+        before it can be deleted (`BUG-024`)."""
+        self._release_pages()
+        super().done(result)
+
+    def _release_pages(self) -> None:
+        for page in self._pages:
+            page.set_change_listener(_ignore_change)
+        for page in self._pages:
+            widget = page.widget()
+            self._stack.removeWidget(widget)
+            widget.setParent(None)

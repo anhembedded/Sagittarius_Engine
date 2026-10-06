@@ -11,6 +11,7 @@ their history is in `git log`.
 
 ### Fixed
 
+- Tools → Options opens more than once (`BUG-024`). Closing the dialog deleted the page widgets it had been lent, so the second open raised "Internal C++ object already deleted" on every page. The dialog now unparents the pages and silences their change listener as it closes; pages are kept by the modules that contribute them, as before.
 - `pyside_mvc` loads its QML layer (`BaseQmlViewModel`, `QmlHostView`, `OverlayHost`, `CardModel`, …) on first use instead of at package import (`BUG-023`). Every public name is still importable from the same path. A process that only uses the workbench no longer exits with `gc: N uncollectable objects at shutdown`.
 
 ---

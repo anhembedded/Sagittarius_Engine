@@ -4,6 +4,7 @@ hosts, View built from the showing mode, only the showing mode's commands live
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
 
 import pytest
@@ -12,6 +13,7 @@ from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
+    QLineEdit,
     QMenu,
     QStatusBar,
     QToolBar,
@@ -83,6 +85,34 @@ def _two_modes(shell: WorkbenchShell, **guards) -> None:
     shell.add_mode(
         ShellMode("bots", "&Bots", _host("bots", "Plan"), can_leave=guards.get("bots"))
     )
+
+
+class _EditPage:
+    """An `IOptionsPage` over one line edit that the test keeps, as a module
+    keeps the page it contributed."""
+
+    title = "General"
+
+    def __init__(self) -> None:
+        self.edit = QLineEdit("a")
+
+    def widget(self) -> QWidget:
+        return self.edit
+
+    def apply(self) -> None:
+        pass
+
+    def revert(self) -> None:
+        pass
+
+    def is_dirty(self) -> bool:
+        return False
+
+    def validation_message(self) -> str | None:
+        return None
+
+    def set_change_listener(self, listener: Callable[[], None]) -> None:
+        pass
 
 
 class TestTheMenuBar:
@@ -417,6 +447,28 @@ class TestStatusBarOutputAndOptions:
         QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
         assert not shiboken6.isValid(dialog)
+
+    def test_tools_options_opens_again_after_it_was_closed(
+        self, shell: WorkbenchShell
+    ) -> None:
+        """`BUG-024`: the second open raised "Internal C++ object already
+        deleted" on every page, because the first dialog deleted the pages'
+        widgets with itself."""
+        _two_modes(shell)
+        page = _EditPage()
+        shell.add_options_page(page)
+        shell.finish_setup()
+
+        def close_it() -> None:
+            dialog = QApplication.activeModalWidget()
+            assert isinstance(dialog, OptionsDialog)
+            dialog.reject()
+
+        for _ in range(2):
+            QTimer.singleShot(0, close_it)
+            shell.show_options()
+            QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            assert shiboken6.isValid(page.edit)
 
 
 class TestRemembered:

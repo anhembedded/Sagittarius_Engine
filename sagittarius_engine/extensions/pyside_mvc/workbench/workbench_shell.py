@@ -340,7 +340,8 @@ class WorkbenchShell(QMainWindow):
         """Opens Tools → Options modally and returns the dialog once closed.
         The dialog is deleted when the event loop next runs: each open builds
         a new one, and a closed one kept alive would keep listening to its
-        pages (`BUG-018`)."""
+        pages (`BUG-018`). It lets go of the pages as it closes, so that
+        deleting it does not delete them (`BUG-024`)."""
         dialog = OptionsDialog(self._options_pages, self)
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.exec()
