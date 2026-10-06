@@ -21,14 +21,14 @@
 
 ## Fix
 
-`StatusSlot` (`workbench/status_slot.py`): the shell puts each status widget in a slot and sets only the slot's scope. The owner keeps calling `show()` and `hide()` on its own widget, which the shell never touches; the slot follows it through `ShowToParent`/`HideToParent` and shows when both say yes, so no empty box is left either. The owner's wish is an explicit hide (`isHidden()` with `WA_WState_ExplicitShowHide`), not `isHidden()` alone: a widget never shown, or one just moved into its slot, reads hidden until its parent shows, and Qt shows such a child with its parent. A widget its owner deletes leaves the slot hidden.
+`StatusSlot` (`workbench/status_slot.py`): the shell puts each status widget in a slot and sets only the slot's scope. The owner keeps calling `show()` and `hide()` on its own widget, which the shell never touches; the slot follows it through `ShowToParent`/`HideToParent` and shows when both say yes, so no empty box is left either. The owner's wish is the widget's own `isHidden()`, which only the owner sets now. Moving the widget into its slot does not mark it hidden; Qt shows it with the slot. A widget its owner deletes leaves the slot hidden.
 
 ## Regression tests
 
 `tests/extensions/pyside_mvc/workbench/test_workbench_shell.py::TestStatusBarOutputAndOptions`:
 - `test_a_status_widget_its_owner_hid_stays_hidden_in_every_mode`: **before**, red (the hidden widget was visible after a mode change); **after**, green. It also asserts no status-bar item is shown for it; with the slot ignoring the owner, that assertion fails.
 - `test_a_status_widget_its_owner_shows_appears_in_its_scope`: **before**, red (a mode-scoped widget its owner showed was visible outside its mode); **after**, green. With the slot's event filter removed, it fails.
-- `test_a_status_widget_shows_at_once_in_a_shown_window`: a widget its owner never hid shows as soon as it is added. With the owner's wish read as plain `isHidden()`, it fails.
+- `test_a_status_widget_shows_at_once_in_a_shown_window`: a widget its owner never hid shows as soon as it is added.
 - `test_a_status_widget_its_owner_deleted_leaves_no_empty_item`: red until the slot followed `destroyed`.
 
 ## Verification

@@ -21,7 +21,7 @@ that deletes its widget leaves no empty box: the slot stays hidden after.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 
@@ -72,11 +72,7 @@ class StatusSlot(QWidget):
 
 
 def _owner_hid(widget: QWidget) -> bool:
-    """Whether the owner hid `widget` itself. The shell never calls
-    `setVisible()` on it, so an explicit hide is the owner's. Plain
-    `isHidden()` would not do: a widget never shown, or one just moved into
-    its slot, reads hidden until its parent shows, and Qt shows such a child
-    with its parent."""
-    return widget.isHidden() and widget.testAttribute(
-        Qt.WidgetAttribute.WA_WState_ExplicitShowHide
-    )
+    """Whether the owner hid `widget`. The shell never calls `setVisible()`
+    on it, so `isHidden()` is the owner's answer alone. Moving the widget
+    into its slot does not mark it hidden: Qt shows it with the slot."""
+    return widget.isHidden()
