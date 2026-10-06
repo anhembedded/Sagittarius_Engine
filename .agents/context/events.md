@@ -137,6 +137,11 @@ does not:
    did not need.
 2. It is unsubscribed automatically on teardown. Opting out of this is *silent* — nothing
    fails, the handler simply keeps running after its screen is gone.
+3. **A subscription does not keep its subscriber alive (`BUG-019`).** A handler that is a bound
+   method is held weakly: whoever owns the presenter (or the feed, or any subscriber) keeps it,
+   by a reference or a Qt `parent=`, and once it is gone it receives nothing. A lambda or a
+   `functools.partial` is held as it is, so one that closes over self keeps self alive and
+   brings back the reference cycle this rule removes: subscribe the bound method instead.
 
 **`QtEventBridge` reports handler failures itself**, and must: a Qt signal/slot boundary does
 not propagate exceptions back to the emitter (PySide6 catches and prints them), so the bus's own

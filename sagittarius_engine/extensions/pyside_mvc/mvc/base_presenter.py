@@ -185,6 +185,10 @@ class BasePresenter(QObject):
         unsubscribed automatically in `dispose()`. Subscribing directly on the
         bus opts out of both, and the second one is silent — nothing fails,
         the handler simply keeps running after the screen is gone.
+
+        A bound-method handler is held weakly, so the subscription does not
+        keep this presenter alive; its owner does (`BUG-019`). Pass the bound
+        method, not a lambda closing over `self`, which would be held as it is.
         """
         self._events.on(event_name_or_type, handler)
 

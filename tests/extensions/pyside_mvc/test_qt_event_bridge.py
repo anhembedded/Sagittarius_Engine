@@ -12,11 +12,15 @@ job was to hop threads. Thread safety was enforced by remembering to read a
 
 from __future__ import annotations
 
+import contextlib
+import gc
 import threading
+import weakref
+from collections.abc import Iterator
 from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QObject, QThread
 
 from sagittarius_engine.extensions.pyside_mvc.mvc.qt_event_bridge import QtEventBridge
 from sagittarius_engine.infrastructure.event_bus.memory_event_bus import MemoryEventBus
@@ -184,3 +188,140 @@ def test_a_raising_handler_is_reported_after_a_cross_thread_hop(qtbot, bus):
     worker.join()
 
     qtbot.waitUntil(lambda: logger.error.called, timeout=2000)
+
+
+class TestNoReferenceCycle:
+    """BUG-019: the gate's intermittent native crash. The bridge's forwarder
+    closed over the bridge, and its bookkeeping held the subscribing
+    presenter's bound methods, so every bridge, and every presenter that
+    subscribed through one, was a reference cycle. Python frees a cycle only
+    when its collector runs, which is on whatever thread allocates at that
+    moment; a presenter freed there with an active `QTimer` (the state
+    console's age tick) crashed the UI thread's event loop. Without the cycle,
+    the last reference going frees them at once, where it goes."""
+
+    def test_an_abandoned_bridge_is_freed_without_the_collector(self, bus) -> None:
+        bridge = QtEventBridge(bus)
+        bridge.on(_EVENT, lambda _payload: None)
+        alive = weakref.ref(bridge)
+
+        with _collector_off():
+            del bridge
+            assert alive() is None
+
+    def test_a_subscriber_is_not_kept_alive_by_its_subscription(
+        self, qtbot, bus
+    ) -> None:
+        class _Screen(QObject):
+            def __init__(self) -> None:
+                super().__init__()
+                self.events = QtEventBridge(bus, parent=self)
+                self.events.on(_EVENT, self.handle)
+
+            def handle(self, payload: object) -> None:
+                pass
+
+        screen = _Screen()
+        alive = weakref.ref(screen)
+
+        with _collector_off():
+            del screen
+            assert alive() is None
+
+    def test_a_freed_subscriber_receives_nothing(self, qtbot, bus) -> None:
+        heard: list[object] = []
+
+        class _Screen(QObject):
+            def handle(self, payload: object) -> None:
+                heard.append(payload)
+
+        bridge = QtEventBridge(bus)
+        screen = _Screen()
+        bridge.on(_EVENT, screen.handle)
+        del screen
+
+        bus.emit(_EVENT, "late")
+
+        assert heard == []
+
+    def test_a_method_subscription_can_still_be_removed(self, qtbot, bus) -> None:
+        heard: list[object] = []
+
+        class _Screen(QObject):
+            def handle(self, payload: object) -> None:
+                heard.append(payload)
+
+        bridge = QtEventBridge(bus)
+        screen = _Screen()
+        bridge.on(_EVENT, screen.handle)
+        bridge.on(_EVENT, screen.handle)
+        bus.emit(_EVENT, "first")
+        bridge.off(_EVENT, screen.handle)
+        bus.emit(_EVENT, "second")
+
+        assert heard == ["first"]
+
+
+@contextlib.contextmanager
+def _collector_off() -> Iterator[None]:
+    """Only reference counting frees anything inside: what is freed here was
+    in no cycle."""
+    gc.collect()
+    gc.disable()
+    try:
+        yield
+    finally:
+        gc.enable()
+
+
+def test_a_method_of_an_object_without_weak_references_is_still_delivered(
+    qtbot, bus
+) -> None:
+    heard: list[object] = []
+
+    class _Slotted:
+        __slots__ = ()
+
+        def handle(self, payload: object) -> None:
+            heard.append(payload)
+
+    subscriber = _Slotted()
+    bridge = QtEventBridge(bus)
+    bridge.on(_EVENT, subscriber.handle)
+
+    bus.emit(_EVENT, "payload")
+
+    assert heard == ["payload"]
+
+
+def test_a_new_subscriber_reusing_a_freed_ones_identity_is_subscribed(
+    qtbot, bus, monkeypatch
+) -> None:
+    """A subscription is keyed by its method's object identity, and Python
+    reuses the identity of a freed object. A new subscriber whose key matches
+    a freed one's must be subscribed, not taken for a duplicate and dropped.
+    Every method here gets the same key, which is what identity reuse does."""
+    monkeypatch.setattr(
+        "sagittarius_engine.extensions.pyside_mvc.mvc.qt_event_bridge._handler_key",
+        lambda handler: "reused",
+    )
+    heard: list[str] = []
+
+    class _Screen(QObject):
+        def __init__(self, name: str) -> None:
+            super().__init__()
+            self.name = name
+
+        def handle(self, payload: object) -> None:
+            heard.append(self.name)
+
+    bridge = QtEventBridge(bus)
+    first = _Screen("first")
+    bridge.on(_EVENT, first.handle)
+    del first
+    second = _Screen("second")
+
+    bridge.on(_EVENT, second.handle)
+    bus.emit(_EVENT, "payload")
+
+    assert heard == ["second"]
