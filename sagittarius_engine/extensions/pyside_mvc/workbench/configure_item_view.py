@@ -12,6 +12,11 @@ The model keeps raw values in `DisplayRole`; a `SpecProxyModel` adds the
 header and the alignment and sorts on those raw values, and a `KindDelegate`
 writes them. So a price sorts as a number and prints as the formatter says,
 and no model formats for display.
+
+A model that knows a cell's precision — a price's tick size from its row's
+symbol — answers `PRECISION_ROLE` for that cell with a `Precision`; the
+delegate hands it to the formatter in `FormatContext.precision`, ahead of the
+column's own `ColumnSpec.precision`.
 """
 
 from __future__ import annotations
@@ -46,9 +51,17 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.i_value_formatter import
     IValueFormatter,
     PlainValueFormatter,
 )
+from sagittarius_engine.extensions.pyside_mvc.workbench.value_precision import (
+    Precision,
+)
 
 #: The dynamic property `find_unconfigured_item_views()` reads.
 CONFIGURED_PROPERTY = "sagittariusConfiguredView"
+
+#: The item data role a model answers with a cell's `Precision` (or `None`).
+#: Far above `Qt.UserRole` so it does not meet a consumer's own roles, which
+#: are customarily counted up from `UserRole + 1`.
+PRECISION_ROLE = int(Qt.ItemDataRole.UserRole) + 0x5347
 
 _SELECTION_MODE = {
     Selection.SINGLE: QAbstractItemView.SelectionMode.SingleSelection,
@@ -93,7 +106,8 @@ class SpecProxyModel(QSortFilterProxyModel):
 
 
 class KindDelegate(QStyledItemDelegate):
-    """Writes each cell through the formatter, by its column's kind."""
+    """Writes each cell through the formatter, by its column's kind, with the
+    cell's precision (`PRECISION_ROLE`) or else its column's."""
 
     def __init__(
         self,
@@ -112,7 +126,10 @@ class KindDelegate(QStyledItemDelegate):
             return
         spec = self._specs[column]
         raw = index.data(Qt.ItemDataRole.DisplayRole)
-        option.text = self._formatter.format(spec.kind, raw, FormatContext(spec.key))  # type: ignore[attr-defined]
+        hint = index.data(PRECISION_ROLE)
+        precision = hint if isinstance(hint, Precision) else spec.precision
+        context = FormatContext(spec.key, precision)
+        option.text = self._formatter.format(spec.kind, raw, context)  # type: ignore[attr-defined]
 
 
 def _configure_header(header: QHeaderView, specs: Sequence[ColumnSpec]) -> None:

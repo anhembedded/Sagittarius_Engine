@@ -459,7 +459,10 @@ capitalisation.
   (MS `ctrl-list-views`), movable columns remembered per view (`ItemViewStateStore`), the
   first click on a header sorting ascending. Values are written by one `IValueFormatter`
   through `KindDelegate` and `ReadoutForm`; the consumer supplies precision, the engine the
-  place it is applied.
+  place it is applied. A value's quantum (a price's tick, a quantity's step) reaches the
+  formatter as `FormatContext.precision`, a `Precision` from the column
+  (`ColumnSpec.precision`) or from the cell (a model answering `PRECISION_ROLE`), the cell's
+  winning.
 - An empty view says what to do (`EmptyStateStack`; MS `ctrl-list-views`).
 - `find_unconfigured_item_views()` is the guard a consumer's booted-app test calls.
 

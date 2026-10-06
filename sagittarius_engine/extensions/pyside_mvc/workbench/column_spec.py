@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from enum import Enum
 
 from sagittarius_engine.extensions.pyside_mvc.workbench.column_kind import ColumnKind
+from sagittarius_engine.extensions.pyside_mvc.workbench.value_precision import (
+    Precision,
+)
 
 
 class Selection(Enum):
@@ -29,6 +32,10 @@ class ColumnSpec:
     kind: ColumnKind
     #: The one column that takes the remaining width; others fit their content.
     stretch: bool = False
+    #: The precision every value of this column is quoted in, handed to the
+    #: formatter as `FormatContext.precision`. A cell's own hint
+    #: (`PRECISION_ROLE`) wins: a price column's tick is usually per symbol.
+    precision: Precision | None = None
 
 
 def spec_problems(specs: Sequence[ColumnSpec]) -> tuple[str, ...]:
