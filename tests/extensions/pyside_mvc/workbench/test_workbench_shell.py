@@ -8,7 +8,7 @@ from functools import partial
 
 import pytest
 import shiboken6
-from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -36,6 +36,7 @@ from sagittarius_engine.extensions.pyside_mvc import (
 from sagittarius_engine.extensions.pyside_mvc.workbench.action_confirmation import (
     MessageBoxConfirmer,
 )
+from sagittarius_engine.extensions.pyside_mvc.workbench.status_slot import StatusSlot
 
 _REGIONS = {"workspace": RegionKind.CENTRAL, "rail": RegionKind.DOCK_RIGHT}
 _TRADE = ("T&rade",)
@@ -328,6 +329,45 @@ class TestStatusBarOutputAndOptions:
         shell.navigate("bots", NavigationSource.USER_INTENT)
 
         assert not item.isVisibleTo(shell)
+
+    def test_a_status_widget_never_opens_a_window_of_its_own(
+        self, shell: WorkbenchShell
+    ) -> None:
+        """`BUG-022` — the slot showed itself while it had no parent yet, a
+        top-level window for a moment (Qt's offscreen platform warns
+        "This plugin does not support propagateSizeHints()")."""
+        _two_modes(shell)
+        shell.finish_setup()
+        shell.show()
+        shown: list[QWidget] = []
+
+        class _WindowWatch(QObject):
+            def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 - Qt override
+                if (
+                    event.type() == QEvent.Type.Show
+                    and isinstance(watched, QWidget)
+                    and watched.isWindow()
+                ):
+                    shown.append(watched)
+                return False
+
+        watch = _WindowWatch()
+        app = QApplication.instance()
+        assert app is not None
+        app.installEventFilter(watch)
+        try:
+            shell.add_status_widget(QLabel("Connected"))
+        finally:
+            app.removeEventFilter(watch)
+
+        assert shown == []
+
+    def test_a_status_slot_without_a_parent_stays_hidden(self, qapp) -> None:
+        """A slot made before it has a bar to sit in is no window of its own."""
+        slot = StatusSlot(QLabel("Connected"))
+
+        assert not slot.isVisible()
+        slot.deleteLater()
 
     def test_the_output_pane_is_docked_and_listed_in_window(
         self, shell: WorkbenchShell

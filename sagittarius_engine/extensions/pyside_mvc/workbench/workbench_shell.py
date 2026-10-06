@@ -250,7 +250,7 @@ class WorkbenchShell(QMainWindow):
 
         The shell decides only the mode: the widget stays its owner's to
         show and hide (`StatusSlot`, `BUG-021`)."""
-        slot = StatusSlot(widget)
+        slot = StatusSlot(widget, self.statusBar())
         self.statusBar().addPermanentWidget(slot)
         self._status_slots.append((mode_id, slot))
         self._sync_status_widgets()

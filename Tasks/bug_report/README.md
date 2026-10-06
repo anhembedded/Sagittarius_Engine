@@ -38,8 +38,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 | Status | Count |
 | :--- | :---: |
 | 🔴 **Open** | 7 |
-| ✅ **Fixed** | 14 |
-| 📈 **Total** | **21** |
+| ✅ **Fixed** | 15 |
+| 📈 **Total** | **22** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -91,6 +91,7 @@ deliberately independent (see the top of this file).
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-022](completed/BUG-022_status_slot_opens_a_window_before_it_has_a_bar.md)** | A status slot showed itself as a top-level window before it was in the status bar | Low | 2026-10-06 | Fixed 2026-10-06. `BUG-021`'s slot refreshed its visibility in its constructor with no parent, opening a window for an instant per status widget (the consumer's sanity tier failed on Qt's `propagateSizeHints` warning). The shell parents the slot to the status bar, and a slot never shows itself while it is a window. |
 | **[BUG-021](completed/BUG-021_shell_shows_status_widgets_their_owners_hid.md)** | The shell showed every status-bar widget on each mode change, over its owner's `hide()` | Medium | 2026-10-06 | Fixed 2026-10-06. `_sync_status_widgets()` set the owner's widget visible by mode scope, so an idle progress bar its owner hid ran busy in every mode (the consumer's `BUG-151`). Each widget now sits in a `StatusSlot`: the shell sets the slot's scope, the owner keeps its widget's visibility. |
 | **[BUG-020](completed/BUG-020_sample_shell_tests_leak_a_running_app.md)** | The example app's sample-shell tests leave a running `App` behind | Low | 2026-10-06 | Fixed 2026-10-06. Three tests in `test_sample_shell.py` booted an `App` through `build_app()` and never stopped it, leaking a `SagittariusScheduler` and an `AsyncRuntimeLoop` thread each (`BUG-014`'s family). A `config` fixture now stops the app; an autouse guard in the example tests' `conftest.py` fails any test there that leaks one. |
 | **[BUG-019](completed/BUG-019_event_bridge_reference_cycle_crashes_the_suite.md)** | `QtEventBridge` made every subscriber a reference cycle, and the full suite crashed natively about one run in seven | Medium | 2026-10-06 | Fixed 2026-10-06. The bridge holds its subscribers and itself weakly, so the collector never frees a presenter with an active `QTimer` mid-dispatch; the example's `RosterPresenter` subscribes through the bridge. |
