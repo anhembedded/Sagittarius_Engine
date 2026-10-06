@@ -292,3 +292,36 @@ def test_a_method_of_an_object_without_weak_references_is_still_delivered(
     bus.emit(_EVENT, "payload")
 
     assert heard == ["payload"]
+
+
+def test_a_new_subscriber_reusing_a_freed_ones_identity_is_subscribed(
+    qtbot, bus, monkeypatch
+) -> None:
+    """A subscription is keyed by its method's object identity, and Python
+    reuses the identity of a freed object. A new subscriber whose key matches
+    a freed one's must be subscribed, not taken for a duplicate and dropped.
+    Every method here gets the same key, which is what identity reuse does."""
+    monkeypatch.setattr(
+        "sagittarius_engine.extensions.pyside_mvc.mvc.qt_event_bridge._handler_key",
+        lambda handler: "reused",
+    )
+    heard: list[str] = []
+
+    class _Screen(QObject):
+        def __init__(self, name: str) -> None:
+            super().__init__()
+            self.name = name
+
+        def handle(self, payload: object) -> None:
+            heard.append(self.name)
+
+    bridge = QtEventBridge(bus)
+    first = _Screen("first")
+    bridge.on(_EVENT, first.handle)
+    del first
+    second = _Screen("second")
+
+    bridge.on(_EVENT, second.handle)
+    bus.emit(_EVENT, "payload")
+
+    assert heard == ["second"]

@@ -174,8 +174,10 @@ def _handler_key(handler: Callable[..., Any]) -> object:
 
 def _weak_handler(handler: Callable[..., Any]) -> _Target:
     """The handler, held without keeping its object alive when it is a bound
-    method; a function or a lambda has no subscriber to free and is held, and
-    so is a method of an object that takes no weak reference."""
+    method. Anything else is held as it is: a function, a method of an object
+    that takes no weak reference, and a lambda or `functools.partial`, which
+    keeps alive whatever it closes over (one closing over its subscriber
+    brings the cycle back; subscribe the bound method instead)."""
     if isinstance(handler, MethodType):
         try:
             return weakref.WeakMethod(handler)

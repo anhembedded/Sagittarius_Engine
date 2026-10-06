@@ -15,10 +15,10 @@ The example app's `RosterPresenter` subscribed on the raw bus (`self.event_bus.o
 
 ## Evidence
 
-- **Where it crashed.** Every crash was in `pytestqt.plugin._process_events`, in a test that uses no Qt itself (`test_ipc_queue_event_bus.py::test_inter_process_communication`, `test_sqlalchemy_student_repository.py`, `demo_faults/test_extension.py`), with 0 to 2 other threads alive. Leaked threads, `BUG-014`'s mechanism, were ruled out with a per-test thread census.
+- **Where it crashed.** Every crash was inside `pytestqt.plugin._process_events`, with 0 to 2 other threads alive. The five local crashes caught with test names fell in tests that use no Qt themselves (`test_ipc_queue_event_bus.py::test_inter_process_communication` twice, `test_sqlalchemy_student_repository.py` twice, `demo_faults/test_extension.py`); one more fell in `test_roster_screen.py::test_roster_screen_date_filter_narrows_visible_students`, and GitHub Actions' crash on `main` (run 37428664730) in `test_roster_screen.py` too. Leaked threads, `BUG-014`'s mechanism, were ruled out with a per-test thread census.
 - **Rate.** 3 crashes in 20 runs of the gate's exact command on `be06cf4`.
 - **The mechanism, in isolation.** A `QObject` owning an active `QTimer`, whose last reference is dropped on a worker thread while the UI thread processes events: segmentation fault 3 runs of 3. The same with the timer stopped: 3 of 3 clean.
-- **The collector is the trigger.** With automatic collection off and `gc.collect()` run only between tests, 9 runs of 9 were clean (stopped by the session's time limit).
+- **The collector is the trigger.** With automatic collection off and `gc.collect()` run only between tests, 9 runs of 9 were clean (stopped by the session's time limit). On its own that is weak: at the base rate, 9 clean runs happen by chance about one time in four. It is supporting evidence; the isolated reproduction above and the 20-run result below are the proof.
 - **What was in cycles.** A per-test scan of `gc.garbage` under `DEBUG_SAVEALL` found Qt objects left in cycles by 30 tests: `QtEventBridge` 22 times, presenters, view models, two `QTimer`s (one active, the `OverviewPresenter`'s), a `QThread`, and the roster's QML scene.
 
 ## Fix
@@ -38,11 +38,13 @@ The example app's `RosterPresenter` subscribed on the raw bus (`self.event_bus.o
 
 - Cycle scan after the fix: 18 tests leave Qt objects in cycles (was 30); no active `QTimer` among them.
 - 20 runs of the gate's exact command after the fix, part of them under the extra load of the consumer's suite running alongside: 20 of 20 clean, 1732 passed each (before: 3 crashes in 20; the chance of 20 clean runs at the old rate is about 4%).
-- The reference consumer's unit, integration and sanity tiers against this Engine: two tests that built an `OrderFeed` without keeping it relied on the bus to keep it alive; they now own it, as the app's desk does (`parent=`).
+- The reference consumer's unit, integration and sanity tiers against this Engine: two tests that built an `OrderFeed` without keeping it relied on the bus to keep it alive; they now own it, as the app's desk does (`parent=`). That change, and the consumer's `engine.ref` bump to this fix, ship in the consumer's own pull request once this one merges; production code there needed no change.
+- Review of this PR: a test now covers the identity-reuse branch (it fails when that branch is reduced to a bare `return`), and `.agents/context/events.md` §5 and `BasePresenter.subscribe()` state the lifetime contract.
 
 ## Not fixed here
 
 - 18 tests still leave Qt objects in cycles, from presenters' own closures (FSM callbacks), `UIWatchdog`'s monitor thread and the roster tests' QML scene; none holds an active timer.
+- **Inert forwarders stay on the bus.** When a bridge or a subscriber is freed without `off_all()`, its forwarder stays registered and returns at once on every emit. It holds nothing alive, so it cannot crash; it costs one call per emit until the bus goes. Removing it needs the bus to drop a handler from inside its own `emit()`, which no `IEventBus` promises today.
 - The three `examples/student_management/tests/presentation/workbench/test_sample_shell.py` tests boot an `App` and never stop it, leaving a `Scheduler` and an `AsyncRuntime` thread each (thread census; `BUG-014`'s family). They run after every crash point seen, so they did not cause this crash.
 
 ## Related
