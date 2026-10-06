@@ -5,6 +5,10 @@ menus, Tools, Window, Help. Each menu is filled when it is about to show, so
 it lists exactly the commands of the mode now showing: a command of another
 mode is not on screen, and neither are its access keys. A top-level menu with
 nothing in it for this mode is disabled, never hidden.
+
+Related commands sit together: one separator between adjacent groups
+(`ActionDescriptor.group`), and before the shell's own extras, never at
+either end of a menu and never two in a row (MS `cmd-menus`).
 """
 
 from __future__ import annotations
@@ -124,15 +128,22 @@ class MenuBarBuilder:
     def _fill(self, menu: QMenu, path: Path) -> None:
         _empty(menu)
         mode = self._current_mode()
-        for action in self._registry.menu_actions(path, mode):
-            menu.addAction(action)
+        for group in self._registry.menu_action_groups(path, mode):
+            # Between groups only: never first, and never two together,
+            # since `menu_action_groups` yields no empty group.
+            if menu.actions():
+                menu.addSeparator()
+            menu.addActions(list(group))
         for child in self._children(path):
             submenu = menu.addMenu(child)
             submenu.setObjectName(f"menu::{plain_text(child)}")
             self._fill(submenu, (*path, child))
         extras = list(self._extra_actions(path))
         if extras:
-            menu.addSeparator()
+            # The extras are a group of their own; a menu holding only them
+            # starts with them, not with a separator.
+            if menu.actions():
+                menu.addSeparator()
             taken = [key for item in menu.actions() for key in access_keys(item.text())]
             labels = assign_access_keys([plain_text(a.text()) for a in extras], taken)
             for action, label in zip(extras, labels, strict=True):

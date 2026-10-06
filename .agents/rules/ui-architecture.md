@@ -440,7 +440,9 @@ capitalisation.
   a central widget, docks, toolbars (Qt Creator's shape). The menu bar reads File, Edit, View,
   the application's menus, Tools, Window, Help (MS `cmd-menus`; `shell_menus.menu_order`),
   each filled when it opens with the showing mode's commands; a menu with nothing in it is
-  disabled. A vertical mode bar (icons only, Ctrl+1…9) switches modes through
+  disabled. Related commands sit together, one separator between adjacent groups
+  (`ActionDescriptor.group`, `ActionRegistry.menu_action_groups`) and before the shell's own
+  extras, never at either end of a menu and never two in a row. A vertical mode bar (icons only, Ctrl+1…9) switches modes through
   `NavigationService`, which asks the mode being left `can_leave(USER_INTENT | RESTORE)`.
   Only the showing mode's commands are live, so two modes may share a key. The window
   remembers its geometry and last mode (`WorkbenchShell` is an `IStateContributor`). A panel is a `QDockWidget` with a title, a close
