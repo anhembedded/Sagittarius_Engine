@@ -65,6 +65,10 @@ class StatusSlot(QWidget):
         self._refresh()
 
     def _refresh(self) -> None:
+        if self.isWindow():
+            # Not in a status bar yet (`BUG-022`): showing now would open a
+            # top-level window. The bar shows the slot when it is added.
+            return
         widget = self._widget
         self.setVisible(
             self._in_scope and widget is not None and not _owner_hid(widget)
