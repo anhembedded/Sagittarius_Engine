@@ -299,6 +299,36 @@ class TestStatusBarOutputAndOptions:
         shell.navigate("bots", NavigationSource.USER_INTENT)
         assert bots_task.isVisibleTo(shell)
 
+    def test_a_status_widget_shows_at_once_in_a_shown_window(
+        self, shell: WorkbenchShell
+    ) -> None:
+        """A widget its owner never hid shows as soon as it is added, not
+        after a later event-loop turn: moving it into its slot hides it, and
+        the layout's own re-show is a queued call."""
+        _two_modes(shell)
+        shell.finish_setup()
+        shell.show()
+        word = QLabel("Connected")
+
+        shell.add_status_widget(word)
+
+        assert word.isVisible()
+
+    def test_a_status_widget_its_owner_deleted_leaves_no_empty_item(
+        self, shell: WorkbenchShell
+    ) -> None:
+        _two_modes(shell)
+        word = QLabel("Connected")
+        shell.add_status_widget(word)
+        shell.finish_setup()
+        item = _status_item_of(word)
+
+        word.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        shell.navigate("bots", NavigationSource.USER_INTENT)
+
+        assert not item.isVisibleTo(shell)
+
     def test_the_output_pane_is_docked_and_listed_in_window(
         self, shell: WorkbenchShell
     ) -> None:
@@ -519,8 +549,8 @@ class TestReviewOfPR225:
 def _status_item_of(widget: QWidget) -> QWidget:
     """The status bar's own item holding `widget`: the box it frames."""
     item = widget
-    while item.parentWidget() is not None and not isinstance(
-        item.parentWidget(), QStatusBar
-    ):
-        item = item.parentWidget()
+    parent: QWidget | None = item.parentWidget()
+    while parent is not None and not isinstance(parent, QStatusBar):
+        item = parent
+        parent = item.parentWidget()
     return item

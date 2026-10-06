@@ -15,7 +15,8 @@ The slot keeps the two answers apart. The shell sets only the slot's scope;
 the owner keeps calling `show()` and `hide()` on its own widget, which the
 shell never touches. The slot shows when both say yes. It follows the owner
 through the `ShowToParent` and `HideToParent` events Qt sends when a child's
-own visibility changes, so an owner needs no API of the shell's.
+own visibility changes, so an owner needs no API of the shell's. An owner
+that deletes its widget leaves no empty box: the slot stays hidden after.
 """
 
 from __future__ import annotations
@@ -32,23 +33,18 @@ class StatusSlot(QWidget):
 
     def __init__(self, widget: QWidget, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._widget = widget
+        self._widget: QWidget | None = widget
         self._in_scope = True
-        # Reparenting hides a widget, and the layout shows it again only from
-        # a queued call; read the owner's wish first and restore it now.
-        owner_hid_it = widget.isHidden() and widget.testAttribute(
-            Qt.WidgetAttribute.WA_WState_ExplicitShowHide
-        )
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(widget)
-        if not owner_hid_it:
-            widget.show()
         widget.installEventFilter(self)
+        widget.destroyed.connect(self._forget_widget)
         self._refresh()
 
     @property
-    def widget(self) -> QWidget:
+    def widget(self) -> QWidget | None:
+        """The owner's widget; `None` once the owner deleted it."""
         return self._widget
 
     def set_in_scope(self, in_scope: bool) -> None:
@@ -64,7 +60,23 @@ class StatusSlot(QWidget):
             self._refresh()
         return super().eventFilter(watched, event)
 
+    def _forget_widget(self) -> None:
+        self._widget = None
+        self._refresh()
+
     def _refresh(self) -> None:
-        # `isHidden()` is the owner's own wish: the shell never calls
-        # `setVisible()` on the widget, so nothing else sets it.
-        self.setVisible(self._in_scope and not self._widget.isHidden())
+        widget = self._widget
+        self.setVisible(
+            self._in_scope and widget is not None and not _owner_hid(widget)
+        )
+
+
+def _owner_hid(widget: QWidget) -> bool:
+    """Whether the owner hid `widget` itself. The shell never calls
+    `setVisible()` on it, so an explicit hide is the owner's. Plain
+    `isHidden()` would not do: a widget never shown, or one just moved into
+    its slot, reads hidden until its parent shows, and Qt shows such a child
+    with its parent."""
+    return widget.isHidden() and widget.testAttribute(
+        Qt.WidgetAttribute.WA_WState_ExplicitShowHide
+    )
