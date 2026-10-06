@@ -66,6 +66,7 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.shell_menus import (
     MenuBarBuilder,
     Path,
 )
+from sagittarius_engine.extensions.pyside_mvc.workbench.status_slot import StatusSlot
 from sagittarius_engine.extensions.ui_state.state_scope import (
     JsonValue,
     StateData,
@@ -126,7 +127,7 @@ class WorkbenchShell(QMainWindow):
         self._navigation = NavigationService(self)
         self._modes: dict[str, ShellMode] = {}
         self._mode_actions: dict[str, QAction] = {}
-        self._status_widgets: list[tuple[str | None, QWidget]] = []
+        self._status_slots: list[tuple[str | None, StatusSlot]] = []
         self._options_pages: list[IOptionsPage] = []
         self._output_pane: OutputPane | None = None
         self._stack = QStackedWidget(self)
@@ -245,9 +246,13 @@ class WorkbenchShell(QMainWindow):
         self._navigation.register(mode.mode_id, mode.can_leave)
 
     def add_status_widget(self, widget: QWidget, mode_id: str | None = None) -> None:
-        """A permanent status-bar widget, shown in every mode or in one."""
-        self.statusBar().addPermanentWidget(widget)
-        self._status_widgets.append((mode_id, widget))
+        """A permanent status-bar widget, shown in every mode or in one.
+
+        The shell decides only the mode: the widget stays its owner's to
+        show and hide (`StatusSlot`, `BUG-021`)."""
+        slot = StatusSlot(widget)
+        self.statusBar().addPermanentWidget(slot)
+        self._status_slots.append((mode_id, slot))
         self._sync_status_widgets()
 
     def add_options_page(self, page: IOptionsPage) -> None:
@@ -305,8 +310,8 @@ class WorkbenchShell(QMainWindow):
 
     def _sync_status_widgets(self) -> None:
         current = self._navigation.current
-        for scope, widget in self._status_widgets:
-            widget.setVisible(scope is None or scope == current)
+        for scope, slot in self._status_slots:
+            slot.set_in_scope(scope is None or scope == current)
 
     # -- the standard commands --------------------------------------------------
 

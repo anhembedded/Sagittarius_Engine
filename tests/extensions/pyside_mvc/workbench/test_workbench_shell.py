@@ -9,7 +9,14 @@ from functools import partial
 import pytest
 import shiboken6
 from PySide6.QtCore import QEvent, Qt, QTimer
-from PySide6.QtWidgets import QApplication, QLabel, QMenu, QToolBar, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QMenu,
+    QStatusBar,
+    QToolBar,
+    QWidget,
+)
 
 from sagittarius_engine.extensions.pyside_mvc import (
     OPTIONS_TITLE,
@@ -250,6 +257,48 @@ class TestStatusBarOutputAndOptions:
 
         assert bots_only.isVisibleTo(shell) and everywhere.isVisibleTo(shell)
 
+    def test_a_status_widget_its_owner_hid_stays_hidden_in_every_mode(
+        self, shell: WorkbenchShell
+    ) -> None:
+        """`BUG-021` — the shell showed every in-scope status widget on each
+        mode change, over its owner's own `hide()`: an idle task's progress
+        bar, hidden by its view, appeared busy from start-up in every mode."""
+        _two_modes(shell)
+        idle_task = QLabel("Syncing")
+        idle_task.hide()
+        bots_idle = QLabel("2 running")
+        bots_idle.hide()
+        shell.add_status_widget(idle_task)
+        shell.add_status_widget(bots_idle, mode_id="bots")
+        shell.finish_setup()
+
+        shell.navigate("bots", NavigationSource.USER_INTENT)
+
+        assert not idle_task.isVisibleTo(shell)
+        assert not bots_idle.isVisibleTo(shell)
+        # Nor an empty box where it would sit: the status bar frames each item.
+        assert not _status_item_of(idle_task).isVisibleTo(shell)
+        assert not _status_item_of(bots_idle).isVisibleTo(shell)
+
+    def test_a_status_widget_its_owner_shows_appears_in_its_scope(
+        self, shell: WorkbenchShell
+    ) -> None:
+        _two_modes(shell)
+        task, bots_task = QLabel("Syncing"), QLabel("2 running")
+        task.hide()
+        bots_task.hide()
+        shell.add_status_widget(task)
+        shell.add_status_widget(bots_task, mode_id="bots")
+        shell.finish_setup()
+
+        task.show()
+        bots_task.show()
+
+        assert task.isVisibleTo(shell)
+        assert not bots_task.isVisibleTo(shell)
+        shell.navigate("bots", NavigationSource.USER_INTENT)
+        assert bots_task.isVisibleTo(shell)
+
     def test_the_output_pane_is_docked_and_listed_in_window(
         self, shell: WorkbenchShell
     ) -> None:
@@ -465,3 +514,13 @@ class TestReviewOfPR225:
 
         assert shell.current_mode == "bots"
         assert asked == [NavigationSource.RESTORE]
+
+
+def _status_item_of(widget: QWidget) -> QWidget:
+    """The status bar's own item holding `widget`: the box it frames."""
+    item = widget
+    while item.parentWidget() is not None and not isinstance(
+        item.parentWidget(), QStatusBar
+    ):
+        item = item.parentWidget()
+    return item
