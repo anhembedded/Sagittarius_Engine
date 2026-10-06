@@ -7,6 +7,9 @@ from PySide6.QtCore import QUrl
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QVBoxLayout
 
+from sagittarius_engine.extensions.pyside_mvc.kit import (
+    card_model as _card_model,  # noqa: F401  # registers CardModel into Sagittarius.UI
+)
 from sagittarius_engine.extensions.pyside_mvc.mvc.base_view import BaseView
 from sagittarius_engine.extensions.pyside_mvc.tokens.theme_bridge import register_theme
 from sagittarius_engine.extensions.pyside_mvc.tokens.vocabulary import (

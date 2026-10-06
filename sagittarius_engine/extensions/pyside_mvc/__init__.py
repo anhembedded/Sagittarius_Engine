@@ -6,6 +6,7 @@ and directory layout.
 """
 
 import sys
+from typing import TYPE_CHECKING, Any
 
 # Dependency Guard: Protects the UI-Agnostic Core from crashing if PySide6 is missing.
 try:
@@ -19,6 +20,7 @@ except ImportError:
     # Expose dummies or just let subsequent imports fail explicitly when consumer code runs.
     # We don't raise an error here because simply scanning the extensions folder shouldn't crash the engine.
 else:
+    from . import runtime as _runtime
     from .kit import RawPrimitiveFinding, find_raw_primitives
     from .mvc import (
         BasePresenter,
@@ -30,26 +32,16 @@ else:
     )
     from .runtime import (
         DEFAULT_BACKGROUND,
-        ICON_PROVIDER_ID,
-        AppQmlConfig,
-        BaseQmlViewModel,
         ContributionDescriptor,
         ContributionError,
         ContributionRegistry,
-        IconImageProvider,
         IContributionRegistry,
-        IIconLoader,
         IRegionHost,
         LogListModel,
-        OverlayHost,
-        QmlHostView,
         RegionHost,
         RegionKind,
         SizeHint,
         SurfaceDeclaration,
-        configure_app_qml,
-        create_quick_widget,
-        ensure_qml_style,
         from_qml,
         resolve_opaque_background,
     )
@@ -135,6 +127,46 @@ else:
         spec_problems,
         text_problems,
     )
+
+    if TYPE_CHECKING:
+        from .runtime import (
+            ICON_PROVIDER_ID,
+            AppQmlConfig,
+            BaseQmlViewModel,
+            IconImageProvider,
+            IIconLoader,
+            OverlayHost,
+            QmlHostView,
+            configure_app_qml,
+            create_quick_widget,
+            ensure_qml_style,
+        )
+
+    #: `runtime`'s QML layer loads when a name is first used, not here --
+    #: `BaseQmlViewModel` defines `QtCore.Property`s and PySide6 6.9-6.11
+    #: leaks one uncollectable object per such class alive at interpreter
+    #: exit (BUG-023). The names stay importable from this package (PEP 562).
+    _LAZY_RUNTIME = frozenset(
+        {
+            "AppQmlConfig",
+            "BaseQmlViewModel",
+            "ICON_PROVIDER_ID",
+            "IIconLoader",
+            "IconImageProvider",
+            "OverlayHost",
+            "QmlHostView",
+            "configure_app_qml",
+            "create_quick_widget",
+            "ensure_qml_style",
+        }
+    )
+
+    def __getattr__(name: str) -> Any:
+        if name in _LAZY_RUNTIME:
+            value = getattr(_runtime, name)
+            globals()[name] = value
+            return value
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
     __all__ = [
         "DEFAULT_MOTION_TOKENS",

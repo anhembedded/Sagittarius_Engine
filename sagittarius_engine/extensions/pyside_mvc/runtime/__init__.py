@@ -13,28 +13,60 @@ fixes. See `ui-architecture.md` and this extension's target structure
 recorded in `EPIC-001A`.
 """
 
-from .base_view_model import BaseQmlViewModel
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
 from .contribution_descriptor import ContributionDescriptor
 from .contribution_error import ContributionError
 from .contribution_registry import ContributionRegistry
 from .i_contribution_registry import IContributionRegistry
 from .i_region_host import IRegionHost
-from .icon_image_provider import ICON_PROVIDER_ID, IconImageProvider, IIconLoader
 from .log_list_model import LogListModel
-from .overlay_host import OverlayHost
-from .qml_host_view import (
-    AppQmlConfig,
-    QmlHostView,
-    configure_app_qml,
-    create_quick_widget,
-)
-from .qml_style import ensure_qml_style
 from .qml_value_normalizer import from_qml
 from .quick_background import DEFAULT_BACKGROUND, resolve_opaque_background
 from .region_host import RegionHost
 from .region_kind import RegionKind
 from .size_hint import SizeHint
 from .surface_declaration import SurfaceDeclaration
+
+if TYPE_CHECKING:
+    from .base_view_model import BaseQmlViewModel
+    from .icon_image_provider import ICON_PROVIDER_ID, IconImageProvider, IIconLoader
+    from .overlay_host import OverlayHost
+    from .qml_host_view import (
+        AppQmlConfig,
+        QmlHostView,
+        configure_app_qml,
+        create_quick_widget,
+    )
+    from .qml_style import ensure_qml_style
+
+#: The QML layer, loaded when a name is first used, not at package import.
+#: `BaseQmlViewModel` defines `QtCore.Property`s, and PySide6 6.9-6.11 leaks
+#: one uncollectable object per such class alive at interpreter exit
+#: (BUG-023); the rest pull in Qt Quick, which a consumer that never hosts
+#: QML should not pay for. The public names are unchanged (PEP 562).
+_LAZY = {
+    "BaseQmlViewModel": ".base_view_model",
+    "ICON_PROVIDER_ID": ".icon_image_provider",
+    "IconImageProvider": ".icon_image_provider",
+    "IIconLoader": ".icon_image_provider",
+    "OverlayHost": ".overlay_host",
+    "AppQmlConfig": ".qml_host_view",
+    "QmlHostView": ".qml_host_view",
+    "configure_app_qml": ".qml_host_view",
+    "create_quick_widget": ".qml_host_view",
+    "ensure_qml_style": ".qml_style",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _LAZY:
+        value = getattr(import_module(_LAZY[name], __name__), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "DEFAULT_BACKGROUND",
