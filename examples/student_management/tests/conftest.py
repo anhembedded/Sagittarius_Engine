@@ -20,6 +20,14 @@ def leaked_runtime_threads(before: set[int | None]) -> list[str]:
     ]
 
 
+def assert_no_leaked_runtime_threads(before: set[int | None]) -> None:
+    """Fails when a scheduler or async-runtime thread started since `before`
+    is still alive. The fixture below and the guard's own tests both call it,
+    so a check that can no longer fail is caught by those tests."""
+    leaked = leaked_runtime_threads(before)
+    assert not leaked, f"test left runtime threads running: {leaked}"
+
+
 @pytest.fixture(autouse=True)
 def no_leaked_runtime_threads() -> Iterator[None]:
     """`build_app()` boots a real `App`, which starts a scheduler and an
@@ -30,5 +38,4 @@ def no_leaked_runtime_threads() -> Iterator[None]:
     """
     before = {t.ident for t in threading.enumerate()}
     yield
-    leaked = leaked_runtime_threads(before)
-    assert not leaked, f"test left runtime threads running: {leaked}"
+    assert_no_leaked_runtime_threads(before)
