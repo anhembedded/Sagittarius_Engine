@@ -38,6 +38,7 @@ from PySide6.QtCore import (
     QPersistentModelIndex,
     QSortFilterProxyModel,
     Qt,
+    QTimer,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -176,17 +177,42 @@ def _configure_header(header: QHeaderView, specs: Sequence[ColumnSpec]) -> None:
         header.setSectionResizeMode(column, mode)
 
 
-def _fit_when_first_rows_arrive(
-    model: QAbstractItemModel,
-    fit: Callable[[], None],
-    parent: QModelIndex,
-    first: int,
-    last: int,
-) -> None:
-    # The first rows under a parent: a table's first rows, or a group's in a
-    # tree, whose rows arrive after their heading.
-    if model.rowCount(parent) == last - first + 1:
-        fit()
+class _FirstRowsFitter(QObject):
+    """Fits the columns when a view's first rows arrive, and never again until
+    the model resets: once at the top level (a table's rows, a tree's
+    headings) and once at the first rows under any heading (a grouped tree's
+    data arrives after its headings). A later group leaves the widths alone,
+    so a width the person set, or a saved one restored, survives a live tree
+    (review of Engine PR #230)."""
+
+    def __init__(
+        self,
+        model: QAbstractItemModel,
+        fit: Callable[[], None],
+        view: QTableView | QTreeView,
+    ) -> None:
+        # A child of the view: it lives as long as the view, and Qt drops its
+        # connections with it. A plain Python object here is collected at
+        # once, since PySide holds a bound method's owner weakly.
+        super().__init__(view)
+        self._model = model
+        self._fit = fit
+        self._fitted_children = False
+
+    def on_reset(self) -> None:
+        self._fitted_children = False
+        self._fit()
+
+    def on_rows_inserted(self, parent: QModelIndex, first: int, last: int) -> None:
+        if not parent.isValid():
+            if self._model.rowCount(parent) == last - first + 1:
+                self._fit()
+        elif not self._fitted_children:
+            self._fitted_children = True
+            # A tree lays out rows under a heading after this signal, so a
+            # fit now measures nothing new; the next turn of the event loop
+            # sees them (measured: 67 px now, 213 px a turn later).
+            QTimer.singleShot(0, self._fit)
 
 
 def _fit_columns(view: QTableView | QTreeView, specs: Sequence[ColumnSpec]) -> None:
@@ -269,10 +295,11 @@ def _fit_and_keep_fitting(
 ) -> None:
     _fit_columns(view, specs)
     fit = partial(_fit_columns, view, tuple(specs))
-    model.modelReset.connect(fit)
     # A view that starts empty fits when its first rows arrive; later
     # inserts leave the widths alone, so a live table is not re-measured.
-    model.rowsInserted.connect(partial(_fit_when_first_rows_arrive, model, fit))
+    fitter = _FirstRowsFitter(model, fit, view)
+    model.modelReset.connect(fitter.on_reset)
+    model.rowsInserted.connect(fitter.on_rows_inserted)
 
 
 @overload

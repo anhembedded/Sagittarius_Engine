@@ -12,6 +12,7 @@ from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QStyleOptionViewItem,
     QTableView,
     QTreeWidget,
@@ -177,3 +178,42 @@ def test_destroying_a_configured_tree_widget_measures_nothing(qtbot) -> None:
 
     with qtbot.waitSignal(tree.destroyed):
         tree.deleteLater()
+
+
+class TestWidthsSurviveALiveTree:
+    """Review of Engine PR #230: the columns fit when a view's first rows
+    arrive, never again until a reset, so a width the person set, or a
+    saved one restored, survives a group that arrives later."""
+
+    _NARROW_SPECS = (
+        ColumnSpec("metric", "Metric", ColumnKind.TEXT),
+        ColumnSpec("value", "Value", ColumnKind.MONEY),
+    )
+
+    def test_a_later_group_leaves_a_set_width_alone(self, tree: QTreeWidget) -> None:
+        configure_item_view(tree, None, self._NARROW_SPECS)
+        _grouped(tree)
+        QApplication.processEvents()  # the first fit has run
+        tree.setColumnWidth(0, 300)
+
+        heading = QTreeWidgetItem(["Costs"])
+        tree.addTopLevelItem(heading)
+        heading.addChild(_row("Costs 0", Decimal("1")))
+        QApplication.processEvents()
+
+        assert tree.columnWidth(0) == 300
+
+    def test_the_first_rows_under_a_heading_fit_the_columns(
+        self, tree: QTreeWidget, qtbot
+    ) -> None:
+        configure_item_view(tree, None, self._NARROW_SPECS)
+        heading = QTreeWidgetItem(["R"])
+        tree.addTopLevelItem(heading)
+        # Qt measures only shown rows, so the heading is open, as a grouped
+        # dialog leaves it.
+        heading.setExpanded(True)
+        headings_only = tree.columnWidth(0)
+
+        heading.addChild(_row("a much longer metric name", None))
+        # The fit waits one turn of the event loop for the tree's layout.
+        qtbot.waitUntil(lambda: tree.columnWidth(0) > headings_only, timeout=1000)
