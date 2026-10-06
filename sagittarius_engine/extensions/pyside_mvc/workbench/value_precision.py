@@ -66,7 +66,8 @@ class Precision:
         """`value` rounded to the nearest whole quantum (half to even), with
         exactly `decimals` digits after the point. A float is read as the
         shortest text that round-trips, so `0.1` is one tenth, not its binary
-        neighbour. A NaN or an infinity comes back as it is."""
+        neighbour. A NaN or an infinity comes back as it is; zero is never
+        negative."""
         number = _decimal(value)
         if not number.is_finite():
             return number
@@ -76,4 +77,6 @@ class Precision:
         with localcontext() as context:
             context.prec = digits
             steps = (number / self.quantum).to_integral_value(rounding=ROUND_HALF_EVEN)
-            return (steps * self.quantum).quantize(_ONE.scaleb(-self.decimals))
+            rounded = (steps * self.quantum).quantize(_ONE.scaleb(-self.decimals))
+        # A small negative rounds to zero, never to "-0.00" (review of PR #230).
+        return rounded.copy_abs() if rounded.is_zero() else rounded

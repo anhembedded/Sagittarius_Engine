@@ -24,7 +24,13 @@ from sagittarius_engine.extensions.pyside_mvc.workbench.display_value_order impo
 class SpecTreeItem(QTreeWidgetItem):
     """Holds raw values in `DisplayRole` (`setData(column,
     Qt.ItemDataRole.DisplayRole, value)`), which the configured tree's
-    delegate writes and its sort orders."""
+    delegate writes and its sort orders.
+
+    Every sortable row under one heading is a `SpecTreeItem`: Qt compares two
+    siblings with the left one's `operator<`, so a plain `QTreeWidgetItem`
+    beside these orders by Qt's text comparison when it is on the left, and
+    the level has no single order (review of PR #230). Headings, which are
+    siblings only of other headings, may stay plain."""
 
     def __lt__(self, other: QTreeWidgetItem) -> bool:
         tree = self.treeWidget()

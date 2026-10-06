@@ -5,7 +5,7 @@ values last ascending (`EPIC-008F`; the reference consumer's `EPIC-033N`)."""
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from decimal import Decimal
 
 import pytest
@@ -118,3 +118,33 @@ class TestTheOrder:
 
     def test_durations_sort_by_length(self) -> None:
         assert display_value_less_than(timedelta(minutes=1), timedelta(hours=1))
+
+
+class _NoOffset(tzinfo):
+    """A zone that names no offset: Python treats its moments as naive."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def dst(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> str | None:
+        return None
+
+
+class TestEdgesFromReview:
+    """Review of Engine PR #230."""
+
+    def test_a_zone_without_an_offset_orders_as_utc_and_never_raises(self) -> None:
+        odd = datetime(2026, 1, 1, 12, tzinfo=_NoOffset())
+        aware = datetime(2026, 1, 1, 13, tzinfo=UTC)
+
+        assert display_value_less_than(odd, aware)
+        assert not display_value_less_than(aware, odd)
+
+    def test_a_numpy_scalar_orders_by_value_not_by_text(self) -> None:
+        numpy = pytest.importorskip("numpy")
+
+        assert display_value_less_than(numpy.int64(9), numpy.int64(10))
+        assert display_value_less_than(numpy.float64(2.5), Decimal("10"))

@@ -13,6 +13,7 @@ one cell). A formatter that ignores `precision` keeps working unchanged.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -86,7 +87,13 @@ class PlainValueFormatter:
             return f"{value:,.{_PERCENT_DIGITS}f}%"
         if kind is ColumnKind.DURATION:
             return _duration_text(float(value))
-        if context.precision is not None and kind in _QUANTIZED:
+        # A non-finite value is written as it is, with or without a hint, so
+        # one column never spells infinity two ways (review of PR #230).
+        if context.precision is not None and kind in _QUANTIZED and _is_finite(value):
             quantized = context.precision.quantize(value)
             return f"{quantized:,.{context.precision.decimals}f}"
         return f"{value:,}"
+
+
+def _is_finite(value: int | float | Decimal) -> bool:
+    return value.is_finite() if isinstance(value, Decimal) else math.isfinite(value)

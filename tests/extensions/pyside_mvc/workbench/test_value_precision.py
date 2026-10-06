@@ -152,3 +152,22 @@ class TestTheDelegateHandsThePrecisionOn:
         form.set_values({"entry": 101.02})
 
         assert form.value_text("entry") == "101.00"
+
+
+class TestEdgesFromReview:
+    """Review of Engine PR #230."""
+
+    def test_a_small_negative_rounds_to_an_unsigned_zero(self) -> None:
+        assert str(Precision.of_decimals(2).quantize(Decimal("-0.001"))) == "0.00"
+
+    @pytest.mark.parametrize(
+        "value", [float("inf"), Decimal("Infinity"), float("-inf")]
+    )
+    def test_infinity_is_spelled_the_same_with_or_without_a_hint(
+        self, value: float | Decimal
+    ) -> None:
+        formatter = PlainValueFormatter()
+        plain = formatter.format(ColumnKind.PRICE, value, FormatContext("p"))
+        hinted = formatter.format(ColumnKind.PRICE, value, FormatContext("p", _TICK))
+
+        assert hinted == plain

@@ -10,10 +10,11 @@ the order instead, so a model hands over the value it holds.
 
 The order, ascending:
 
-1. numbers — `int`, `float`, `Decimal` — by value, compared exactly across
-   types;
+1. numbers — `int`, `float`, `Decimal`, and any other `numbers.Real` such as
+   a NumPy scalar — by value, compared exactly across the built-in types;
 2. durations (`timedelta`);
-3. moments (`datetime`); a naive one is read as UTC, so a column of naive
+3. moments (`datetime`); a naive one, or one whose zone gives no offset, is
+   read as UTC, so a column of naive
    values keeps its own order and a mixed column does not raise;
 4. text;
 5. anything else, by its `str()`;
@@ -33,6 +34,7 @@ import math
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from enum import IntEnum
+from numbers import Integral, Real
 
 
 class _Group(IntEnum):
@@ -60,10 +62,20 @@ def _sort_key(value: object) -> _Key:
         return (_Group.UNKNOWN, 0)
     if isinstance(value, int | float | Decimal):
         return (_Group.NUMBER, value)
+    if isinstance(value, Real):
+        # A number of another library (a NumPy scalar) orders by its value,
+        # not its text (review of PR #230).
+        return (
+            _Group.NUMBER,
+            int(value) if isinstance(value, Integral) else float(value),
+        )
     if isinstance(value, timedelta):
         return (_Group.DURATION, value)
     if isinstance(value, datetime):
-        moment = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        # Naive, or carrying a zone that names no offset (`utcoffset()` is
+        # None, which Python then treats as naive and refuses to compare
+        # with an aware moment): read as UTC (review of PR #230).
+        moment = value if value.utcoffset() is not None else value.replace(tzinfo=UTC)
         return (_Group.MOMENT, moment)
     if isinstance(value, str):
         return (_Group.TEXT, value)
