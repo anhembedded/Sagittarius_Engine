@@ -38,8 +38,8 @@ absent); a docstring naming a class that doesn't exist is a `BUG` (an active fal
 | Status | Count |
 | :--- | :---: |
 | 🔴 **Open** | 7 |
-| ✅ **Fixed** | 15 |
-| 📈 **Total** | **22** |
+| ✅ **Fixed** | 16 |
+| 📈 **Total** | **23** |
 
 `BUG-004` and `BUG-005` were found on 2026-08-24 during a cross-repo audit run for
 `Sagittarius_Elite_Warrior`'s `EPIC-007`/`EPIC-008`. Both are defects in **this** repo, so
@@ -91,6 +91,7 @@ deliberately independent (see the top of this file).
 
 | ID | Title | Severity | Reported | Note |
 | :--- | :--- | :---: | :---: | :--- |
+| **[BUG-023](completed/BUG-023_pyside_mvc_loads_its_qml_layer_at_import_and_leaks_at_exit.md)** | Importing `pyside_mvc` loads two `Property` classes, so every process exits with uncollectable objects | Low | 2026-10-06 | Fixed 2026-10-06. PySide6 6.9–6.11 leaks one object per `Property`-bearing `QObject` class alive at exit; `CardModel` and `BaseQmlViewModel` were loaded by any import under the package. The QML layer now loads on first use (PEP 562), public names unchanged. |
 | **[BUG-022](completed/BUG-022_status_slot_opens_a_window_before_it_has_a_bar.md)** | A status slot showed itself as a top-level window before it was in the status bar | Low | 2026-10-06 | Fixed 2026-10-06. `BUG-021`'s slot refreshed its visibility in its constructor with no parent, opening a window for an instant per status widget (the consumer's sanity tier failed on Qt's `propagateSizeHints` warning). The shell parents the slot to the status bar, and a slot never shows itself while it is a window. |
 | **[BUG-021](completed/BUG-021_shell_shows_status_widgets_their_owners_hid.md)** | The shell showed every status-bar widget on each mode change, over its owner's `hide()` | Medium | 2026-10-06 | Fixed 2026-10-06. `_sync_status_widgets()` set the owner's widget visible by mode scope, so an idle progress bar its owner hid ran busy in every mode (the consumer's `BUG-151`). Each widget now sits in a `StatusSlot`: the shell sets the slot's scope, the owner keeps its widget's visibility. |
 | **[BUG-020](completed/BUG-020_sample_shell_tests_leak_a_running_app.md)** | The example app's sample-shell tests leave a running `App` behind | Low | 2026-10-06 | Fixed 2026-10-06. Three tests in `test_sample_shell.py` booted an `App` through `build_app()` and never stopped it, leaking a `SagittariusScheduler` and an `AsyncRuntimeLoop` thread each (`BUG-014`'s family). A `config` fixture now stops the app; an autouse guard in the example tests' `conftest.py` fails any test there that leaks one. |

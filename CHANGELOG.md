@@ -7,6 +7,14 @@ their history is in `git log`.
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- `pyside_mvc` loads its QML layer (`BaseQmlViewModel`, `QmlHostView`, `OverlayHost`, `CardModel`, …) on first use instead of at package import (`BUG-023`). Every public name is still importable from the same path. A process that only uses the workbench no longer exits with `gc: N uncollectable objects at shutdown`.
+
+---
+
 ## [3.0.0] — 2026-10-04
 
 Version component `a`, per `rules/release.md` §2: features changed — the QtWidgets workbench

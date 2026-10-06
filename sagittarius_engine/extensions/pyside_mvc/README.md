@@ -21,6 +21,8 @@ and count how many consumer files must change to stay visually correct. The answ
 zero. A consuming app also imports exclusively from the top-level package — never a
 submodule path (`ui-architecture.md` §8.1) — enforced by `import_boundary.find_deep_imports()`.
 
+The QML layer (`BaseQmlViewModel`, `QmlHostView`, `OverlayHost`, `configure_app_qml`, `create_quick_widget`, the icon provider, `CardModel`) is loaded on first use, not when the package is imported (PEP 562 `__getattr__` in `__init__.py`, `runtime/__init__.py`, `kit/__init__.py`): PySide6 6.9–6.11 leaks one object per `Property`-bearing `QObject` class alive at exit (`BUG-023`). Import the names exactly as before.
+
 ## Class diagram
 
 ```mermaid
