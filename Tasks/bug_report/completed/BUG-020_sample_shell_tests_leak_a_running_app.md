@@ -33,4 +33,6 @@ The file's `_config(tmp_path)` helper became a `config` fixture that yields the 
 
 ## Regression test
 
-An autouse fixture in the same file, `no_leaked_runtime_threads`, fails any test that leaves a new `SagittariusScheduler` or `AsyncRuntimeLoop` thread running. With the `app.stop()` removed it errors all 3 tests; with it, all pass.
+An autouse fixture, `no_leaked_runtime_threads`, in `examples/student_management/tests/conftest.py` fails any test under that directory that leaves a new `SagittariusScheduler` or `AsyncRuntimeLoop` thread running, so the next test that boots an `App` and forgets it is caught, not just these three. `test_runtime_thread_guard.py` tests the guard's own check (reports a live runtime thread, ignores an unrelated one).
+
+With the `app.stop()` removed from the `config` fixture, the guard errors exactly those three tests and no other in the example suite (69 passed, 3 errors); with it, all pass.

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import threading
 from collections.abc import Iterator
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -20,24 +19,6 @@ from examples.student_management.presentation.workbench.sample_shell import (
 )
 from sagittarius_engine.extensions.pyside_mvc import OptionsDialog
 from sagittarius_engine.interfaces.i_config import IConfig
-
-_RUNTIME_THREADS = ("SagittariusScheduler", "AsyncRuntimeLoop")
-
-
-@pytest.fixture(autouse=True)
-def no_leaked_runtime_threads() -> Iterator[None]:
-    """`BUG-020`: `build_app()` boots a real `App`, which starts a scheduler
-    and an async-runtime thread. Fails any test here that leaves one running.
-    Autouse fixtures tear down last, so `config` has already stopped its app.
-    """
-    before = {t.ident for t in threading.enumerate()}
-    yield
-    leaked = [
-        t.name
-        for t in threading.enumerate()
-        if t.ident not in before and t.name in _RUNTIME_THREADS
-    ]
-    assert not leaked, f"test left runtime threads running: {leaked}"
 
 
 @pytest.fixture
